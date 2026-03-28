@@ -5,6 +5,7 @@
 #include <chrono>
 #include "../../include/spsc_queue.hpp"
 #include "../../include/ipc_messages.hpp"
+#include "../../include/impedance_control_manager.hpp"
 
 // Forward declaration of ROKAE robot class to avoid dragging big dependencies into header
 namespace rokae { 
@@ -55,6 +56,7 @@ public:
 
 private:
     std::shared_ptr<rokae::xMateErProRobot> robot_;
+    std::unique_ptr<robot_core::ImpedanceControlManager> impedance_manager_;
     std::atomic<bool> is_running_{false};
     
     // Stores the last valid command for timeout checks

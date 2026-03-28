@@ -37,6 +37,15 @@ add_executable(spine_robot_core ${SOURCES})
 # Build test executable for Seqlock IPC
 add_executable(test_seqlock src/test_seqlock.cpp)
 
+# Build test executable for Force Control Safety System
+add_executable(test_force_control src/test_force_control.cpp)
+
+# Build test executable for Impedance Scan Controller
+add_executable(test_impedance_scan src/test_impedance_scan.cpp)
+
+# Build example executable for Impedance Scan Controller
+add_executable(impedance_scan_example src/impedance_scan_example.cpp)
+
 # Link libraries: POSIX threads, RealTime (-lrt), and hypothetically ROKAE's dynamic .so
 target_link_libraries(spine_robot_core
     Threads::Threads
@@ -50,6 +59,18 @@ target_link_libraries(spine_robot_core
 target_link_libraries(test_seqlock
     Threads::Threads
     rt
+)
+
+target_link_libraries(test_force_control
+    Threads::Threads
+)
+
+target_link_libraries(test_impedance_scan
+    Threads::Threads
+)
+
+target_link_libraries(impedance_scan_example
+    Threads::Threads
 )
 
 # Install location matching the systemd service template

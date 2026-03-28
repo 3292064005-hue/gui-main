@@ -1,4 +1,5 @@
 #include "robot_core/rt_motion_service.h"
+#include "impedance_control_manager.hpp"
 #include <iostream>
 #include <array>
 #include <cstring>
@@ -82,7 +83,9 @@ inline int64_t get_current_time_ns() {
 }
 
 RtMotionService::RtMotionService(std::shared_ptr<rokae::xMateErProRobot> robot)
-    : robot_(robot), cmd_queue(100), telemetry_queue(100), adaptive_timer_(std::make_unique<AdaptiveTimer>()) {
+    : robot_(robot), cmd_queue(100), telemetry_queue(100),
+      adaptive_timer_(std::make_unique<AdaptiveTimer>()),
+      impedance_manager_(std::make_unique<ImpedanceControlManager>()) {
     // Initialize current_target_ to a safe default.
     std::memset(current_target_.tcp_pose_td, 0, sizeof(current_target_.tcp_pose_td));
     current_target_.tcp_pose_td[0] = 1.0;
@@ -123,6 +126,19 @@ bool RtMotionService::startCartesianImpedance() {
     is_running_ = true;
     adaptive_timer_->start();
 
+    // Initialize impedance control manager with medical safety parameters
+    impedance_manager_->configureImpedance({
+        1500.0,  // X stiffness (N/m) - very stiff for lateral control
+        1500.0,  // Y stiffness (N/m) - very stiff for lateral control  
+        20.0,    // Z stiffness (N/m) - compliant for contact
+        100.0,   // RX damping (Nm/rad)
+        100.0,   // RY damping (Nm/rad)
+        100.0    // RZ damping (Nm/rad)
+    });
+    
+    // Set desired force for ultrasound contact (10N downward pressure)
+    impedance_manager_->setDesiredWrench({0.0, 0.0, -10.0, 0.0, 0.0, 0.0});
+
     /*
      * std::function<rokae::CartesianPosition()> callback = [&]() -> rokae::CartesianPosition {
      *     
@@ -143,24 +159,32 @@ bool RtMotionService::startCartesianImpedance() {
      *          // This branch would eventually return a halted position or call stopLoop().
      *     }
      *
-     *     // (3) Adaptive frequency adjustment based on CPU load
+     *     // (3) Force Circuit Breaker Safety Check
+     *     std::array<double, 6> measured_forces = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // Would read from rtCon
+     *     if (impedance_manager_->getForceCircuitBreaker().checkForces(measured_forces)) {
+     *         // Force exceeded safety limits - emergency stop
+     *         this->controlledRetract();
+     *         // This branch would eventually return a halted position or call stopLoop().
+     *     }
+     *
+     *     // (4) Adaptive frequency adjustment based on CPU load
      *     double cpu_usage = adaptive_timer_->getCpuUsage();
      *     adaptive_timer_->adjustPeriod(cpu_usage);
      *     std::cout << "Current period: " << adaptive_timer_->getCurrentPeriodMs() << "ms, CPU: " << cpu_usage << "%" << std::endl;
      *
-     *     // (4) Lock-free Data Push to Python Telemetry Thread
+     *     // (5) Lock-free Data Push to Python Telemetry Thread
      *     spine_core::RobotTelemetry tel = {};
      *     tel.timestamp_ns = now_ns;
      *     rtCon->getStateData(rokae::RtSupportedFields::tcpPose_m, tel.tcp_pose_measured);
      *     // Omitted getting joint angles / Z-torque for brevity.
-     *     tel.actual_force_z = 0.0;
+     *     tel.actual_force_z = measured_forces[2]; // Z-force from circuit breaker
      *     tel.safety_status = is_running_.load() ? 0 : 1;
      *     telemetry_queue.try_enqueue(tel);
      *
-     *     // (5) Wait for adaptive period
+     *     // (6) Wait for adaptive period
      *     adaptive_timer_->wait();
      *
-     *     // (6) Actuate pure tracking trajectory, relying on hardware controller for Z-Force
+     *     // (7) Actuate pure tracking trajectory, relying on hardware controller for Z-Force
      *     rokae::CartesianPosition out;
      *     std::memcpy(out.pos.data(), current_target_.tcp_pose_td, sizeof(double)*16);
      *     return out;
@@ -174,6 +198,10 @@ bool RtMotionService::startCartesianImpedance() {
 
 void RtMotionService::controlledRetract() {
     is_running_ = false;
+    
+    // Emergency stop - remove all forces and lift safely
+    impedance_manager_->setDesiredWrench({0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    
     // Command the robot upward by +10cm relative to the path Z axis securely.
     /*
      * std::error_code ec;
