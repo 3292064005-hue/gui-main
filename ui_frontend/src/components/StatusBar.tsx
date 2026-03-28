@@ -3,7 +3,7 @@ import { useSessionStore } from '../store/sessionStore';
 import { Wifi, WifiOff, Gauge, MonitorDot } from 'lucide-react';
 
 export default function StatusBar() {
-  const { connected, latencyMs, fps } = useTelemetryStore();
+  const { connected, latencyMs, fps, telemetryStale } = useTelemetryStore();
   const { scanState, sessionId } = useSessionStore();
 
   const stateLabel: Record<string, [string, string]> = {
@@ -25,6 +25,9 @@ export default function StatusBar() {
         <span className="flex items-center space-x-1">
           <Gauge className="w-3 h-3" />
           <span>{latencyMs}ms</span>
+        </span>
+        <span className={telemetryStale ? 'text-clinical-error' : 'text-clinical-emerald'}>
+          {telemetryStale ? 'STALE' : 'FRESH'}
         </span>
         <span className="flex items-center space-x-1">
           <MonitorDot className="w-3 h-3" />

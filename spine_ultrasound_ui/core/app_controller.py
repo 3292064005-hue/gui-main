@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
 from spine_ultrasound_ui.core.alarm_manager import AlarmManager
+from spine_ultrasound_ui.core.command_journal import summarize_command_payload
 from spine_ultrasound_ui.core.exception_handler import global_exception_handler, AppException, ErrorCategory, ErrorSeverity
 from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.core.plan_service import LocalizationResult, PlanService
@@ -17,8 +18,9 @@ from spine_ultrasound_ui.core.telemetry_store import TelemetryStore
 from spine_ultrasound_ui.core.view_state_factory import ViewStateFactory
 from spine_ultrasound_ui.models import ExperimentRecord, RuntimeConfig, ScanPlan, SystemState, WorkflowArtifacts
 from spine_ultrasound_ui.services.backend_base import BackendBase
+from spine_ultrasound_ui.services.force_control_config import load_force_control_config
 from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope, TelemetryEnvelope
-from spine_ultrasound_ui.utils import ensure_dir, now_text
+from spine_ultrasound_ui.utils import ensure_dir, now_ns, now_text
 
 
 class AppController(QObject):
@@ -43,7 +45,7 @@ class AppController(QObject):
         self.exp_manager = ExperimentManager(self.exp_root)
         self.session_service = SessionService(self.exp_manager)
         self.plan_service = PlanService()
-        self.postprocess_service = PostprocessService()
+        self.postprocess_service = PostprocessService(self.exp_manager)
         self.view_factory = ViewStateFactory()
         self.alarm_manager = AlarmManager()
         self.experiments: list[ExperimentRecord] = []
@@ -111,7 +113,7 @@ class AppController(QObject):
         self._send_or_warn("set_manual_mode")
 
     def create_experiment(self) -> None:
-        reply = self.backend.send_command("validate_setup")
+        reply = self._send_command("validate_setup", workflow_step="create_experiment")
         if not reply.ok:
             self._log("WARN", f"系统自检未通过：{reply.message}")
             return
@@ -170,12 +172,15 @@ class AppController(QObject):
                 self.config,
                 self.telemetry.device_roster(),
                 self.preview_scan_plan,
+                protocol_version=1,
+                safety_thresholds=load_force_control_config(),
+                device_health_snapshot=self.telemetry.device_roster(),
             )
         except RuntimeError as exc:
             self._log("ERROR", str(exc))
             return
         if not was_locked:
-            reply = self.backend.send_command(
+            reply = self._send_command(
                 "lock_session",
                 {
                     "experiment_id": self.session_service.current_experiment.exp_id,
@@ -186,10 +191,23 @@ class AppController(QObject):
                     "software_version": self.config.software_version,
                     "build_id": self.config.build_id,
                     "scan_plan_hash": locked.scan_plan.plan_hash(),
+                    "force_sensor_provider": self.config.force_sensor_provider,
+                    "protocol_version": 1,
+                    "safety_thresholds": load_force_control_config(),
+                    "device_health_snapshot": self.telemetry.device_roster(),
                 },
+                workflow_step="lock_session",
             )
             if not reply.ok:
                 self.session_service.rollback_pending_lock(self.preview_scan_plan)
+                self._raise_local_alarm(
+                    "ERROR",
+                    "session",
+                    f"锁定会话失败：{reply.message}",
+                    workflow_step="lock_session",
+                    request_id=reply.request_id,
+                    auto_action="rollback_pending_lock",
+                )
                 self._log("ERROR", f"锁定会话失败：{reply.message}")
                 self._emit_status()
                 return
@@ -197,8 +215,19 @@ class AppController(QObject):
             self.workflow_artifacts.session_id = locked.session_id
             self.workflow_artifacts.session_dir = str(locked.session_dir)
             self._log("INFO", f"会话 {locked.session_id} 已锁定，manifest 不再允许改写语义字段。")
-        reply = self.backend.send_command("load_scan_plan", {"scan_plan": locked.scan_plan.to_dict()})
+        reply = self._send_command(
+            "load_scan_plan",
+            {"scan_plan": locked.scan_plan.to_dict()},
+            workflow_step="load_scan_plan",
+        )
         if not reply.ok:
+            self._raise_local_alarm(
+                "WARN",
+                "planning",
+                f"加载扫查路径失败：{reply.message}",
+                workflow_step="load_scan_plan",
+                request_id=reply.request_id,
+            )
             self._log("ERROR", f"加载扫查路径失败：{reply.message}。会话保持锁定以便排查，不执行扫查启动链。")
             self._emit_status()
             return
@@ -250,6 +279,7 @@ class AppController(QObject):
         except RuntimeError as exc:
             self._log("WARN", str(exc))
             return
+        self._refresh_session_products()
         self._log("INFO", f"会话摘要已保存到 {path}")
 
     def export_summary(self) -> None:
@@ -273,6 +303,7 @@ class AppController(QObject):
         except RuntimeError as exc:
             self._log("WARN", str(exc))
             return
+        self._refresh_session_products()
         self._log("INFO", f"文本摘要已导出到 {path}")
 
     def emergency_stop(self) -> None:
@@ -297,8 +328,20 @@ class AppController(QObject):
         if env.topic == "quality_feedback":
             self.session_service.record_quality_feedback(env.data, env.ts_ns)
         if alarm is not None:
-            self.alarm_manager.push(alarm["severity"], alarm["source"], alarm["message"])
-            trace = f"session={alarm['session_id'] or '-'} segment={alarm['segment_id']} ts={alarm['event_ts_ns']}"
+            self.alarm_manager.push(
+                alarm["severity"],
+                alarm["source"],
+                alarm["message"],
+                auto_action_taken=alarm.get("auto_action", ""),
+                workflow_step=alarm.get("workflow_step", ""),
+                request_id=alarm.get("request_id", ""),
+                event_ts_ns=alarm["event_ts_ns"],
+            )
+            trace = (
+                f"session={alarm['session_id'] or '-'} segment={alarm['segment_id']} "
+                f"step={alarm.get('workflow_step') or '-'} request={alarm.get('request_id') or '-'} "
+                f"auto={alarm.get('auto_action') or '-'} ts={alarm['event_ts_ns']}"
+            )
             self.alarm_raised.emit(f"{alarm['severity']}/{alarm['source']}: {alarm['message']} ({trace})")
             self.log_generated.emit(
                 alarm["severity"],
@@ -320,7 +363,7 @@ class AppController(QObject):
         self.log_generated.emit(level, message)
 
     def _send_or_warn(self, command: str, payload: Optional[dict] = None) -> ReplyEnvelope:
-        reply = self.backend.send_command(command, payload)
+        reply = self._send_command(command, payload, workflow_step=command)
         if not reply.ok:
             self._log("WARN", f"{command} 失败：{reply.message}")
         return reply
@@ -333,13 +376,14 @@ class AppController(QObject):
         success_message: Optional[str] = None,
         fallback_to_safe_retreat: bool = False,
     ) -> bool:
-        reply = self.backend.send_command(command, payload)
+        reply = self._send_command(command, payload, workflow_step=command)
         if reply.ok:
             if success_message:
                 self._log("INFO", success_message)
             self._emit_status()
             return True
         self._log("ERROR", f"{command} 失败：{reply.message}")
+        self._raise_local_alarm("ERROR", "workflow", f"{command} 失败：{reply.message}", workflow_step=command, request_id=reply.request_id)
         if fallback_to_safe_retreat:
             self._request_safe_retreat_after_failure(command)
         self._emit_status()
@@ -349,11 +393,27 @@ class AppController(QObject):
         return self._run_guarded_command(command, fallback_to_safe_retreat=True)
 
     def _request_safe_retreat_after_failure(self, failed_command: str) -> None:
-        retreat = self.backend.send_command("safe_retreat")
+        retreat = self._send_command("safe_retreat", workflow_step=failed_command, auto_action="safe_retreat")
         if retreat.ok:
             self._log("WARN", f"{failed_command} 失败后已自动请求安全退让。")
+            self._raise_local_alarm(
+                "WARN",
+                "workflow",
+                f"{failed_command} 失败后已自动请求安全退让。",
+                workflow_step=failed_command,
+                request_id=retreat.request_id,
+                auto_action="safe_retreat",
+            )
         else:
             self._log("ERROR", f"{failed_command} 失败后安全退让也失败：{retreat.message}")
+            self._raise_local_alarm(
+                "ERROR",
+                "workflow",
+                f"{failed_command} 失败后安全退让也失败：{retreat.message}",
+                workflow_step=failed_command,
+                request_id=retreat.request_id,
+                auto_action="safe_retreat_failed",
+            )
 
     def _build_summary_payload(self) -> dict:
         return {
@@ -398,3 +458,58 @@ class AppController(QObject):
 
     def _log(self, level: str, message: str) -> None:
         self.log_generated.emit(level, f"[{now_text()}] {message}")
+
+    def _send_command(
+        self,
+        command: str,
+        payload: Optional[dict] = None,
+        *,
+        workflow_step: str,
+        auto_action: str = "",
+    ) -> ReplyEnvelope:
+        reply = self.backend.send_command(command, payload)
+        self.session_service.record_command_journal(
+            source="desktop",
+            command=command,
+            payload=payload or {},
+            reply={
+                "ok": reply.ok,
+                "message": reply.message,
+                "request_id": reply.request_id,
+                "data": dict(reply.data),
+                "ts_ns": now_ns(),
+            },
+            workflow_step=workflow_step,
+            auto_action=auto_action,
+        )
+        return reply
+
+    def _raise_local_alarm(
+        self,
+        severity: str,
+        source: str,
+        message: str,
+        *,
+        workflow_step: str,
+        request_id: str = "",
+        auto_action: str = "",
+    ) -> None:
+        event_ts_ns = now_ns()
+        self.alarm_manager.push(
+            severity,
+            source,
+            message,
+            auto_action_taken=auto_action,
+            workflow_step=workflow_step,
+            request_id=request_id,
+            event_ts_ns=event_ts_ns,
+        )
+        trace = f"step={workflow_step or '-'} request={request_id or '-'} auto={auto_action or '-'} ts={event_ts_ns}"
+        self.alarm_raised.emit(f"{severity}/{source}: {message} ({trace})")
+        self.log_generated.emit(severity, f"[{now_text()}] [{source}] {message} ({trace})")
+
+    def _refresh_session_products(self) -> None:
+        statuses = self.postprocess_service.refresh_all(self.session_service.current_session_dir)
+        self.workflow_artifacts.preprocess = statuses["preprocess"]
+        self.workflow_artifacts.reconstruction = statuses["reconstruction"]
+        self.workflow_artifacts.assessment = statuses["assessment"]

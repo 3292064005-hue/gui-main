@@ -101,6 +101,25 @@ export function useTelemetrySocket() {
           timestamp: tsMs,
           safety: safeToScan ? 0 : 1,
         });
+        return;
+      }
+
+      if (message.topic === 'alarm_event') {
+        useSessionStore.getState().pushAlarm({
+          tsNs: message.ts_ns,
+          severity: typeof message.data.severity === 'string' ? message.data.severity : 'WARN',
+          source: typeof message.data.source === 'string' ? message.data.source : 'runtime',
+          message: typeof message.data.message === 'string' ? message.data.message : '未知告警',
+          workflowStep: typeof message.data.workflow_step === 'string' ? message.data.workflow_step : '',
+          requestId: typeof message.data.request_id === 'string' ? message.data.request_id : '',
+          autoAction: typeof message.data.auto_action === 'string' ? message.data.auto_action : '',
+        });
+        useSessionStore.getState().addLog(
+          'warn',
+          `[告警] ${typeof message.data.source === 'string' ? message.data.source : 'runtime'}: ${
+            typeof message.data.message === 'string' ? message.data.message : '未知告警'
+          }`,
+        );
       }
     };
   }, []);

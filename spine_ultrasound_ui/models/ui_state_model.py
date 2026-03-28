@@ -46,20 +46,20 @@ class WorkflowArtifacts:
     )
     preprocess: CapabilityStatus = field(
         default_factory=lambda: CapabilityStatus(
-            implementation=ImplementationState.PLANNED.value,
-            detail="图像预处理接口已保留，当前未接入真实算法。",
+            implementation=ImplementationState.IMPLEMENTED.value,
+            detail="正式数据产物链已接入，预处理阶段输出质量时间线。",
         )
     )
     reconstruction: CapabilityStatus = field(
         default_factory=lambda: CapabilityStatus(
-            implementation=ImplementationState.PLANNED.value,
-            detail="重建接口已保留，当前未接入真实算法。",
+            implementation=ImplementationState.IMPLEMENTED.value,
+            detail="正式数据产物链已接入，重建阶段输出回放索引。",
         )
     )
     assessment: CapabilityStatus = field(
         default_factory=lambda: CapabilityStatus(
-            implementation=ImplementationState.PLANNED.value,
-            detail="Cobb 角评估接口已保留，当前未接入真实算法。",
+            implementation=ImplementationState.IMPLEMENTED.value,
+            detail="正式数据产物链已接入，评估阶段输出会话报告。",
         )
     )
 

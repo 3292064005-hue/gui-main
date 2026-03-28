@@ -5,6 +5,7 @@
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include "robot_core/rt_motion_service.h"
 
 int main() {
     std::cout << "Testing Force Control Safety System..." << std::endl;
@@ -14,6 +15,10 @@ int main() {
     robot_core::ImpedanceControlManager manager;
     if (std::abs(manager.getCircuitBreaker().getLimits().max_z_force_n - limits.max_z_force_n) > 1e-9) {
         std::cerr << "Runtime force limits did not load from configs/force_control.json" << std::endl;
+        return 1;
+    }
+    if (std::abs(manager.getCircuitBreaker().getLimits().sensor_timeout_ms - limits.sensor_timeout_ms) > 1e-9) {
+        std::cerr << "Sensor timeout did not load from configs/force_control.json" << std::endl;
         return 1;
     }
     std::cout << "✓ Force limits loaded from configs/force_control.json" << std::endl;
@@ -78,6 +83,21 @@ int main() {
         return 1;
     }
     std::cout << "✓ Force circuit breaker check with excessive X force: " << (safe ? "OK (unexpected)" : "TRIPPED (expected)") << std::endl;
+
+    robot_core::RtMotionService motion_service;
+    if (motion_service.evaluateSensorFreshnessMs(limits.stale_telemetry_ms + 10.0) != robot_core::SensorHealthDecision::Hold) {
+        std::cerr << "Stale telemetry should request PAUSED_HOLD semantics" << std::endl;
+        return 1;
+    }
+    if (motion_service.evaluateSensorFreshnessMs(limits.sensor_timeout_ms + 10.0) != robot_core::SensorHealthDecision::ControlledRetract) {
+        std::cerr << "Sensor timeout should request controlled retract" << std::endl;
+        return 1;
+    }
+    if (motion_service.evaluateSensorFreshnessMs(limits.sensor_timeout_ms * 2.0 + 10.0) != robot_core::SensorHealthDecision::Estop) {
+        std::cerr << "Severe sensor timeout should request ESTOP" << std::endl;
+        return 1;
+    }
+    std::cout << "✓ Sensor freshness decisions map to hold/retract/estop" << std::endl;
 
     std::cout << "Force Control Safety System test completed successfully!" << std::endl;
     return 0;

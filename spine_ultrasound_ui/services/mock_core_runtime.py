@@ -9,6 +9,7 @@ from spine_ultrasound_ui.core.session_recorders import JsonlRecorder
 from spine_ultrasound_ui.models import RuntimeConfig, SystemState
 from spine_ultrasound_ui.services.force_control_config import load_force_control_config
 from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope, TelemetryEnvelope
+from spine_ultrasound_ui.services.pressure_sensor_service import ForceSensorProvider, create_force_sensor_provider
 from spine_ultrasound_ui.utils import ensure_dir, now_ns
 
 
@@ -49,6 +50,13 @@ class MockCoreRuntime:
         self.pressure_fresh = False
         self.robot_state_fresh = False
         self.rt_jitter_ok = True
+        self.force_sensor_provider_name = "mock_force_sensor"
+        self.force_sensor_provider: ForceSensorProvider = create_force_sensor_provider(self.force_sensor_provider_name)
+        self.force_sensor_status = "ok"
+        self.force_sensor_source = self.force_sensor_provider_name
+        self.force_sensor_stale_ticks = 0
+        self.force_sensor_timeout_alarm = False
+        self.force_sensor_estop_alarm = False
         self.devices = {
             "robot": self._device(False, "offline", "机械臂控制器未连接"),
             "camera": self._device(False, "offline", "摄像头未连接"),
@@ -64,6 +72,8 @@ class MockCoreRuntime:
 
     def update_runtime_config(self, config: RuntimeConfig) -> None:
         self.config = config
+        self.force_sensor_provider_name = config.force_sensor_provider
+        self.force_sensor_provider = create_force_sensor_provider(config.force_sensor_provider)
 
     def handle_command(self, command: str, payload: Optional[dict] = None) -> ReplyEnvelope:
         payload = payload or {}
@@ -172,7 +182,7 @@ class MockCoreRuntime:
         self.devices = {
             "robot": self._device(True, "online", "robot_core 已连接"),
             "camera": self._device(True, "online", "摄像头在线"),
-            "pressure": self._device(True, "online", "压力传感器在线"),
+            "pressure": self._device(True, "online", f"压力传感器在线 ({self.force_sensor_provider_name})"),
             "ultrasound": self._device(True, "online", "超声设备在线"),
         }
         self.last_event = "robot_connected"
@@ -236,6 +246,8 @@ class MockCoreRuntime:
         self.load_ready = self.config.load_kg > 0.0
         self.session_dir = ensure_dir(Path(str(payload.get("session_dir", "."))))
         self.device_roster = dict(payload.get("device_roster", {}))
+        self.force_sensor_provider_name = str(payload.get("force_sensor_provider", self.config.force_sensor_provider))
+        self.force_sensor_provider = create_force_sensor_provider(self.force_sensor_provider_name)
         self._open_recorders(self.session_dir, self.session_id)
         self.execution_state = SystemState.SESSION_LOCKED
         self.last_event = "session_locked"
@@ -330,7 +342,7 @@ class MockCoreRuntime:
         self.execution_state = SystemState.ESTOP
         self.fault_code = "ESTOP"
         self.last_event = "emergency_stop"
-        self._queue_alarm("FATAL_FAULT", "safety", "急停触发")
+        self._queue_alarm("FATAL_FAULT", "safety", "急停触发", workflow_step="emergency_stop", auto_action="estop")
         return ReplyEnvelope(ok=True, message="emergency_stop accepted")
 
     def _update_robot_kinematics(self) -> None:
@@ -354,8 +366,19 @@ class MockCoreRuntime:
         }
 
     def _update_contact_and_progress(self) -> None:
+        force_sample = self.force_sensor_provider.read_sample(
+            contact_active=self.execution_state in {SystemState.CONTACT_SEEKING, SystemState.SCANNING, SystemState.PAUSED_HOLD},
+            desired_force_n=float(self.force_control["desired_contact_force_n"]),
+        )
+        self.force_sensor_status = force_sample.status
+        self.force_sensor_source = force_sample.source
+        measured_pressure = abs(float(force_sample.wrench_n[2])) if force_sample.status == "ok" else 0.0
+        if force_sample.status == "ok":
+            self.force_sensor_stale_ticks = 0
+        else:
+            self.force_sensor_stale_ticks += 1
         if self.execution_state == SystemState.CONTACT_SEEKING:
-            self.pressure_current = round(max(self.config.pressure_lower, self.config.pressure_target - 0.1 + 0.04 * math.sin(self.phase)), 3)
+            self.pressure_current = round(max(measured_pressure, 0.0), 3)
             self.contact_mode = "STABLE_CONTACT" if self.pressure_current >= self.config.pressure_target - 0.05 else "SEEKING_CONTACT"
             self.contact_confidence = 0.78
             self.recommended_action = "START_SCAN"
@@ -364,7 +387,7 @@ class MockCoreRuntime:
             self.path_index += 1
             self.progress_pct = min(100.0, self.progress_pct + 100.0 / total_points)
             self.active_segment = self._segment_for_path_index()
-            self.pressure_current = round(self.config.pressure_target + 0.08 * math.sin(self.phase) + random.uniform(-0.03, 0.03), 3)
+            self.pressure_current = round(measured_pressure if measured_pressure > 0.0 else self.config.pressure_target + 0.08 * math.sin(self.phase) + random.uniform(-0.03, 0.03), 3)
             self.contact_mode = "STABLE_CONTACT"
             self.contact_confidence = 0.87
             self.recommended_action = "SCAN"
@@ -372,14 +395,20 @@ class MockCoreRuntime:
                 self.execution_state = SystemState.PAUSED_HOLD
                 self.contact_mode = "OVERPRESSURE"
                 self.recommended_action = "CONTROLLED_RETRACT"
-                self._queue_alarm("RECOVERABLE_FAULT", "contact", "压力超上限，已进入保持状态")
+                self._queue_alarm(
+                    "RECOVERABLE_FAULT",
+                    "contact",
+                    "压力超上限，已进入保持状态",
+                    workflow_step="scan_monitor",
+                    auto_action="pause_hold",
+                )
             if self.progress_pct >= 100.0:
                 self.execution_state = SystemState.SCAN_COMPLETE
                 self.contact_mode = "NO_CONTACT"
                 self.recommended_action = "POSTPROCESS"
                 self.last_event = "scan_complete"
         elif self.execution_state == SystemState.PAUSED_HOLD:
-            self.pressure_current = round(self.config.pressure_target - 0.03, 3)
+            self.pressure_current = round(measured_pressure if measured_pressure > 0.0 else max(self.config.pressure_target - 0.03, 0.0), 3)
             self.contact_mode = "HOLDING_CONTACT"
             self.contact_confidence = 0.75
             self.recommended_action = "RESUME_OR_RETREAT"
@@ -393,7 +422,7 @@ class MockCoreRuntime:
                 self.execution_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
                 self.recommended_action = "IDLE"
         else:
-            self.pressure_current = max(0.0, self.config.pressure_target - 0.25)
+            self.pressure_current = max(0.0, measured_pressure)
             self.contact_confidence = 0.0
             self.contact_mode = "NO_CONTACT"
             self.recommended_action = "IDLE"
@@ -466,16 +495,61 @@ class MockCoreRuntime:
     def _refresh_device_health(self, ts_ns: int) -> None:
         self.pressure_fresh = False
         self.robot_state_fresh = False
+        stale_telemetry_ms = int(self.force_control["stale_telemetry_ms"])
+        timeout_ms = int(self.force_control["sensor_timeout_ms"])
+        current_stale_ms = self.force_sensor_stale_ticks * 100
         for name, device in self.devices.items():
             device["fresh"] = device["connected"]
             device["last_ts_ns"] = ts_ns if device["connected"] else 0
             if device["connected"] and name == "pressure":
-                self.pressure_fresh = True
+                self.pressure_fresh = self.force_sensor_status == "ok" and current_stale_ms < stale_telemetry_ms
+                device["fresh"] = self.pressure_fresh
+                device["health"] = "online" if self.pressure_fresh else "degraded"
+                device["detail"] = (
+                    f"{self.force_sensor_source} fresh"
+                    if self.pressure_fresh
+                    else f"{self.force_sensor_source} stale ({current_stale_ms} ms)"
+                )
             if device["connected"] and name == "robot":
                 self.robot_state_fresh = True
             if self.execution_state in {SystemState.FAULT, SystemState.ESTOP} and name == "robot":
                 device["health"] = "fault"
                 device["detail"] = "机器人控制器处于故障或急停状态"
+        if current_stale_ms >= stale_telemetry_ms and not self.force_sensor_timeout_alarm:
+            self._queue_alarm(
+                "WARN",
+                "sensor",
+                "力传感器数据陈旧，已触发 stale telemetry 告警",
+                workflow_step="telemetry_watchdog",
+                auto_action="mark_stale",
+            )
+            self.force_sensor_timeout_alarm = True
+        if current_stale_ms < stale_telemetry_ms:
+            self.force_sensor_timeout_alarm = False
+        if self.execution_state == SystemState.SCANNING and current_stale_ms >= timeout_ms and not self.force_sensor_estop_alarm:
+            self.execution_state = SystemState.PAUSED_HOLD
+            self.contact_mode = "SENSOR_STALE"
+            self.recommended_action = "CONTROLLED_RETRACT"
+            self._queue_alarm(
+                "RECOVERABLE_FAULT",
+                "sensor",
+                "力传感器超时，已进入保持状态",
+                workflow_step="scan_monitor",
+                auto_action="pause_hold",
+            )
+            self.force_sensor_estop_alarm = True
+        if self.execution_state in {SystemState.SCANNING, SystemState.PAUSED_HOLD} and current_stale_ms >= timeout_ms * 2 and self.fault_code != "SENSOR_TIMEOUT":
+            self.execution_state = SystemState.ESTOP
+            self.fault_code = "SENSOR_TIMEOUT"
+            self._queue_alarm(
+                "FATAL_FAULT",
+                "sensor",
+                "力传感器连续超时，已升级为急停",
+                workflow_step="scan_monitor",
+                auto_action="estop",
+            )
+        if current_stale_ms < timeout_ms:
+            self.force_sensor_estop_alarm = False
 
     def _record_core_streams(self, ts_ns: int) -> None:
         if not self.recorders:
@@ -516,7 +590,16 @@ class MockCoreRuntime:
             "alarm_event": JsonlRecorder(core_root / "alarm_event.jsonl", session_id),
         }
 
-    def _queue_alarm(self, severity: str, source: str, message: str) -> None:
+    def _queue_alarm(
+        self,
+        severity: str,
+        source: str,
+        message: str,
+        *,
+        workflow_step: str = "",
+        request_id: str = "",
+        auto_action: str = "",
+    ) -> None:
         ts_ns = now_ns()
         alarm = {
             "severity": severity,
@@ -525,6 +608,9 @@ class MockCoreRuntime:
             "session_id": self.session_id,
             "segment_id": self.active_segment,
             "event_ts_ns": ts_ns,
+            "workflow_step": workflow_step,
+            "request_id": request_id,
+            "auto_action": auto_action,
         }
         self.pending_alarms.append(alarm)
         recorder = self.recorders.get("alarm_event")

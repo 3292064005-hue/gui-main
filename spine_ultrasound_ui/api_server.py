@@ -44,14 +44,44 @@ async def get_system_status():
     return adapter.status()
 
 
+@app.get("/api/v1/health")
+async def get_health():
+    return adapter.health()
+
+
 @app.get("/api/v1/telemetry/snapshot")
-async def get_telemetry_snapshot():
-    return adapter.snapshot()
+async def get_telemetry_snapshot(topics: str | None = None):
+    topic_filter = {topic.strip() for topic in (topics or "").split(",") if topic.strip()} or None
+    return adapter.snapshot(topic_filter)
 
 
 @app.get("/api/v1/schema")
 async def get_protocol_schema():
     return adapter.schema()
+
+
+@app.get("/api/v1/sessions/current")
+async def get_current_session():
+    try:
+        return adapter.current_session()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/sessions/current/report")
+async def get_current_session_report():
+    try:
+        return adapter.current_report()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/sessions/current/replay")
+async def get_current_session_replay():
+    try:
+        return adapter.current_replay()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/v1/commands/{command}")
@@ -70,9 +100,10 @@ async def post_command(command: str, payload: Any = Body(default=None)):
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     await websocket.accept()
+    topic_filter = {topic.strip() for topic in websocket.query_params.get("topics", "").split(",") if topic.strip()} or None
     try:
         while True:
-            for item in adapter.snapshot():
+            for item in adapter.snapshot(topic_filter):
                 await websocket.send_json(item)
             await asyncio.sleep(0.1)
     except WebSocketDisconnect:

@@ -29,6 +29,25 @@ export interface TelemetryMessage {
   data: Record<string, unknown>;
 }
 
+export interface HealthEnvelope {
+  backend_mode: string;
+  adapter_running: boolean;
+  protocol_version: number;
+  topics: string[];
+  latest_telemetry_age_ms: number | null;
+  telemetry_stale: boolean;
+  stale_threshold_ms: number;
+}
+
+export interface CurrentSessionEnvelope {
+  session_id: string;
+  session_dir: string;
+  artifacts: Record<string, string>;
+  report_available: boolean;
+  replay_available: boolean;
+  status: Record<string, unknown>;
+}
+
 function readErrorDetail(payload: unknown): string {
   if (!payload || typeof payload !== 'object') {
     return 'adapter request failed';
@@ -54,12 +73,23 @@ export async function postCommand(
 }
 
 export async function fetchProtocolSchema(): Promise<ProtocolSchema> {
-  const response = await fetch(apiUrl('/api/v1/schema'));
-  const body = (await response.json()) as unknown;
-  if (!response.ok) {
-    throw new Error(readErrorDetail(body));
-  }
-  return body as ProtocolSchema;
+  return fetchJson<ProtocolSchema>('/api/v1/schema');
+}
+
+export async function fetchHealth(): Promise<HealthEnvelope> {
+  return fetchJson<HealthEnvelope>('/api/v1/health');
+}
+
+export async function fetchCurrentSession(): Promise<CurrentSessionEnvelope> {
+  return fetchJson<CurrentSessionEnvelope>('/api/v1/sessions/current');
+}
+
+export async function fetchCurrentReport(): Promise<Record<string, unknown>> {
+  return fetchJson<Record<string, unknown>>('/api/v1/sessions/current/report');
+}
+
+export async function fetchCurrentReplay(): Promise<Record<string, unknown>> {
+  return fetchJson<Record<string, unknown>>('/api/v1/sessions/current/replay');
 }
 
 export function parseTelemetryMessage(raw: unknown): TelemetryMessage | null {
@@ -78,4 +108,13 @@ export function parseTelemetryMessage(raw: unknown): TelemetryMessage | null {
   } catch {
     return null;
   }
+}
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const response = await fetch(apiUrl(path));
+  const body = (await response.json()) as unknown;
+  if (!response.ok) {
+    throw new Error(readErrorDetail(body));
+  }
+  return body as T;
 }

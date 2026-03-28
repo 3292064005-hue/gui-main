@@ -22,7 +22,7 @@ function Toggle({ id, label, Icon, active }: { id: string; label: string; Icon: 
 }
 
 export default function Sidebar() {
-  const { sidebarOpen, toggleSidebar, showCamera, showUltrasound, showForceGraph, show3DView, showJoints, showLog } = useUIStore();
+  const { sidebarOpen, toggleSidebar, showCamera, showUltrasound, showForceGraph, show3DView, showJoints, showLog, showReport, showAlarms } = useUIStore();
   const exportCSV = useSessionStore(s => s.exportCSV);
 
   return (
@@ -44,6 +44,8 @@ export default function Sidebar() {
                 <Toggle id="show3DView"      label="3D 雷达"      Icon={Cuboid}         active={show3DView} />
                 <Toggle id="showJoints"      label="关节角度"      Icon={Joystick}       active={showJoints} />
                 <Toggle id="showLog"         label="系统日志"      Icon={ScrollText}     active={showLog} />
+                <Toggle id="showReport"      label="会话报告"      Icon={Download}       active={showReport} />
+                <Toggle id="showAlarms"      label="告警时间线"    Icon={ActivitySquare} active={showAlarms} />
               </div>
             </div>
 

@@ -26,6 +26,9 @@ int main() {
   if (!require(manager.pauseHoldActive(), "pauseAndHold should mark hold as active")) {
     return 1;
   }
+  if (!require(std::string(manager.currentStateName()) == "HOLDING", "pauseAndHold should expose HOLDING state")) {
+    return 1;
+  }
   if (!require(!manager.retreatCompleted(), "pauseAndHold should clear retreat completion")) {
     return 1;
   }
@@ -35,6 +38,9 @@ int main() {
     return 1;
   }
   if (!require(manager.retreatCompleted(), "controlledRetract should mark retreat as complete")) {
+    return 1;
+  }
+  if (!require(std::string(manager.currentStateName()) == "CONTROLLED_RETRACT", "controlledRetract should expose CONTROLLED_RETRACT state")) {
     return 1;
   }
 
@@ -60,6 +66,14 @@ int main() {
     return 1;
   }
   if (!require(manager.retreatCompleted(), "successful retry should restore retreat completion")) {
+    return 1;
+  }
+  if (!require(std::string(manager.currentStateName()) == "RETRY_READY", "successful retry should expose RETRY_READY")) {
+    return 1;
+  }
+
+  manager.latchEstop();
+  if (!require(std::string(manager.currentStateName()) == "ESTOP_LATCHED", "latchEstop should expose ESTOP_LATCHED")) {
     return 1;
   }
 

@@ -28,9 +28,11 @@ class TelemetryStore:
             "last_event": "-",
             "last_controller_log": "-",
         }
+        self.topic_timestamps_ns: Dict[str, int] = {}
 
     def apply(self, env: TelemetryEnvelope) -> Optional[dict[str, Any]]:
         data = env.data
+        self.topic_timestamps_ns[env.topic] = int(env.ts_ns or 0)
         if env.topic == "core_state":
             self.core_state = CoreStateSnapshot(
                 execution_state=str(data.get("execution_state", self.core_state.execution_state)),
@@ -108,6 +110,9 @@ class TelemetryStore:
                 "session_id": str(data.get("session_id", "")),
                 "segment_id": int(data.get("segment_id", 0)),
                 "event_ts_ns": int(data.get("event_ts_ns", env.ts_ns or 0)),
+                "workflow_step": str(data.get("workflow_step", "")),
+                "request_id": str(data.get("request_id", "")),
+                "auto_action": str(data.get("auto_action", "")),
             }
         return None
 

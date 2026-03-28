@@ -126,7 +126,17 @@ TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
         "core_fields": ["session_id", "recording", "dropped_samples", "last_flush_ns"],
     },
     "alarm_event": {
-        "core_fields": ["severity", "source", "message", "session_id", "segment_id", "event_ts_ns"],
+        "core_fields": [
+            "severity",
+            "source",
+            "message",
+            "session_id",
+            "segment_id",
+            "event_ts_ns",
+            "workflow_step",
+            "request_id",
+            "auto_action",
+        ],
     },
     "quality_feedback": {
         "core_fields": ["image_quality", "feature_confidence", "quality_score", "need_resample"],

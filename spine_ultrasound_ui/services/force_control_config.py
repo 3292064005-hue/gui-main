@@ -13,6 +13,10 @@ DEFAULT_FORCE_CONTROL_CONFIG = {
     "desired_contact_force_n": 10.0,
     "emergency_retract_mm": 50.0,
     "force_filter_cutoff_hz": 30.0,
+    "sensor_timeout_ms": 500,
+    "stale_telemetry_ms": 250,
+    "force_settle_window_ms": 150,
+    "resume_force_band_n": 1.5,
 }
 
 

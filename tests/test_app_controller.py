@@ -38,6 +38,11 @@ def test_app_controller_locks_session_only_when_scan_starts(tmp_path):
     assert controller.session_service.current_experiment.session_id
     manifest_path = controller.session_service.current_session_dir / "meta" / "manifest.json"
     assert manifest_path.exists()
+    manifest = __import__("json").loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["protocol_version"] == 1
+    assert manifest["force_sensor_provider"] == controller.config.force_sensor_provider
+    assert manifest["safety_thresholds"]["sensor_timeout_ms"] == 500
+    assert "pressure" in manifest["device_health_snapshot"]
 
 
 def test_app_controller_rolls_back_local_session_if_core_lock_fails(tmp_path):

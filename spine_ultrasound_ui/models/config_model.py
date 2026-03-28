@@ -26,6 +26,7 @@ class RuntimeConfig:
     tool_name: str = "ultrasound_probe"
     tcp_name: str = "ultrasound_tcp"
     load_kg: float = 0.85
+    force_sensor_provider: str = "mock_force_sensor"
     build_id: str = "dev"
     software_version: str = "0.2.0"
 

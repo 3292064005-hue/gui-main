@@ -8,3 +8,7 @@ def test_force_control_config_is_loaded_from_repo_source():
     assert config["max_xy_force_n"] == 20.0
     assert config["desired_contact_force_n"] == 10.0
     assert config["emergency_retract_mm"] == 50.0
+    assert config["sensor_timeout_ms"] == 500
+    assert config["stale_telemetry_ms"] == 250
+    assert config["force_settle_window_ms"] == 150
+    assert config["resume_force_band_n"] == 1.5

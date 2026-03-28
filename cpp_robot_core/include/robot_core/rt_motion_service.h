@@ -14,6 +14,13 @@ namespace rokae {
 
 namespace robot_core {
 
+enum class SensorHealthDecision {
+    None,
+    Hold,
+    ControlledRetract,
+    Estop,
+};
+
 class AdaptiveTimer {
 public:
     AdaptiveTimer(double min_period_ms = 0.5, double max_period_ms = 2.0, double target_cpu = 70.0);
@@ -49,6 +56,7 @@ public:
     // Safety triggers
     void stop();
     void controlledRetract();
+    SensorHealthDecision evaluateSensorFreshnessMs(double age_ms) const;
     
     // Deprecated in favor of direct Force-Tracking, but kept for interface compatibility
     bool seekContact();

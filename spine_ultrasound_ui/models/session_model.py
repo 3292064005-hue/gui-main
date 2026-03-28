@@ -140,6 +140,10 @@ class SessionManifest:
     device_roster: Dict[str, Any]
     software_version: str
     build_id: str
+    protocol_version: int = 1
+    force_sensor_provider: str = "mock_force_sensor"
+    safety_thresholds: Dict[str, Any] = field(default_factory=dict)
+    device_health_snapshot: Dict[str, Any] = field(default_factory=dict)
     artifacts: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

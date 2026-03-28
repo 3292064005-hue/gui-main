@@ -270,6 +270,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
   if (command == "emergency_stop") {
     rt_motion_service_.stop();
     recovery_manager_.cancelRetry();
+    recovery_manager_.latchEstop();
     execution_state_ = RobotCoreState::Estop;
     fault_code_ = "ESTOP";
     queueAlarmLocked("FATAL_FAULT", "safety", "急停触发");

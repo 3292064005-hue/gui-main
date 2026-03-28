@@ -221,6 +221,20 @@ void RtMotionService::controlledRetract() {
      */
 }
 
+SensorHealthDecision RtMotionService::evaluateSensorFreshnessMs(double age_ms) const {
+    const auto& limits = impedance_manager_->getCircuitBreaker().getLimits();
+    if (age_ms > limits.sensor_timeout_ms * 2.0) {
+        return SensorHealthDecision::Estop;
+    }
+    if (age_ms > limits.sensor_timeout_ms) {
+        return SensorHealthDecision::ControlledRetract;
+    }
+    if (age_ms > limits.stale_telemetry_ms) {
+        return SensorHealthDecision::Hold;
+    }
+    return SensorHealthDecision::None;
+}
+
 void RtMotionService::stop() {
     is_running_ = false;
     impedance_manager_->deactivateImpedance();

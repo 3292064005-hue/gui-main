@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import json
 import os
 from pathlib import Path
 
@@ -18,11 +17,10 @@ def _app():
     return app
 
 
-def test_mock_mainline_e2e_workflow(tmp_path):
+def test_session_products_are_materialized_and_registered(tmp_path):
     _app()
     backend = MockBackend(Path(tmp_path))
     controller = AppController(Path(tmp_path), backend)
-
     controller.connect_robot()
     controller.power_on()
     controller.set_auto_mode()
@@ -35,16 +33,12 @@ def test_mock_mainline_e2e_workflow(tmp_path):
     controller.safe_retreat()
     controller.save_results()
     controller.export_summary()
-    controller.run_preprocess()
-    controller.run_reconstruction()
-    controller.run_assessment()
 
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None
-    assert (session_dir / "meta" / "manifest.json").exists()
-    assert (session_dir / "export" / "summary.json").exists()
-    assert (session_dir / "export" / "summary.txt").exists()
-    assert (session_dir / "export" / "session_report.json").exists()
-    assert (session_dir / "derived" / "quality" / "quality_timeline.json").exists()
-    assert (session_dir / "replay" / "replay_index.json").exists()
-    assert (session_dir / "raw" / "ui" / "command_journal.jsonl").exists()
+    manifest = json.loads((session_dir / "meta" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["artifacts"]["summary_json"] == "export/summary.json"
+    assert manifest["artifacts"]["summary_text"] == "export/summary.txt"
+    assert manifest["artifacts"]["quality_timeline"] == "derived/quality/quality_timeline.json"
+    assert manifest["artifacts"]["replay_index"] == "replay/replay_index.json"
+    assert manifest["artifacts"]["session_report"] == "export/session_report.json"

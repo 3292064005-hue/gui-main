@@ -18,10 +18,19 @@ class _StubAdapter:
         pass
 
     def status(self) -> dict:
-        return {"backend_mode": "mock", "execution_state": "AUTO_READY", "protocol_version": 1}
+        return {"backend_mode": "mock", "execution_state": "AUTO_READY", "protocol_version": 1, "session_id": "S1"}
 
-    def snapshot(self) -> list[dict]:
-        return [{"topic": "core_state", "ts_ns": 1, "data": {"execution_state": "AUTO_READY"}}]
+    def health(self) -> dict:
+        return {"backend_mode": "mock", "telemetry_stale": False, "latest_telemetry_age_ms": 10}
+
+    def snapshot(self, topics=None) -> list[dict]:
+        payload = [
+            {"topic": "core_state", "ts_ns": 1, "data": {"execution_state": "AUTO_READY"}},
+            {"topic": "alarm_event", "ts_ns": 2, "data": {"severity": "WARN"}},
+        ]
+        if topics is None:
+            return payload
+        return [item for item in payload if item["topic"] in topics]
 
     def schema(self) -> dict:
         return {
@@ -29,8 +38,17 @@ class _StubAdapter:
             "protocol_version": 1,
             "commands": {"start_scan": {"required_payload_fields": []}},
             "telemetry_topics": {"core_state": {"core_fields": ["execution_state"]}},
-            "force_control": {"desired_contact_force_n": 10.0},
+            "force_control": {"desired_contact_force_n": 10.0, "stale_telemetry_ms": 250},
         }
+
+    def current_session(self) -> dict:
+        return {"session_id": "S1", "report_available": True, "replay_available": True}
+
+    def current_report(self) -> dict:
+        return {"session_id": "S1", "quality_summary": {"avg_quality_score": 0.9}}
+
+    def current_replay(self) -> dict:
+        return {"session_id": "S1", "streams": {"camera": {"frame_count": 12}}}
 
     def command(self, command: str, payload: dict) -> dict:
         if command == "start_scan":
@@ -66,6 +84,13 @@ def test_api_server_schema_contract(monkeypatch: pytest.MonkeyPatch):
         assert body["protocol_version"] == 1
 
 
+def test_api_server_health_contract(monkeypatch: pytest.MonkeyPatch):
+    with _client(monkeypatch) as client:
+        response = client.get("/api/v1/health")
+        assert response.status_code == 200
+        assert response.json()["telemetry_stale"] is False
+
+
 def test_api_server_commands_return_reply_shape(monkeypatch: pytest.MonkeyPatch):
     with _client(monkeypatch) as client:
         response = client.post("/api/v1/commands/start_scan", json={"mode": "auto"})
@@ -94,3 +119,23 @@ def test_api_server_websocket_telemetry_shape(monkeypatch: pytest.MonkeyPatch):
             message = websocket.receive_json()
             assert message["topic"] == "core_state"
             assert message["data"]["execution_state"] == "AUTO_READY"
+
+
+def test_api_server_websocket_telemetry_topics_filter(monkeypatch: pytest.MonkeyPatch):
+    with _client(monkeypatch) as client:
+        with client.websocket_connect("/ws/telemetry?topics=alarm_event") as websocket:
+            message = websocket.receive_json()
+            assert message["topic"] == "alarm_event"
+
+
+def test_api_server_current_session_endpoints(monkeypatch: pytest.MonkeyPatch):
+    with _client(monkeypatch) as client:
+        session_response = client.get("/api/v1/sessions/current")
+        report_response = client.get("/api/v1/sessions/current/report")
+        replay_response = client.get("/api/v1/sessions/current/replay")
+        assert session_response.status_code == 200
+        assert report_response.status_code == 200
+        assert replay_response.status_code == 200
+        assert session_response.json()["session_id"] == "S1"
+        assert report_response.json()["quality_summary"]["avg_quality_score"] == 0.9
+        assert replay_response.json()["streams"]["camera"]["frame_count"] == 12

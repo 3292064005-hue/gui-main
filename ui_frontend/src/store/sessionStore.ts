@@ -6,6 +6,16 @@ export interface LogEntry {
   msg: string;
 }
 
+export interface AlarmEntry {
+  tsNs: number;
+  severity: string;
+  source: string;
+  message: string;
+  workflowStep?: string;
+  requestId?: string;
+  autoAction?: string;
+}
+
 interface SessionState {
   // Scan state
   scanState: 'idle' | 'scanning' | 'paused' | 'halted';
@@ -16,6 +26,9 @@ interface SessionState {
 
   // Event log
   logs: LogEntry[];
+  alarms: AlarmEntry[];
+  sessionReport: Record<string, unknown> | null;
+  replayIndex: Record<string, unknown> | null;
 
   // Force history for CSV export
   forceHistory: { t: number; v: number }[];
@@ -26,6 +39,9 @@ interface SessionState {
   triggerHalt: () => void;
   resetHalt: () => void;
   addLog: (level: LogEntry['level'], msg: string) => void;
+  pushAlarm: (alarm: AlarmEntry) => void;
+  setSessionReport: (report: Record<string, unknown> | null) => void;
+  setReplayIndex: (replay: Record<string, unknown> | null) => void;
   pushForce: (v: number) => void;
   incrementFrame: () => void;
   syncCoreState: (executionState: string, sessionId?: string | null) => void;
@@ -50,6 +66,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   startTime: null,
   frameCount: 0,
   logs: [{ time: timeStr(), level: 'info', msg: '系统初始化完成，等待连接...' }],
+  alarms: [],
+  sessionReport: null,
+  replayIndex: null,
   forceHistory: [],
 
   startScan: () => {
@@ -79,6 +98,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       logs: [...s.logs.slice(-200), { time: timeStr(), level, msg }]
     }));
   },
+
+  pushAlarm: (alarm) => {
+    set((s) => ({
+      alarms: [...s.alarms.slice(-99), alarm],
+    }));
+  },
+
+  setSessionReport: (report) => set({ sessionReport: report }),
+  setReplayIndex: (replay) => set({ replayIndex: replay }),
 
   pushForce: (v) => {
     if (get().scanState !== 'scanning') return;

@@ -26,6 +26,9 @@ class JsonlRecorder:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(envelope, ensure_ascii=False) + "\n")
 
+    def append_event(self, payload: Dict[str, Any]) -> None:
+        self.append(payload, source_ts_ns=int(payload.get("ts_ns", 0) or 0))
+
 
 class FrameRecorder:
     def __init__(self, frame_root: Path, index_path: Path, session_id: str):

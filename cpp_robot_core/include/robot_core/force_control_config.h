@@ -18,6 +18,10 @@ struct ForceControlLimits {
     double desired_contact_force_n = 10.0;
     double emergency_retract_mm = 50.0;
     double force_filter_cutoff_hz = 30.0;
+    double sensor_timeout_ms = 500.0;
+    double stale_telemetry_ms = 250.0;
+    double force_settle_window_ms = 150.0;
+    double resume_force_band_n = 1.5;
 };
 
 inline double extractForceControlDouble(const std::string& json_text, const std::string& key, double fallback) {
@@ -82,6 +86,11 @@ inline ForceControlLimits loadForceControlLimits() {
     limits.force_filter_cutoff_hz = extractForceControlDouble(
         json_text, "force_filter_cutoff_hz", limits.force_filter_cutoff_hz
     );
+    limits.sensor_timeout_ms = extractForceControlDouble(json_text, "sensor_timeout_ms", limits.sensor_timeout_ms);
+    limits.stale_telemetry_ms = extractForceControlDouble(json_text, "stale_telemetry_ms", limits.stale_telemetry_ms);
+    limits.force_settle_window_ms =
+        extractForceControlDouble(json_text, "force_settle_window_ms", limits.force_settle_window_ms);
+    limits.resume_force_band_n = extractForceControlDouble(json_text, "resume_force_band_n", limits.resume_force_band_n);
     return limits;
 }
 

@@ -8,6 +8,8 @@ interface UIState {
   show3DView: boolean;
   showJoints: boolean;
   showLog: boolean;
+  showReport: boolean;
+  showAlarms: boolean;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -32,6 +34,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   show3DView: true,
   showJoints: false,
   showLog: true,
+  showReport: true,
+  showAlarms: true,
 
   sidebarOpen: true,
 

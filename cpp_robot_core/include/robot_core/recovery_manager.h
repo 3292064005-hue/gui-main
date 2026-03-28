@@ -4,6 +4,14 @@
 #include <thread>
 #include <chrono>
 namespace robot_core {
+enum class RecoveryState {
+  Idle,
+  Holding,
+  ControlledRetract,
+  RetryReady,
+  EstopLatched,
+};
+
 class RecoveryManager {
 public:
   RecoveryManager();
@@ -20,6 +28,9 @@ public:
   void triggerRetry(int max_attempts = 3, std::chrono::milliseconds delay = std::chrono::milliseconds(1000));
   void cancelRetry();
   bool retryActive() const;
+  void latchEstop();
+  RecoveryState currentState() const;
+  const char* currentStateName() const;
 
 private:
   void joinRetryThreadIfNeeded();
@@ -27,6 +38,7 @@ private:
 
   bool retreat_completed_{true};
   std::atomic<bool> pause_hold_active_{false};
+  std::atomic<RecoveryState> current_state_{RecoveryState::Idle};
   RetryFunction retry_callback_;
   std::atomic<bool> retry_active_{false};
   std::atomic<int> max_attempts_{0};

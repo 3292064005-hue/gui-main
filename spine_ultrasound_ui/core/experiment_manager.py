@@ -62,6 +62,11 @@ class ExperimentManager:
         software_version: str,
         build_id: str,
         scan_plan: ScanPlan,
+        *,
+        protocol_version: int,
+        force_sensor_provider: str,
+        safety_thresholds: Dict[str, Any],
+        device_health_snapshot: Dict[str, Any],
     ) -> dict:
         exp_dir = self.root / exp_id
         session_id = self.make_session_id(exp_id)
@@ -89,6 +94,10 @@ class ExperimentManager:
             device_roster=device_roster,
             software_version=software_version,
             build_id=build_id,
+            protocol_version=protocol_version,
+            force_sensor_provider=force_sensor_provider,
+            safety_thresholds=safety_thresholds,
+            device_health_snapshot=device_health_snapshot,
             artifacts={"scan_plan": "meta/scan_plan.json"},
         )
         self._write_manifest(session_dir, manifest)
@@ -119,6 +128,16 @@ class ExperimentManager:
         target = session_dir / "export" / "summary.json"
         target.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return target
+
+    def save_json_artifact(self, session_dir: Path, relative_path: str, payload: Dict[str, Any]) -> Path:
+        target = session_dir / relative_path
+        ensure_dir(target.parent)
+        target.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        return target
+
+    def load_json_artifact(self, session_dir: Path, relative_path: str) -> Dict[str, Any]:
+        target = session_dir / relative_path
+        return json.loads(target.read_text(encoding="utf-8"))
 
     def _write_manifest(self, session_dir: Path, manifest: SessionManifest) -> None:
         path = session_dir / "meta" / "manifest.json"

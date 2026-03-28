@@ -6,6 +6,7 @@ import shutil
 from typing import Any, Optional
 
 from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
+from spine_ultrasound_ui.core.command_journal import summarize_command_payload
 from spine_ultrasound_ui.core.session_recorders import FrameRecorder, JsonlRecorder
 from spine_ultrasound_ui.models import ExperimentRecord, RuntimeConfig, ScanPlan
 from spine_ultrasound_ui.services.export_service import export_text_report
@@ -29,6 +30,7 @@ class SessionService:
         self.quality_recorder: Optional[JsonlRecorder] = None
         self.camera_recorder: Optional[FrameRecorder] = None
         self.ultrasound_recorder: Optional[FrameRecorder] = None
+        self.command_journal: Optional[JsonlRecorder] = None
 
     def create_experiment(self, config: RuntimeConfig, note: str = "") -> ExperimentRecord:
         self.reset_for_new_experiment()
@@ -56,6 +58,10 @@ class SessionService:
         config: RuntimeConfig,
         device_roster: dict[str, Any],
         preview_plan: ScanPlan,
+        *,
+        protocol_version: int,
+        safety_thresholds: dict[str, Any],
+        device_health_snapshot: dict[str, Any],
     ) -> LockedSessionContext:
         if self.current_experiment is None:
             raise RuntimeError("experiment has not been created")
@@ -78,6 +84,10 @@ class SessionService:
             software_version=config.software_version,
             build_id=config.build_id,
             scan_plan=preview_plan,
+            protocol_version=protocol_version,
+            force_sensor_provider=config.force_sensor_provider,
+            safety_thresholds=safety_thresholds,
+            device_health_snapshot=device_health_snapshot,
         )
         self.current_session_dir = Path(locked["session_dir"])
         self.current_scan_plan = ScanPlan.from_dict(locked["scan_plan"])
@@ -119,6 +129,7 @@ class SessionService:
         self.quality_recorder = None
         self.camera_recorder = None
         self.ultrasound_recorder = None
+        self.command_journal = None
 
     def record_quality_feedback(self, payload: dict[str, Any], source_ts_ns: Optional[int]) -> None:
         if self.quality_recorder is not None:
@@ -139,6 +150,7 @@ class SessionService:
         self.quality_recorder = None
         self.camera_recorder = None
         self.ultrasound_recorder = None
+        self.command_journal = None
 
     def reset(self) -> None:
         self.current_experiment = None
@@ -148,3 +160,33 @@ class SessionService:
         self.quality_recorder = JsonlRecorder(session_dir / "raw" / "ui" / "quality_feedback.jsonl", session_id)
         self.camera_recorder = FrameRecorder(session_dir / "raw" / "camera" / "frames", session_dir / "raw" / "camera" / "index.jsonl", session_id)
         self.ultrasound_recorder = FrameRecorder(session_dir / "raw" / "ultrasound" / "frames", session_dir / "raw" / "ultrasound" / "index.jsonl", session_id)
+        self.command_journal = JsonlRecorder(session_dir / "raw" / "ui" / "command_journal.jsonl", session_id)
+
+    def record_command_journal(
+        self,
+        *,
+        source: str,
+        command: str,
+        payload: dict[str, Any] | None,
+        reply: dict[str, Any],
+        workflow_step: str,
+        auto_action: str = "",
+    ) -> None:
+        if self.command_journal is None:
+            return
+        self.command_journal.append_event(
+            {
+                "ts_ns": reply.get("ts_ns", 0),
+                "source": source,
+                "command": command,
+                "workflow_step": workflow_step,
+                "auto_action": auto_action,
+                "payload_summary": summarize_command_payload(payload),
+                "reply": {
+                    "ok": bool(reply.get("ok", False)),
+                    "message": str(reply.get("message", "")),
+                    "request_id": str(reply.get("request_id", "")),
+                    "data": dict(reply.get("data", {})),
+                },
+            }
+        )

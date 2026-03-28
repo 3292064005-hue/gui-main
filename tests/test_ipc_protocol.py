@@ -113,7 +113,9 @@ def test_protocol_schema_exposes_canonical_contract():
     assert schema["protocol_version"] == PROTOCOL_VERSION
     assert schema["commands"]["lock_session"]["required_payload_fields"] == COMMAND_SPECS["lock_session"]["required_payload_fields"]
     assert "desired_contact_force_n" in schema["force_control"]
+    assert "sensor_timeout_ms" in schema["force_control"]
     assert "core_state" in schema["telemetry_topics"]
+    assert "workflow_step" in schema["telemetry_topics"]["alarm_event"]["core_fields"]
 
 
 def test_validate_command_payload_rejects_missing_required_fields():

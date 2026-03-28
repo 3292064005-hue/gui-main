@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import socket
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice
 from PySide6.QtGui import QGuiApplication
 
 from spine_ultrasound_ui.services.core_transport import parse_telemetry_payload, send_tls_command
+from spine_ultrasound_ui.core.command_journal import summarize_command_payload
+from spine_ultrasound_ui.core.session_recorders import JsonlRecorder
 from spine_ultrasound_ui.services.ipc_protocol import (
     COMMANDS,
     PROTOCOL_VERSION,
@@ -60,6 +64,9 @@ class HeadlessAdapter:
         self._lock = threading.Lock()
         self.latest_by_topic: dict[str, dict[str, Any]] = {}
         self.phase = 0.0
+        self._current_session_dir: Path | None = None
+        self._current_session_id = ""
+        self._command_journal: JsonlRecorder | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -88,14 +95,33 @@ class HeadlessAdapter:
             "powered": robot.get("powered", False),
             "safe_to_scan": safety.get("safe_to_scan", False),
             "protocol_version": PROTOCOL_VERSION,
+            "session_id": core.get("session_id", self._current_session_id),
             "topics": topics,
         }
 
-    def snapshot(self) -> list[dict[str, Any]]:
+    def health(self) -> dict[str, Any]:
+        with self._lock:
+            latest_ts_ns = max((int(data.get("_ts_ns", 0)) for data in self.latest_by_topic.values()), default=0)
+            topics = sorted(self.latest_by_topic.keys())
+        force_control = protocol_schema()["force_control"]
+        latest_age_ms = max(0, int((now_ns() - latest_ts_ns) / 1_000_000)) if latest_ts_ns else None
+        stale_threshold_ms = int(force_control.get("stale_telemetry_ms", 250))
+        return {
+            "backend_mode": self.mode,
+            "adapter_running": self._thread is not None and self._thread.is_alive(),
+            "protocol_version": PROTOCOL_VERSION,
+            "topics": topics,
+            "latest_telemetry_age_ms": latest_age_ms,
+            "telemetry_stale": latest_age_ms is None or latest_age_ms > stale_threshold_ms,
+            "stale_threshold_ms": stale_threshold_ms,
+        }
+
+    def snapshot(self, topics: set[str] | None = None) -> list[dict[str, Any]]:
         with self._lock:
             return [
                 {"topic": topic, "ts_ns": data.get("_ts_ns", now_ns()), "data": {k: v for k, v in data.items() if k != "_ts_ns"}}
                 for topic, data in self.latest_by_topic.items()
+                if topics is None or topic in topics
             ]
 
     def schema(self) -> dict[str, Any]:
@@ -106,6 +132,7 @@ class HeadlessAdapter:
             raise ValueError(f"unsupported command: {command}")
         payload = payload or {}
         validate_command_payload(command, payload)
+        self._prepare_session_tracking(command, payload)
         if self.mode == "mock":
             assert self.runtime is not None
             reply = self.runtime.handle_command(command, payload)
@@ -119,7 +146,38 @@ class HeadlessAdapter:
                 command,
                 payload,
             )
+        if not reply.ok and command == "lock_session":
+            self._clear_current_session()
+        if command == "disconnect_robot" and reply.ok:
+            self._clear_current_session()
+        self._record_command_journal(command, payload, reply)
         return self._reply_dict(reply)
+
+    def current_session(self) -> dict[str, Any]:
+        session_dir = self._resolve_session_dir()
+        if session_dir is None:
+            raise FileNotFoundError("no active session")
+        manifest = self._read_json(session_dir / "meta" / "manifest.json")
+        return {
+            "session_id": manifest.get("session_id", self._current_session_id),
+            "session_dir": str(session_dir),
+            "artifacts": manifest.get("artifacts", {}),
+            "report_available": (session_dir / "export" / "session_report.json").exists(),
+            "replay_available": (session_dir / "replay" / "replay_index.json").exists(),
+            "status": self.status(),
+        }
+
+    def current_report(self) -> dict[str, Any]:
+        session_dir = self._resolve_session_dir()
+        if session_dir is None:
+            raise FileNotFoundError("no active session")
+        return self._read_json(session_dir / "export" / "session_report.json")
+
+    def current_replay(self) -> dict[str, Any]:
+        session_dir = self._resolve_session_dir()
+        if session_dir is None:
+            raise FileNotFoundError("no active session")
+        return self._read_json(session_dir / "replay" / "replay_index.json")
 
     def camera_frame(self) -> str:
         self.phase += 0.1
@@ -147,6 +205,55 @@ class HeadlessAdapter:
     def _store_messages(self, messages: list[TelemetryEnvelope]) -> None:
         for env in messages:
             self._store_message(env)
+
+    def _prepare_session_tracking(self, command: str, payload: dict[str, Any]) -> None:
+        if command != "lock_session":
+            return
+        session_dir = payload.get("session_dir")
+        session_id = payload.get("session_id", "")
+        if not isinstance(session_dir, str) or not session_dir:
+            return
+        self._current_session_dir = Path(session_dir)
+        self._current_session_id = str(session_id)
+        self._command_journal = JsonlRecorder(self._current_session_dir / "raw" / "ui" / "command_journal.jsonl", self._current_session_id or "headless")
+
+    def _record_command_journal(self, command: str, payload: dict[str, Any], reply: ReplyEnvelope) -> None:
+        if self._command_journal is None:
+            return
+        self._command_journal.append_event(
+            {
+                "ts_ns": now_ns(),
+                "source": "headless",
+                "command": command,
+                "workflow_step": command,
+                "auto_action": "",
+                "payload_summary": summarize_command_payload(payload),
+                "reply": {
+                    "ok": reply.ok,
+                    "message": reply.message,
+                    "request_id": reply.request_id,
+                    "data": dict(reply.data),
+                },
+            }
+        )
+
+    def _resolve_session_dir(self) -> Path | None:
+        if self._current_session_dir is not None:
+            return self._current_session_dir
+        if self.runtime is not None and self.runtime.session_dir is not None:
+            return self.runtime.session_dir
+        return None
+
+    def _clear_current_session(self) -> None:
+        self._current_session_dir = None
+        self._current_session_id = ""
+        self._command_journal = None
+
+    @staticmethod
+    def _read_json(path: Path) -> dict[str, Any]:
+        if not path.exists():
+            raise FileNotFoundError(path.name)
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def _mock_loop(self) -> None:
         assert self.runtime is not None
