@@ -1,0 +1,41 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/spine_robot_core_runtime.dir/ipc_messages.pb.cc.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/ipc_messages.pb.cc.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/command_server.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/command_server.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/contact_observer.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/contact_observer.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/core_runtime.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/core_runtime.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/kinematics_validator.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/kinematics_validator.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/nrt_motion_service.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/nrt_motion_service.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/pose_interpolator.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/pose_interpolator.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/protobuf_protocol.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/protobuf_protocol.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/recording_service.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/recording_service.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/recovery_manager.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/recovery_manager.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/robot_state_hub.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/robot_state_hub.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/rt_motion_service.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/rt_motion_service.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/safety_service.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/safety_service.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/telemetry_publisher.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/telemetry_publisher.cpp.o.d"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/trajectory_compiler.cpp.o"
+  "CMakeFiles/spine_robot_core_runtime.dir/src/trajectory_compiler.cpp.o.d"
+  "ipc_messages.pb.cc"
+  "ipc_messages.pb.h"
+  "libspine_robot_core_runtime.a"
+  "libspine_robot_core_runtime.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/spine_robot_core_runtime.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

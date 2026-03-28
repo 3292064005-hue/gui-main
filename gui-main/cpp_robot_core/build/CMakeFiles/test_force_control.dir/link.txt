@@ -1,0 +1,1 @@
+/usr/bin/c++  -O3 -march=native -pthread -O3 -DNDEBUG CMakeFiles/test_force_control.dir/src/test_force_control.cpp.o -o test_force_control 

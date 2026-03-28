@@ -1,0 +1,1 @@
+/usr/bin/c++  -O3 -march=native -pthread -O3 -DNDEBUG CMakeFiles/test_seqlock.dir/src/test_seqlock.cpp.o -o test_seqlock  -lrt 
