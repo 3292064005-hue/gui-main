@@ -85,6 +85,7 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
           field("active_segment", std::to_string(snapshot.core_state.active_segment)),
           field("progress_pct", formatDouble(snapshot.core_state.progress_pct)),
           field("session_id", quote(snapshot.core_state.session_id)),
+          field("recovery_state", quote(snapshot.core_state.recovery_state)),
       })));
   lines.push_back(envelope(
       "robot_state",
@@ -158,6 +159,9 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
             field("session_id", quote(alarm.session_id)),
             field("segment_id", std::to_string(alarm.segment_id)),
             field("event_ts_ns", std::to_string(alarm.event_ts_ns)),
+            field("workflow_step", quote(alarm.workflow_step)),
+            field("request_id", quote(alarm.request_id)),
+            field("auto_action", quote(alarm.auto_action)),
         })));
   }
   return lines;
@@ -180,6 +184,7 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
           field("active_segment", std::to_string(snapshot.core_state.active_segment)),
           field("progress_pct", formatDouble(snapshot.core_state.progress_pct)),
           field("session_id", quote(snapshot.core_state.session_id)),
+          field("recovery_state", quote(snapshot.core_state.recovery_state)),
       })));
 
   messages.push_back(makeTelemetryEnvelope(
@@ -268,6 +273,9 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
             field("session_id", quote(alarm.session_id)),
             field("segment_id", std::to_string(alarm.segment_id)),
             field("event_ts_ns", std::to_string(alarm.event_ts_ns)),
+            field("workflow_step", quote(alarm.workflow_step)),
+            field("request_id", quote(alarm.request_id)),
+            field("auto_action", quote(alarm.auto_action)),
         })));
   }
 

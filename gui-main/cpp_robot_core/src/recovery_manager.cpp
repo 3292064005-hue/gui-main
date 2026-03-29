@@ -1,7 +1,7 @@
 #include "robot_core/recovery_manager.h"
+#include <chrono>
 #include <iostream>
 #include <thread>
-#include <chrono>
 
 namespace robot_core {
 
@@ -15,12 +15,14 @@ RecoveryManager::~RecoveryManager() {
 void RecoveryManager::pauseAndHold() {
   pause_hold_active_.store(true);
   retreat_completed_ = false;
+  stable_since_ts_ns_.store(0);
   current_state_.store(RecoveryState::Holding);
 }
 
 void RecoveryManager::controlledRetract() {
   pause_hold_active_.store(false);
   retreat_completed_ = true;
+  stable_since_ts_ns_.store(0);
   current_state_.store(RecoveryState::ControlledRetract);
 }
 
@@ -42,8 +44,8 @@ void RecoveryManager::triggerRetry(int max_attempts, std::chrono::milliseconds d
   max_attempts_ = max_attempts;
   retry_delay_ = delay;
   retry_active_.store(true);
+  stable_since_ts_ns_.store(0);
   current_state_.store(RecoveryState::Holding);
-
   retry_thread_ = std::thread(&RecoveryManager::retryLoop, this);
 }
 
@@ -59,7 +61,49 @@ void RecoveryManager::latchEstop() {
   cancelRetry();
   pause_hold_active_.store(false);
   retreat_completed_ = false;
+  stable_since_ts_ns_.store(0);
   current_state_.store(RecoveryState::EstopLatched);
+}
+
+void RecoveryManager::resetToIdle() {
+  cancelRetry();
+  joinRetryThreadIfNeeded();
+  pause_hold_active_.store(false);
+  retreat_completed_ = true;
+  stable_since_ts_ns_.store(0);
+  current_state_.store(RecoveryState::Idle);
+}
+
+void RecoveryManager::setRetrySettleWindow(std::chrono::milliseconds window) {
+  retry_settle_window_ = window;
+}
+
+void RecoveryManager::updateStableCondition(bool within_resume_band, int64_t now_ns) {
+  const auto state = current_state_.load();
+  if (state == RecoveryState::EstopLatched || state == RecoveryState::Idle) {
+    return;
+  }
+  if (!within_resume_band) {
+    stable_since_ts_ns_.store(0);
+    if (state == RecoveryState::RetryReady) {
+      current_state_.store(RecoveryState::RetryWaitStable);
+    }
+    return;
+  }
+  auto stable_since = stable_since_ts_ns_.load();
+  if (stable_since <= 0) {
+    stable_since_ts_ns_.store(now_ns);
+    stable_since = now_ns;
+  }
+  if (state == RecoveryState::ControlledRetract || state == RecoveryState::Holding || state == RecoveryState::RetryWaitStable) {
+    current_state_.store(RecoveryState::RetryWaitStable);
+  }
+  const auto elapsed_ns = now_ns - stable_since;
+  if (elapsed_ns >= retry_settle_window_.count() * 1000LL * 1000LL) {
+    pause_hold_active_.store(false);
+    retreat_completed_ = true;
+    current_state_.store(RecoveryState::RetryReady);
+  }
 }
 
 RecoveryState RecoveryManager::currentState() const {
@@ -74,6 +118,8 @@ const char* RecoveryManager::currentStateName() const {
       return "HOLDING";
     case RecoveryState::ControlledRetract:
       return "CONTROLLED_RETRACT";
+    case RecoveryState::RetryWaitStable:
+      return "RETRY_WAIT_STABLE";
     case RecoveryState::RetryReady:
       return "RETRY_READY";
     case RecoveryState::EstopLatched:
@@ -91,28 +137,20 @@ void RecoveryManager::joinRetryThreadIfNeeded() {
 void RecoveryManager::retryLoop() {
   for (int attempt = 1; attempt <= max_attempts_ && retry_active_.load(); ++attempt) {
     std::this_thread::sleep_for(retry_delay_);
-
     if (!retry_active_.load()) {
       break;
     }
-
     std::cout << "RecoveryManager: Retry attempt " << attempt << "/" << max_attempts_ << std::endl;
-
     if (retry_callback_ && retry_callback_()) {
-      std::cout << "RecoveryManager: Retry succeeded on attempt " << attempt << std::endl;
-      pause_hold_active_.store(false);
-      retreat_completed_ = true;
       retry_active_.store(false);
-      current_state_.store(RecoveryState::RetryReady);
+      pause_hold_active_.store(true);
+      retreat_completed_ = false;
+      stable_since_ts_ns_.store(0);
+      current_state_.store(RecoveryState::RetryWaitStable);
       return;
     }
-  }
-
-  if (retry_active_.load()) {
-    std::cout << "RecoveryManager: All retry attempts failed" << std::endl;
-    current_state_.store(RecoveryState::Holding);
   }
   retry_active_.store(false);
 }
 
-}
+}  // namespace robot_core

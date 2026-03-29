@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -march=native -pthread -O3 -DNDEBUG CMakeFiles/test_impedance_scan.dir/src/test_impedance_scan.cpp.o -o test_impedance_scan 

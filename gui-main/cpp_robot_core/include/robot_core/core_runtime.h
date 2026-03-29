@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "robot_core/contact_observer.h"
+#include "robot_core/force_control_config.h"
 #include "robot_core/nrt_motion_service.h"
 #include "robot_core/recording_service.h"
 #include "robot_core/recovery_manager.h"
@@ -33,7 +34,7 @@ private:
   void updateContactAndProgressLocked();
   void refreshDeviceHealthLocked(int64_t ts_ns);
   SafetyStatus evaluateSafetyLocked() const;
-  void queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message);
+  void queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step = "", const std::string& request_id = "", const std::string& auto_action = "");
   CoreStateSnapshot buildCoreSnapshotLocked() const;
   ScanProgress buildScanProgressLocked() const;
   void recordStreamsLocked();
@@ -80,6 +81,7 @@ private:
   NrtMotionService nrt_motion_service_{};
   RtMotionService rt_motion_service_{};
   RecoveryManager recovery_manager_{};
+  ForceControlLimits force_limits_{loadForceControlLimits()};
 };
 
 }  // namespace robot_core

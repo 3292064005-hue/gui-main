@@ -74,6 +74,7 @@ struct CoreStateSnapshot {
   int active_segment{0};
   double progress_pct{0.0};
   std::string session_id;
+  std::string recovery_state;
 };
 
 struct DeviceHealth {
@@ -139,6 +140,9 @@ struct AlarmEvent {
   std::string session_id;
   int segment_id{0};
   int64_t event_ts_ns{0};
+  std::string workflow_step;
+  std::string request_id;
+  std::string auto_action;
 };
 
 struct TelemetrySnapshot {

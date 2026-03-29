@@ -1,2 +1,0 @@
-# Hashes of file build rules.
-69650f5fe1496e8f01324e54677fb575 ipc_messages.pb.h

@@ -1,18 +1,18 @@
 import { create } from 'zustand';
 
+const ZERO_JOINTS = [0, 0, 0, 0, 0, 0];
+
 interface TelemetryState {
   connected: boolean;
   timestamp: number;
   force: number;
-  safety: number; // 0 = OK, 1 = HALT
-  joints: number[]; // 7-DOF
+  safety: number;
+  joints: number[];
   latencyMs: number;
   telemetryStale: boolean;
   fps: number;
-  // Internal FPS tracking
   _frameCount: number;
   _lastFpsTime: number;
-
   setConnected: (v: boolean) => void;
   pushTelemetry: (ts: number, force: number, safety: number, joints: number[]) => void;
   mergeTelemetry: (update: Partial<Pick<TelemetryState, 'timestamp' | 'force' | 'safety' | 'joints'>>) => void;
@@ -26,7 +26,7 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
   timestamp: 0,
   force: 0,
   safety: 0,
-  joints: [0, 0, 0, 0, 0, 0, 0],
+  joints: ZERO_JOINTS,
   latencyMs: 0,
   telemetryStale: false,
   fps: 0,
@@ -46,7 +46,6 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
     let newCount = state._frameCount + 1;
     let lastTime = state._lastFpsTime;
 
-    // Calculate FPS every second
     if (now - lastTime >= 1000) {
       newFps = newCount;
       newCount = 0;
@@ -71,7 +70,13 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
   setLatency: (ms) => set({ latencyMs: ms }),
   setTelemetryStale: (stale) => set({ telemetryStale: stale }),
 
-  reset: () => set({
-    force: 0, safety: 0, joints: [0, 0, 0, 0, 0, 0, 0], fps: 0, _frameCount: 0, telemetryStale: false
-  }),
+  reset: () =>
+    set({
+      force: 0,
+      safety: 0,
+      joints: ZERO_JOINTS,
+      fps: 0,
+      _frameCount: 0,
+      telemetryStale: false,
+    }),
 }));

@@ -5,6 +5,8 @@
 #include <filesystem>
 
 #include "json_utils.h"
+#include "robot_core/force_state.h"
+#include "robot_core/safety_decision.h"
 
 namespace robot_core {
 
@@ -55,6 +57,7 @@ CoreRuntime::CoreRuntime() {
       makeDevice("pressure", false, "压力传感器未连接"),
       makeDevice("ultrasound", false, "超声设备未连接"),
   };
+  recovery_manager_.setRetrySettleWindow(std::chrono::milliseconds(static_cast<int>(force_limits_.force_settle_window_ms)));
 }
 
 void CoreRuntime::setState(RobotCoreState state) {
@@ -110,6 +113,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     pressure_current_ = 0.0;
     contact_state_ = ContactTelemetry{};
     pending_alarms_.clear();
+    recovery_manager_.resetToIdle();
     devices_ = {
         makeDevice("robot", false, "机械臂控制器未连接"),
         makeDevice("camera", false, "摄像头未连接"),
@@ -325,7 +329,6 @@ void CoreRuntime::statePollStep() {
       std::sin(phase_ * 0.4 + 0.6),
       std::sin(phase_ * 0.4 + 0.8),
       std::sin(phase_ * 0.4 + 1.0),
-      std::sin(phase_ * 0.4 + 1.2),
   };
   snapshot.joint_vel = {
       0.08 * std::cos(phase_ * 0.3 + 0.0),
@@ -334,7 +337,6 @@ void CoreRuntime::statePollStep() {
       0.08 * std::cos(phase_ * 0.3 + 0.6),
       0.08 * std::cos(phase_ * 0.3 + 0.8),
       0.08 * std::cos(phase_ * 0.3 + 1.0),
-      0.08 * std::cos(phase_ * 0.3 + 1.2),
   };
   snapshot.joint_torque = {
       0.45 * std::sin(phase_ * 0.2 + 0.0),
@@ -343,7 +345,6 @@ void CoreRuntime::statePollStep() {
       0.45 * std::sin(phase_ * 0.2 + 0.6),
       0.45 * std::sin(phase_ * 0.2 + 0.8),
       0.45 * std::sin(phase_ * 0.2 + 1.0),
-      0.45 * std::sin(phase_ * 0.2 + 1.2),
   };
   const double z_base = execution_state_ == RobotCoreState::Approaching
                             ? 220.0
@@ -370,17 +371,43 @@ void CoreRuntime::statePollStep() {
 void CoreRuntime::watchdogStep() {
   std::lock_guard<std::mutex> lock(mutex_);
   const auto safety = evaluateSafetyLocked();
+  const auto now = json::nowNs();
+  const auto force_state = makeForceStateSnapshot(
+      now,
+      0.0,
+      std::vector<double>{0.0, 0.0, pressure_current_, 0.0, 0.0, 0.0},
+      force_limits_,
+      config_.pressure_target);
+  const auto decision = decideSafetyAction(force_state);
+  if (decision == SafetyDecision::WarnOnly && execution_state_ == RobotCoreState::Scanning) {
+    queueAlarmLocked("WARN", "force_monitor", "力控接近告警阈值", "force_monitor", "", "warn_only");
+  }
   if (pressure_current_ > config_.pressure_upper && execution_state_ == RobotCoreState::Scanning) {
     rt_motion_service_.pauseAndHold();
     recovery_manager_.pauseAndHold();
     execution_state_ = RobotCoreState::PausedHold;
     contact_state_.mode = "OVERPRESSURE";
     contact_state_.recommended_action = "CONTROLLED_RETRACT";
-    queueAlarmLocked("RECOVERABLE_FAULT", "contact", "压力超上限，已进入保持状态");
+    queueAlarmLocked("RECOVERABLE_FAULT", "contact", "压力超上限，已进入保持状态", "scan_monitor", "", "hold");
+  }
+  if (decision == SafetyDecision::ControlledRetract && execution_state_ != RobotCoreState::Estop) {
+    rt_motion_service_.controlledRetract();
+    recovery_manager_.controlledRetract();
+    execution_state_ = RobotCoreState::Retreating;
+    queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "力控进入受控退让", "force_monitor", "", "controlled_retract");
+  }
+  if (decision == SafetyDecision::EstopLatch && execution_state_ != RobotCoreState::Estop) {
+    recovery_manager_.latchEstop();
+    execution_state_ = RobotCoreState::Estop;
+    queueAlarmLocked("FATAL_FAULT", "force_monitor", "力传感器超时，进入急停锁存", "telemetry_watchdog", "", "estop");
+  }
+  if (execution_state_ == RobotCoreState::PausedHold || execution_state_ == RobotCoreState::Retreating) {
+    const bool within_band = std::fabs(pressure_current_ - config_.pressure_target) <= force_limits_.resume_force_band_n;
+    recovery_manager_.updateStableCondition(within_band, now);
   }
   if (!safety.safe_to_arm && controller_online_ && powered_ && automatic_mode_ && execution_state_ != RobotCoreState::Fault &&
       execution_state_ != RobotCoreState::Estop && !fault_code_.empty()) {
-    queueAlarmLocked("WARN", "safety", "存在联锁，safe_to_arm 退化");
+    queueAlarmLocked("WARN", "safety", "存在联锁，safe_to_arm 退化", "validate_setup", "", "warn_only");
   }
 }
 
@@ -495,7 +522,7 @@ SafetyStatus CoreRuntime::evaluateSafetyLocked() const {
       load_ready_);
 }
 
-void CoreRuntime::queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message) {
+void CoreRuntime::queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step, const std::string& request_id, const std::string& auto_action) {
   AlarmEvent alarm;
   alarm.severity = severity;
   alarm.source = source;
@@ -503,6 +530,9 @@ void CoreRuntime::queueAlarmLocked(const std::string& severity, const std::strin
   alarm.session_id = session_id_;
   alarm.segment_id = active_segment_;
   alarm.event_ts_ns = json::nowNs();
+  alarm.workflow_step = workflow_step;
+  alarm.request_id = request_id;
+  alarm.auto_action = auto_action;
   pending_alarms_.push_back(alarm);
   recording_service_.recordAlarm(alarm);
   if (severity == "FATAL_FAULT") {
@@ -519,6 +549,7 @@ CoreStateSnapshot CoreRuntime::buildCoreSnapshotLocked() const {
   snapshot.active_segment = active_segment_;
   snapshot.progress_pct = progress_pct_;
   snapshot.session_id = session_id_;
+  snapshot.recovery_state = recovery_manager_.currentStateName();
   return snapshot;
 }
 

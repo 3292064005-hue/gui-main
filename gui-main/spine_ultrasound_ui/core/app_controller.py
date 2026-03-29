@@ -175,6 +175,7 @@ class AppController(QObject):
                 protocol_version=1,
                 safety_thresholds=load_force_control_config(),
                 device_health_snapshot=self.telemetry.device_roster(),
+                patient_registration=self.localization_result.patient_registration if self.localization_result else None,
             )
         except RuntimeError as exc:
             self._log("ERROR", str(exc))
@@ -327,6 +328,15 @@ class AppController(QObject):
         alarm = self.telemetry.apply(env)
         if env.topic == "quality_feedback":
             self.session_service.record_quality_feedback(env.data, env.ts_ns)
+            if float(env.data.get("quality_score", 1.0)) < 0.75:
+                self.session_service.record_annotation(
+                    kind="quality_issue",
+                    message=f"quality_score={float(env.data.get('quality_score', 0.0)):.2f}",
+                    ts_ns=env.ts_ns,
+                    segment_id=self.telemetry.core_state.active_segment,
+                    severity="WARN",
+                    tags=["quality", "review"],
+                )
         if alarm is not None:
             self.alarm_manager.push(
                 alarm["severity"],
@@ -343,6 +353,14 @@ class AppController(QObject):
                 f"auto={alarm.get('auto_action') or '-'} ts={alarm['event_ts_ns']}"
             )
             self.alarm_raised.emit(f"{alarm['severity']}/{alarm['source']}: {alarm['message']} ({trace})")
+            self.session_service.record_annotation(
+                kind="alarm",
+                message=alarm["message"],
+                ts_ns=alarm["event_ts_ns"],
+                segment_id=alarm.get("segment_id", 0),
+                severity=alarm["severity"],
+                tags=[alarm["source"], alarm.get("workflow_step", "")],
+            )
             self.log_generated.emit(
                 alarm["severity"],
                 f"[{now_text()}] [{alarm['source']}] {alarm['message']} ({trace})",
@@ -378,10 +396,24 @@ class AppController(QObject):
     ) -> bool:
         reply = self._send_command(command, payload, workflow_step=command)
         if reply.ok:
+            self.session_service.record_annotation(
+                kind="workflow",
+                message=f"{command} ok",
+                segment_id=self.telemetry.core_state.active_segment,
+                severity="INFO",
+                tags=[command],
+            )
             if success_message:
                 self._log("INFO", success_message)
             self._emit_status()
             return True
+        self.session_service.record_annotation(
+            kind="workflow_failure",
+            message=f"{command} failed: {reply.message}",
+            segment_id=self.telemetry.core_state.active_segment,
+            severity="ERROR",
+            tags=[command, "retry" if fallback_to_safe_retreat else "manual"],
+        )
         self._log("ERROR", f"{command} 失败：{reply.message}")
         self._raise_local_alarm("ERROR", "workflow", f"{command} 失败：{reply.message}", workflow_step=command, request_id=reply.request_id)
         if fallback_to_safe_retreat:
@@ -440,7 +472,12 @@ class AppController(QObject):
                 "joint_torque": self.telemetry.metrics.joint_torque,
                 "cart_force": self.telemetry.metrics.cart_force,
             },
-            "robot": dict(self.telemetry.robot),
+            "robot": {
+                **dict(self.telemetry.robot),
+                "robot_model": self.config.robot_model,
+                "axis_count": self.config.axis_count,
+                "sdk_robot_class": self.config.sdk_robot_class,
+            },
             "safety": asdict(self.telemetry.safety_status),
             "recording": asdict(self.telemetry.recorder_status),
             "workflow": self.workflow_artifacts.to_dict(),

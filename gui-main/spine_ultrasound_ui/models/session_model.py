@@ -132,6 +132,45 @@ class RecorderStatus:
 
 
 @dataclass
+class ArtifactDescriptor:
+    artifact_type: str
+    path: str
+    mime_type: str = "application/json"
+    producer: str = "session_service"
+    schema: str = ""
+    schema_version: str = "1.0"
+    artifact_id: str = ""
+    ready: bool = True
+    size_bytes: int = 0
+    checksum: str = ""
+    created_at: str = ""
+    summary: str = ""
+    source_stage: str = ""
+    dependencies: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = asdict(self)
+        if not payload["artifact_id"]:
+            payload["artifact_id"] = self.path or self.artifact_type
+        return payload
+
+
+@dataclass
+class ProcessingStepRecord:
+    step_id: str
+    plugin_id: str
+    plugin_version: str
+    input_artifacts: List[str] = field(default_factory=list)
+    output_artifacts: List[str] = field(default_factory=list)
+    status: str = "completed"
+    detail: str = ""
+    metrics: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class SessionManifest:
     experiment_id: str
     session_id: str
@@ -140,11 +179,21 @@ class SessionManifest:
     device_roster: Dict[str, Any]
     software_version: str
     build_id: str
+    created_at: str = ""
     protocol_version: int = 1
     force_sensor_provider: str = "mock_force_sensor"
     safety_thresholds: Dict[str, Any] = field(default_factory=dict)
     device_health_snapshot: Dict[str, Any] = field(default_factory=dict)
+    device_readiness: Dict[str, Any] = field(default_factory=dict)
+    robot_profile: Dict[str, Any] = field(default_factory=dict)
+    patient_registration: Dict[str, Any] = field(default_factory=dict)
+    scan_protocol: Dict[str, Any] = field(default_factory=dict)
+    algorithm_registry: Dict[str, Any] = field(default_factory=dict)
     artifacts: Dict[str, str] = field(default_factory=dict)
+    artifact_registry: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    processing_steps: List[Dict[str, Any]] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    alarms_summary: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

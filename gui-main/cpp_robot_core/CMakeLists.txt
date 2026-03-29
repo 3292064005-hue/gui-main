@@ -35,6 +35,7 @@ set(CORE_RUNTIME_SOURCES
     src/robot_state_hub.cpp
     src/rt_motion_service.cpp
     src/safety_service.cpp
+    src/sdk_robot_facade.cpp
     src/telemetry_publisher.cpp
     src/trajectory_compiler.cpp
     src/kinematics_validator.cpp

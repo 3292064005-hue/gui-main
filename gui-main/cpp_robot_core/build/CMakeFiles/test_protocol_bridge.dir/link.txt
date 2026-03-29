@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -march=native -pthread -O3 -DNDEBUG CMakeFiles/test_protocol_bridge.dir/src/test_protocol_bridge.cpp.o -o test_protocol_bridge  libspine_robot_core_runtime.a /usr/lib/x86_64-linux-gnu/libprotobuf.so /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so -lrt 

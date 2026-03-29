@@ -42,3 +42,31 @@ def test_session_products_are_materialized_and_registered(tmp_path):
     assert manifest["artifacts"]["quality_timeline"] == "derived/quality/quality_timeline.json"
     assert manifest["artifacts"]["replay_index"] == "replay/replay_index.json"
     assert manifest["artifacts"]["session_report"] == "export/session_report.json"
+    assert manifest["artifacts"]["frame_sync_index"] == "derived/sync/frame_sync_index.json"
+
+
+
+def test_session_products_include_readiness_and_diagnostics_structure(tmp_path):
+    _app()
+    backend = MockBackend(Path(tmp_path))
+    controller = AppController(Path(tmp_path), backend)
+    controller.connect_robot()
+    controller.power_on()
+    controller.set_auto_mode()
+    controller.create_experiment()
+    controller.run_localization()
+    controller.generate_path()
+    controller.start_scan()
+    controller.safe_retreat()
+    controller.save_results()
+    controller.export_summary()
+
+    session_dir = controller.session_service.current_session_dir
+    assert session_dir is not None
+    readiness = json.loads((session_dir / "meta" / "device_readiness.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads((session_dir / "export" / "diagnostics_pack.json").read_text(encoding="utf-8"))
+    manifest = json.loads((session_dir / "meta" / "manifest.json").read_text(encoding="utf-8"))
+    assert readiness["ready_to_lock"] is True
+    assert diagnostics["recovery_snapshot"]["state"] in {"IDLE", "HOLDING", "CONTROLLED_RETRACT", "ESTOP_LATCHED"}
+    assert manifest["artifact_registry"]["device_readiness"]["source_stage"] == "workflow_lock"
+    assert "dependencies" in manifest["artifact_registry"]["session_report"]

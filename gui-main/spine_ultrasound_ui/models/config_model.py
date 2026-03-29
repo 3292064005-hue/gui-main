@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any, Dict
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List
 
 
 @dataclass
 class RuntimeConfig:
-    pressure_target: float = 1.5
-    pressure_upper: float = 2.0
-    pressure_lower: float = 1.0
+    pressure_target: float = 8.0
+    pressure_upper: float = 12.0
+    pressure_lower: float = 5.0
     scan_speed_mm_s: float = 8.0
     sample_step_mm: float = 0.5
     segment_length_mm: float = 120.0
+    strip_width_mm: float = 18.0
+    strip_overlap_mm: float = 6.0
     contact_seek_speed_mm_s: float = 3.0
     retreat_speed_mm_s: float = 20.0
     image_quality_threshold: float = 0.7
@@ -27,8 +29,34 @@ class RuntimeConfig:
     tcp_name: str = "ultrasound_tcp"
     load_kg: float = 0.85
     force_sensor_provider: str = "mock_force_sensor"
+    robot_model: str = "xmate_er3"
+    axis_count: int = 6
+    sdk_robot_class: str = "xMateRobot"
+    preferred_link: str = "wired_direct"
+    requires_single_control_source: bool = True
     build_id: str = "dev"
-    software_version: str = "0.2.0"
+    software_version: str = "0.3.0"
+    rt_network_tolerance_percent: int = 15
+    joint_filter_hz: float = 40.0
+    cart_filter_hz: float = 30.0
+    torque_filter_hz: float = 25.0
+    cartesian_impedance: List[float] = field(default_factory=lambda: [2200.0, 2200.0, 1400.0, 45.0, 45.0, 35.0])
+    desired_wrench_n: List[float] = field(default_factory=lambda: [0.0, 0.0, 8.0, 0.0, 0.0, 0.0])
+    fc_frame_type: str = "path"
+    fc_frame_matrix: List[float] = field(default_factory=lambda: [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    ])
+    tcp_frame_matrix: List[float] = field(default_factory=lambda: [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 62.0,
+        0.0, 0.0, 0.0, 1.0,
+    ])
+    load_com_mm: List[float] = field(default_factory=lambda: [0.0, 0.0, 62.0])
+    load_inertia: List[float] = field(default_factory=lambda: [0.0012, 0.0012, 0.0008, 0.0, 0.0, 0.0])
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -40,6 +68,8 @@ class RuntimeConfig:
             payload["scan_speed_mm_s"] = payload.pop("scan_speed")
         if "network_tolerance" in payload and "network_stale_ms" not in payload:
             payload["network_stale_ms"] = int(payload.pop("network_tolerance")) * 10
+        if "load_mass_kg" in payload and "load_kg" not in payload:
+            payload["load_kg"] = payload.pop("load_mass_kg")
         return cls(**{k: v for k, v in payload.items() if k in cls.__dataclass_fields__})
 
 

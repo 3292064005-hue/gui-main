@@ -77,6 +77,9 @@ std::string alarmJson(const AlarmEvent& alarm) {
       field("session_id", quote(alarm.session_id)),
       field("segment_id", std::to_string(alarm.segment_id)),
       field("event_ts_ns", std::to_string(alarm.event_ts_ns)),
+      field("workflow_step", quote(alarm.workflow_step)),
+      field("request_id", quote(alarm.request_id)),
+      field("auto_action", quote(alarm.auto_action)),
   });
 }
 

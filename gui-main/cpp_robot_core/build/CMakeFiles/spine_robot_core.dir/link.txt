@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -march=native -pthread -O3 -DNDEBUG CMakeFiles/spine_robot_core.dir/src/main_ubuntu_rt.cpp.o -o spine_robot_core  libspine_robot_core_runtime.a /usr/lib/x86_64-linux-gnu/libprotobuf.so /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so -lrt 

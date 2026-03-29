@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AlarmTimeline",
+  "type": "object",
+  "required": ["session_id", "events", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "source", "message", "workflow_step", "request_id", "auto_action", "ts_ns"],
+        "properties": {
+          "severity": {"type": "string"},
+          "source": {"type": "string"},
+          "message": {"type": "string"},
+          "workflow_step": {"type": "string"},
+          "request_id": {"type": "string"},
+          "auto_action": {"type": "string"},
+          "ts_ns": {"type": "integer"}
+        }
+      }
+    },
+    "summary": {"type": "object"}
+  }
+}

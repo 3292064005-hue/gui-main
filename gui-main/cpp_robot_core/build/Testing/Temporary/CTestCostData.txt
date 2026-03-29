@@ -1,5 +1,0 @@
-cpp_force_control 6 0.00072325
-cpp_impedance_scan 6 0.000499448
-cpp_protocol_bridge 6 0.000530911
-cpp_recovery_manager 6 0.0036962
----

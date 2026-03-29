@@ -1,0 +1,23 @@
+{
+  "$id": "xmate_profile.schema.json",
+  "type": "object",
+  "required": ["robot_model", "sdk_robot_class", "axis_count", "preferred_link", "rt_loop_hz"],
+  "properties": {
+    "robot_model": {"type": "string"},
+    "sdk_robot_class": {"type": "string"},
+    "controller_series": {"type": "string"},
+    "controller_version": {"type": "string"},
+    "axis_count": {"type": "integer"},
+    "preferred_link": {"type": "string"},
+    "rt_loop_hz": {"type": "integer"},
+    "rt_mode": {"type": "string"},
+    "supported_rt_modes": {"type": "array", "items": {"type": "string"}},
+    "clinical_allowed_modes": {"type": "array", "items": {"type": "string"}},
+    "rt_network_tolerance_percent": {"type": "integer"},
+    "cartesian_impedance": {"type": "array"},
+    "desired_wrench_n": {"type": "array"},
+    "dh_parameters": {"type": "array"},
+    "clinical_scan_contract": {"type": "object"},
+    "rt_control_contract": {"type": "object"}
+  }
+}

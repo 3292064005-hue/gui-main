@@ -124,15 +124,41 @@ def test_headless_adapter_health_and_session_views(tmp_path):
         json.dumps({"session_id": "S1", "streams": {"camera": {"frame_count": 4}}}),
         encoding="utf-8",
     )
+    (session_dir / "export" / "session_trends.json").write_text(
+        json.dumps({"session_id": "S1", "history": [], "current": {"avg_quality_score": 0.81}, "trends": {}, "history_window": 5, "history_count": 0, "fleet_summary": {"sessions": 0}}),
+        encoding="utf-8",
+    )
+    (session_dir / "export" / "diagnostics_pack.json").write_text(
+        json.dumps({"session_id": "S1", "health_snapshot": {"execution_state": "AUTO_READY"}, "last_commands": [], "last_alarms": [], "summary": {"command_count": 0}}),
+        encoding="utf-8",
+    )
+    (session_dir / "derived" / "sync").mkdir(parents=True, exist_ok=True)
+    (session_dir / "derived" / "sync" / "frame_sync_index.json").write_text(
+        json.dumps({"session_id": "S1", "rows": [{"frame_id": 1, "segment_id": 0, "usable": True, "quality_score": 0.9, "contact_confidence": 0.8, "ts_ns": 123}], "summary": {"usable_ratio": 0.75, "frame_count": 1}}),
+        encoding="utf-8",
+    )
     journal_path = session_dir / "raw" / "ui" / "command_journal.jsonl"
+    annotations_path = session_dir / "raw" / "ui" / "annotations.jsonl"
+    annotations_path.parent.mkdir(parents=True, exist_ok=True)
+    annotations_path.write_text(json.dumps({"data": {"kind": "alarm", "message": "x"}}) + "\n", encoding="utf-8")
 
     health = adapter.health()
     current = adapter.current_session()
     report = adapter.current_report()
     replay = adapter.current_replay()
+    trends = adapter.current_trends()
+    diagnostics = adapter.current_diagnostics()
+    annotations = adapter.current_annotations()
+    command_trace = adapter.current_command_trace()
+    assessment = adapter.current_assessment()
 
     assert health["backend_mode"] == "mock"
     assert current["session_id"] == "S1"
+    assert current["trends_available"] is True
+    assert current["diagnostics_available"] is True
     assert report["quality_summary"]["avg_quality_score"] == 0.81
     assert replay["streams"]["camera"]["frame_count"] == 4
+    assert trends["session_id"] == "S1"
+    assert diagnostics["summary"]["command_count"] == 0
+    assert annotations["annotations"][0]["kind"] == "alarm"
     assert journal_path.exists()

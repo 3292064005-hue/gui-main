@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QualityTimeline",
+  "type": "object",
+  "required": ["session_id", "points", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts_ns", "quality_score", "coverage_score", "contact_confidence", "stale_telemetry", "force_status", "segment_id"],
+        "properties": {
+          "ts_ns": {"type": "integer"},
+          "quality_score": {"type": "number"},
+          "coverage_score": {"type": "number"},
+          "contact_confidence": {"type": "number"},
+          "stale_telemetry": {"type": "boolean"},
+          "force_status": {"type": "string"},
+          "segment_id": {"type": "integer"}
+        }
+      }
+    },
+    "summary": {"type": "object"}
+  }
+}

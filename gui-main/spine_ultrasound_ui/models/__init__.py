@@ -4,7 +4,7 @@ from .device_model import DeviceHealth, DeviceStatus
 from .experiment_model import ExperimentRecord
 from .metric_model import RunMetrics, TcpPose
 from .robot_state_model import RobotStateSnapshot
-from .session_model import CoreStateSnapshot, RecorderStatus, SafetyStatus, ScanPlan, ScanSegment, ScanWaypoint, SessionManifest
+from .session_model import ArtifactDescriptor, CoreStateSnapshot, ProcessingStepRecord, RecorderStatus, SafetyStatus, ScanPlan, ScanSegment, ScanWaypoint, SessionManifest
 from .state_model import CoreExecutionState, SystemState
 from .ui_state_model import CapabilityStatus, ImplementationState, UiViewState, WorkflowArtifacts
 
@@ -18,7 +18,9 @@ __all__ = [
     "RunMetrics",
     "TcpPose",
     "RobotStateSnapshot",
+    "ArtifactDescriptor",
     "CoreStateSnapshot",
+    "ProcessingStepRecord",
     "RecorderStatus",
     "SafetyStatus",
     "ScanPlan",

@@ -1,13 +1,33 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import mimetypes
 import platform
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict
 
-from spine_ultrasound_ui.models import ScanPlan, SessionManifest
+from spine_ultrasound_ui.models import ArtifactDescriptor, ProcessingStepRecord, ScanPlan, SessionManifest
 from spine_ultrasound_ui.utils import ensure_dir, now_text
+
+
+_ARTIFACT_SCHEMA_HINTS = {
+    "summary_json": "summary.schema.json",
+    "session_report": "session_report.schema.json",
+    "replay_index": "replay_index.schema.json",
+    "quality_timeline": "quality_timeline.schema.json",
+    "alarm_timeline": "alarm_event.schema.json",
+    "qa_pack": "qa_pack.schema.json",
+    "session_compare": "session_compare.schema.json",
+    "session_trends": "session_trends.schema.json",
+    "diagnostics_pack": "diagnostics_pack.schema.json",
+    "device_readiness": "device_readiness.schema.json",
+    "xmate_profile": "xmate_profile.schema.json",
+    "patient_registration": "patient_registration.schema.json",
+    "scan_protocol": "scan_protocol.schema.json",
+    "frame_sync_index": "frame_sync_index.schema.json",
+}
 
 
 class ExperimentManager:
@@ -63,10 +83,13 @@ class ExperimentManager:
         build_id: str,
         scan_plan: ScanPlan,
         *,
-        protocol_version: int,
-        force_sensor_provider: str,
-        safety_thresholds: Dict[str, Any],
-        device_health_snapshot: Dict[str, Any],
+        protocol_version: int = 1,
+        force_sensor_provider: str = "mock_force_sensor",
+        safety_thresholds: Dict[str, Any] | None = None,
+        device_health_snapshot: Dict[str, Any] | None = None,
+        robot_profile: Dict[str, Any] | None = None,
+        patient_registration: Dict[str, Any] | None = None,
+        scan_protocol: Dict[str, Any] | None = None,
     ) -> dict:
         exp_dir = self.root / exp_id
         session_id = self.make_session_id(exp_id)
@@ -81,14 +104,18 @@ class ExperimentManager:
             "derived/keyframes",
             "derived/reconstruction",
             "derived/assessment",
+            "derived/quality",
+            "derived/alarms",
             "replay",
             "export",
         ]:
             ensure_dir(session_dir / p)
         final_plan = scan_plan.with_session(session_id, plan_id=f"PLAN_{session_id}")
+        readiness_payload = {"ready_to_lock": True}
         manifest = SessionManifest(
             experiment_id=exp_id,
             session_id=session_id,
+            created_at=now_text(),
             config_snapshot=config_snapshot,
             scan_plan_hash=final_plan.plan_hash(),
             device_roster=device_roster,
@@ -96,9 +123,24 @@ class ExperimentManager:
             build_id=build_id,
             protocol_version=protocol_version,
             force_sensor_provider=force_sensor_provider,
-            safety_thresholds=safety_thresholds,
-            device_health_snapshot=device_health_snapshot,
+            safety_thresholds=safety_thresholds or {},
+            device_health_snapshot=device_health_snapshot or {},
+            device_readiness=readiness_payload,
+            robot_profile=robot_profile or {},
+            patient_registration=patient_registration or {},
+            scan_protocol=scan_protocol or {},
             artifacts={"scan_plan": "meta/scan_plan.json"},
+            artifact_registry={
+                "scan_plan": ArtifactDescriptor(
+                    artifact_type="scan_plan",
+                    path="meta/scan_plan.json",
+                    producer="experiment_manager",
+                    artifact_id="scan_plan",
+                    created_at=now_text(),
+                    summary="Frozen locked scan plan",
+                    source_stage="workflow_lock",
+                ).to_dict()
+            },
         )
         self._write_manifest(session_dir, manifest)
         (session_dir / "meta" / "scan_plan.json").write_text(
@@ -113,16 +155,44 @@ class ExperimentManager:
         }
 
     def append_artifact(self, session_dir: Path, name: str, artifact_path: Path) -> dict:
+        descriptor = self._build_artifact_descriptor(session_dir, name, artifact_path)
+        return self.register_artifact(session_dir, name, descriptor)
+
+    def register_artifact(self, session_dir: Path, name: str, descriptor: ArtifactDescriptor | Dict[str, Any]) -> dict:
         manifest = self.load_manifest(session_dir)
         artifacts = dict(manifest.get("artifacts", {}))
-        artifacts[name] = str(artifact_path.relative_to(session_dir))
+        artifact_registry = dict(manifest.get("artifact_registry", {}))
+        payload = descriptor.to_dict() if isinstance(descriptor, ArtifactDescriptor) else dict(descriptor)
+        payload.setdefault("artifact_id", name)
+        payload.setdefault("schema", _ARTIFACT_SCHEMA_HINTS.get(name, ""))
+        artifacts[name] = payload["path"]
+        artifact_registry[name] = payload
         manifest["artifacts"] = artifacts
+        manifest["artifact_registry"] = artifact_registry
+        self._write_manifest(session_dir, SessionManifest(**manifest))
+        return manifest
+
+    def append_processing_step(self, session_dir: Path, step: ProcessingStepRecord | Dict[str, Any]) -> dict:
+        manifest = self.load_manifest(session_dir)
+        steps = list(manifest.get("processing_steps", []))
+        steps.append(step.to_dict() if isinstance(step, ProcessingStepRecord) else dict(step))
+        manifest["processing_steps"] = steps
+        self._write_manifest(session_dir, SessionManifest(**manifest))
+        return manifest
+
+    def update_manifest(self, session_dir: Path, **updates: Any) -> dict:
+        manifest = self.load_manifest(session_dir)
+        manifest.update(updates)
         self._write_manifest(session_dir, SessionManifest(**manifest))
         return manifest
 
     def load_manifest(self, session_dir: Path) -> Dict[str, Any]:
         path = session_dir / "meta" / "manifest.json"
-        return json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        normalized = SessionManifest(**raw).to_dict()
+        if normalized != raw:
+            path.write_text(json.dumps(normalized, indent=2, ensure_ascii=False), encoding="utf-8")
+        return normalized
 
     def save_summary(self, session_dir: Path, payload: Dict[str, Any]) -> Path:
         target = session_dir / "export" / "summary.json"
@@ -139,6 +209,65 @@ class ExperimentManager:
         target = session_dir / relative_path
         return json.loads(target.read_text(encoding="utf-8"))
 
+    def _build_artifact_descriptor(self, session_dir: Path, name: str, artifact_path: Path) -> ArtifactDescriptor:
+        mime_type = mimetypes.guess_type(str(artifact_path))[0] or "application/octet-stream"
+        rel_path = str(artifact_path.relative_to(session_dir))
+        return ArtifactDescriptor(
+            artifact_type=name,
+            path=rel_path,
+            mime_type=mime_type,
+            producer="experiment_manager",
+            schema=_ARTIFACT_SCHEMA_HINTS.get(name, ""),
+            artifact_id=name,
+            size_bytes=artifact_path.stat().st_size if artifact_path.exists() else 0,
+            checksum=self._checksum_for_path(artifact_path),
+            created_at=now_text(),
+            summary=name.replace("_", " "),
+            source_stage=self._infer_source_stage(name),
+            dependencies=self._infer_dependencies(name),
+        )
+
     def _write_manifest(self, session_dir: Path, manifest: SessionManifest) -> None:
         path = session_dir / "meta" / "manifest.json"
         path.write_text(json.dumps(asdict(manifest), indent=2, ensure_ascii=False), encoding="utf-8")
+
+    @staticmethod
+    def _checksum_for_path(path: Path) -> str:
+        if not path.exists() or not path.is_file():
+            return ""
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+
+    @staticmethod
+    def _infer_source_stage(name: str) -> str:
+        if name in {"scan_plan", "device_readiness"}:
+            return "workflow_lock"
+        if name in {"summary_json", "summary_text", "quality_feedback", "camera_index", "ultrasound_index", "command_journal", "annotations"}:
+            return "capture"
+        if name in {"quality_timeline", "alarm_timeline"}:
+            return "preprocess"
+        if name in {"frame_sync_index", "replay_index"}:
+            return "reconstruction"
+        if name in {"session_report", "session_compare", "session_trends", "diagnostics_pack", "qa_pack"}:
+            return "assessment"
+        return "session_service"
+
+    @staticmethod
+    def _infer_dependencies(name: str) -> list[str]:
+        mapping = {
+            "device_readiness": ["scan_plan"],
+            "quality_timeline": ["quality_feedback"],
+            "alarm_timeline": ["command_journal"],
+            "frame_sync_index": ["quality_feedback", "camera_index", "ultrasound_index", "annotations"],
+            "replay_index": ["alarm_timeline", "quality_timeline", "annotations", "frame_sync_index"],
+            "session_report": ["summary_json", "replay_index", "quality_timeline", "alarm_timeline", "frame_sync_index"],
+            "session_compare": ["session_report"],
+            "session_trends": ["session_report", "diagnostics_pack"],
+            "diagnostics_pack": ["command_journal", "alarm_timeline", "quality_timeline", "annotations"],
+            "qa_pack": ["session_report", "replay_index", "quality_timeline", "alarm_timeline", "session_compare", "session_trends", "diagnostics_pack"],
+        }
+        return list(mapping.get(name, []))

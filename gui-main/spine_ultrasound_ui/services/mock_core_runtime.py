@@ -58,15 +58,15 @@ class MockCoreRuntime:
         self.force_sensor_timeout_alarm = False
         self.force_sensor_estop_alarm = False
         self.devices = {
-            "robot": self._device(False, "offline", "机械臂控制器未连接"),
+            "robot": self._device(False, "offline", "xMate ER3 控制器未连接"),
             "camera": self._device(False, "offline", "摄像头未连接"),
             "pressure": self._device(False, "offline", "压力传感器未连接"),
             "ultrasound": self._device(False, "offline", "超声设备未连接"),
         }
         self.tcp_pose = {"x": 0.0, "y": 0.0, "z": 240.0, "rx": 180.0, "ry": 0.0, "rz": 90.0}
-        self.joint_pos = [0.0] * 7
-        self.joint_vel = [0.0] * 7
-        self.joint_torque = [0.0] * 7
+        self.joint_pos = [0.0] * 6
+        self.joint_vel = [0.0] * 6
+        self.joint_torque = [0.0] * 6
         self.cart_force = [0.0] * 6
         self.pending_alarms: list[dict[str, Any]] = []
 
@@ -108,6 +108,7 @@ class MockCoreRuntime:
                     "active_segment": self.active_segment,
                     "progress_pct": self.progress_pct,
                     "session_id": self.session_id,
+                    "recovery_state": self._recovery_state(),
                 },
             ),
             TelemetryEnvelope(
@@ -180,7 +181,7 @@ class MockCoreRuntime:
         self.execution_state = SystemState.CONNECTED
         self.controller_online = True
         self.devices = {
-            "robot": self._device(True, "online", "robot_core 已连接"),
+            "robot": self._device(True, "online", "xMate ER3 robot_core 已连接"),
             "camera": self._device(True, "online", "摄像头在线"),
             "pressure": self._device(True, "online", f"压力传感器在线 ({self.force_sensor_provider_name})"),
             "ultrasound": self._device(True, "online", "超声设备在线"),
@@ -346,9 +347,9 @@ class MockCoreRuntime:
         return ReplyEnvelope(ok=True, message="emergency_stop accepted")
 
     def _update_robot_kinematics(self) -> None:
-        self.joint_pos = [round(math.sin(self.phase * 0.1 + i * 0.2), 4) for i in range(7)]
-        self.joint_vel = [round(0.08 * math.cos(self.phase * 0.2 + i * 0.15), 4) for i in range(7)]
-        self.joint_torque = [round(0.45 * math.sin(self.phase * 0.16 + i * 0.18), 4) for i in range(7)]
+        self.joint_pos = [round(math.sin(self.phase * 0.1 + i * 0.2), 4) for i in range(6)]
+        self.joint_vel = [round(0.08 * math.cos(self.phase * 0.2 + i * 0.15), 4) for i in range(6)]
+        self.joint_torque = [round(0.45 * math.sin(self.phase * 0.16 + i * 0.18), 4) for i in range(6)]
         z_base = 240.0
         if self.execution_state == SystemState.APPROACHING:
             z_base = 220.0
@@ -440,6 +441,17 @@ class MockCoreRuntime:
             if self.path_index <= points_seen:
                 return int(segment.get("segment_id", 0))
         return int(segments[-1].get("segment_id", 0))
+
+    def _recovery_state(self) -> str:
+        if self.execution_state == SystemState.ESTOP:
+            return "ESTOP_LATCHED"
+        if self.execution_state == SystemState.FAULT:
+            return "CONTROLLED_RETRACT"
+        if self.execution_state == SystemState.PAUSED_HOLD:
+            return "HOLDING"
+        if self.execution_state in {SystemState.RETREATING, SystemState.SCAN_COMPLETE}:
+            return "RETRY_READY"
+        return "IDLE"
 
     def _safety_status(self) -> dict[str, Any]:
         interlocks = []

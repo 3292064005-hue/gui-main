@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manifest.schema.json",
+  "title": "SessionManifest",
+  "type": "object",
+  "required": [
+    "experiment_id",
+    "session_id",
+    "config_snapshot",
+    "scan_plan_hash",
+    "artifact_registry",
+    "processing_steps"
+  ],
+  "properties": {
+    "experiment_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "config_snapshot": {
+      "type": "object"
+    },
+    "scan_plan_hash": {
+      "type": "string"
+    },
+    "artifact_registry": {
+      "type": "object"
+    },
+    "processing_steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "algorithm_registry": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "alarms_summary": {
+      "type": "object"
+    },
+    "device_readiness": {
+      "type": "object"
+    },
+    "safety_thresholds": {
+      "type": "object"
+    },
+    "device_health_snapshot": {
+      "type": "object"
+    },
+    "artifacts": {
+      "type": "object"
+    },
+    "robot_profile": {
+      "type": "object"
+    },
+    "patient_registration": {
+      "type": "object"
+    },
+    "scan_protocol": {
+      "type": "object"
+    }
+  }
+}
