@@ -33,7 +33,11 @@ class MockCoreRuntime:
         self.pressure_current = 0.0
         self.contact_mode = "NO_CONTACT"
         self.contact_confidence = 0.0
+        self.contact_stable = False
         self.recommended_action = "IDLE"
+        self.plan_hash = ""
+        self.recovery_reason = ""
+        self.last_recovery_action = ""
         self.image_quality = 0.82
         self.feature_confidence = 0.76
         self.quality_score = 0.79
@@ -109,6 +113,8 @@ class MockCoreRuntime:
                     "progress_pct": self.progress_pct,
                     "session_id": self.session_id,
                     "recovery_state": self._recovery_state(),
+                    "plan_hash": self.plan_hash,
+                    "contact_stable": self.contact_stable,
                 },
             ),
             TelemetryEnvelope(
@@ -134,6 +140,7 @@ class MockCoreRuntime:
                     "confidence": self.contact_confidence,
                     "pressure_current": self.pressure_current,
                     "recommended_action": self.recommended_action,
+                    "contact_stable": self.contact_stable,
                 },
             ),
             TelemetryEnvelope(
@@ -251,6 +258,8 @@ class MockCoreRuntime:
         self.force_sensor_provider = create_force_sensor_provider(self.force_sensor_provider_name)
         self._open_recorders(self.session_dir, self.session_id)
         self.execution_state = SystemState.SESSION_LOCKED
+        self.recovery_reason = ""
+        self.last_recovery_action = "session_locked"
         self.last_event = "session_locked"
         return ReplyEnvelope(ok=True, message="lock_session accepted", data={"session_id": self.session_id})
 
@@ -258,13 +267,18 @@ class MockCoreRuntime:
         if self.execution_state not in {SystemState.SESSION_LOCKED, SystemState.PATH_VALIDATED, SystemState.SCAN_COMPLETE}:
             return ReplyEnvelope(ok=False, message="session not locked")
         plan_payload = dict(payload.get("scan_plan", {}))
-        if not plan_payload.get("segments"):
-            return ReplyEnvelope(ok=False, message="scan plan missing segments")
+        validation_error = self._validate_scan_plan(plan_payload)
+        if validation_error:
+            return ReplyEnvelope(ok=False, message=validation_error)
         self.scan_plan = plan_payload
+        self.plan_hash = self._plan_hash(plan_payload)
         self.path_index = 0
         self.progress_pct = 0.0
         self.active_segment = 0
         self.execution_state = SystemState.PATH_VALIDATED
+        self.contact_stable = False
+        self.recovery_reason = ""
+        self.last_recovery_action = "load_scan_plan"
         self.last_event = "scan_plan_loaded"
         return ReplyEnvelope(ok=True, message="load_scan_plan accepted", data={"plan_id": plan_payload.get("plan_id", "")})
 
@@ -273,6 +287,7 @@ class MockCoreRuntime:
         if self.execution_state != SystemState.PATH_VALIDATED:
             return ReplyEnvelope(ok=False, message="scan plan not ready")
         self.execution_state = SystemState.APPROACHING
+        self.contact_stable = False
         self.recommended_action = "SEEK_CONTACT"
         return ReplyEnvelope(ok=True, message="approach_prescan accepted")
 
@@ -280,17 +295,23 @@ class MockCoreRuntime:
         del payload
         if self.execution_state not in {SystemState.APPROACHING, SystemState.PATH_VALIDATED}:
             return ReplyEnvelope(ok=False, message="cannot seek contact from current state")
-        self.execution_state = SystemState.CONTACT_SEEKING
-        self.contact_mode = "SEEKING_CONTACT"
+        self.execution_state = SystemState.CONTACT_STABLE
+        self.contact_mode = "STABLE_CONTACT"
+        self.contact_confidence = 0.82
+        self.contact_stable = True
         self.recommended_action = "START_SCAN"
+        self.last_recovery_action = "contact_stable"
         return ReplyEnvelope(ok=True, message="seek_contact accepted")
 
     def _cmd_start_scan(self, payload: dict) -> ReplyEnvelope:
         del payload
-        if self.execution_state not in {SystemState.CONTACT_SEEKING, SystemState.PATH_VALIDATED, SystemState.PAUSED_HOLD}:
-            return ReplyEnvelope(ok=False, message="cannot start scan from current state")
+        if self.execution_state not in {SystemState.CONTACT_STABLE, SystemState.PAUSED_HOLD}:
+            return ReplyEnvelope(ok=False, message="cannot start scan before contact is stable")
         self.execution_state = SystemState.SCANNING
         self.contact_mode = "STABLE_CONTACT"
+        self.contact_stable = True
+        self.recovery_reason = ""
+        self.last_recovery_action = "start_scan"
         self.recommended_action = "SCAN"
         self.last_event = "scan_started"
         return ReplyEnvelope(ok=True, message="start_scan accepted")
@@ -301,6 +322,9 @@ class MockCoreRuntime:
             return ReplyEnvelope(ok=False, message="scan not active")
         self.execution_state = SystemState.PAUSED_HOLD
         self.contact_mode = "HOLDING_CONTACT"
+        self.contact_stable = True
+        self.recovery_reason = "operator_pause"
+        self.last_recovery_action = "pause_hold"
         self.recommended_action = "RESUME_OR_RETREAT"
         return ReplyEnvelope(ok=True, message="pause_scan accepted")
 
@@ -310,6 +334,9 @@ class MockCoreRuntime:
             return ReplyEnvelope(ok=False, message="scan not paused")
         self.execution_state = SystemState.SCANNING
         self.contact_mode = "STABLE_CONTACT"
+        self.contact_stable = True
+        self.recovery_reason = ""
+        self.last_recovery_action = "resume_scan"
         self.recommended_action = "SCAN"
         return ReplyEnvelope(ok=True, message="resume_scan accepted")
 
@@ -320,6 +347,9 @@ class MockCoreRuntime:
         self.execution_state = SystemState.RETREATING
         self.retreat_ticks_remaining = 6
         self.contact_mode = "NO_CONTACT"
+        self.contact_stable = False
+        self.recovery_reason = "requested_safe_retreat"
+        self.last_recovery_action = "safe_retreat"
         self.recommended_action = "WAIT_RETREAT_COMPLETE"
         self.last_event = "safe_retreat"
         return ReplyEnvelope(ok=True, message="safe_retreat accepted")
@@ -353,7 +383,7 @@ class MockCoreRuntime:
         z_base = 240.0
         if self.execution_state == SystemState.APPROACHING:
             z_base = 220.0
-        elif self.execution_state in {SystemState.CONTACT_SEEKING, SystemState.SCANNING, SystemState.PAUSED_HOLD}:
+        elif self.execution_state in {SystemState.CONTACT_SEEKING, SystemState.CONTACT_STABLE, SystemState.SCANNING, SystemState.PAUSED_HOLD}:
             z_base = 205.0
         elif self.execution_state == SystemState.RETREATING:
             z_base = 230.0
@@ -368,7 +398,7 @@ class MockCoreRuntime:
 
     def _update_contact_and_progress(self) -> None:
         force_sample = self.force_sensor_provider.read_sample(
-            contact_active=self.execution_state in {SystemState.CONTACT_SEEKING, SystemState.SCANNING, SystemState.PAUSED_HOLD},
+            contact_active=self.execution_state in {SystemState.CONTACT_SEEKING, SystemState.CONTACT_STABLE, SystemState.SCANNING, SystemState.PAUSED_HOLD},
             desired_force_n=float(self.force_control["desired_contact_force_n"]),
         )
         self.force_sensor_status = force_sample.status
@@ -380,8 +410,15 @@ class MockCoreRuntime:
             self.force_sensor_stale_ticks += 1
         if self.execution_state == SystemState.CONTACT_SEEKING:
             self.pressure_current = round(max(measured_pressure, 0.0), 3)
-            self.contact_mode = "STABLE_CONTACT" if self.pressure_current >= self.config.pressure_target - 0.05 else "SEEKING_CONTACT"
-            self.contact_confidence = 0.78
+            self.contact_mode = "SEEKING_CONTACT"
+            self.contact_confidence = 0.72
+            self.contact_stable = False
+            self.recommended_action = "WAIT_CONTACT_STABLE"
+        elif self.execution_state == SystemState.CONTACT_STABLE:
+            self.pressure_current = round(measured_pressure if measured_pressure > 0.0 else self.config.pressure_target, 3)
+            self.contact_mode = "STABLE_CONTACT"
+            self.contact_confidence = 0.84
+            self.contact_stable = True
             self.recommended_action = "START_SCAN"
         elif self.execution_state == SystemState.SCANNING:
             total_points = max(sum(len(segment.get("waypoints", [])) for segment in self.scan_plan.get("segments", [])) if self.scan_plan else 0, 120)
@@ -391,10 +428,14 @@ class MockCoreRuntime:
             self.pressure_current = round(measured_pressure if measured_pressure > 0.0 else self.config.pressure_target + 0.08 * math.sin(self.phase) + random.uniform(-0.03, 0.03), 3)
             self.contact_mode = "STABLE_CONTACT"
             self.contact_confidence = 0.87
+            self.contact_stable = True
             self.recommended_action = "SCAN"
             if self.pressure_current > self.config.pressure_upper:
                 self.execution_state = SystemState.PAUSED_HOLD
                 self.contact_mode = "OVERPRESSURE"
+                self.contact_stable = False
+                self.recovery_reason = "pressure_over_upper_limit"
+                self.last_recovery_action = "pause_hold"
                 self.recommended_action = "CONTROLLED_RETRACT"
                 self._queue_alarm(
                     "RECOVERABLE_FAULT",
@@ -406,26 +447,34 @@ class MockCoreRuntime:
             if self.progress_pct >= 100.0:
                 self.execution_state = SystemState.SCAN_COMPLETE
                 self.contact_mode = "NO_CONTACT"
+                self.contact_stable = False
+                self.recovery_reason = ""
+                self.last_recovery_action = "scan_complete"
                 self.recommended_action = "POSTPROCESS"
                 self.last_event = "scan_complete"
         elif self.execution_state == SystemState.PAUSED_HOLD:
             self.pressure_current = round(measured_pressure if measured_pressure > 0.0 else max(self.config.pressure_target - 0.03, 0.0), 3)
             self.contact_mode = "HOLDING_CONTACT"
             self.contact_confidence = 0.75
+            self.contact_stable = True
             self.recommended_action = "RESUME_OR_RETREAT"
         elif self.execution_state == SystemState.RETREATING:
             self.pressure_current = 0.0
             self.contact_confidence = 0.0
             self.contact_mode = "NO_CONTACT"
+            self.contact_stable = False
             self.recommended_action = "WAIT_RETREAT_COMPLETE"
             self.retreat_ticks_remaining -= 1
             if self.retreat_ticks_remaining <= 0:
                 self.execution_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
+                self.recovery_reason = ""
+                self.last_recovery_action = "retreat_complete"
                 self.recommended_action = "IDLE"
         else:
             self.pressure_current = max(0.0, measured_pressure)
             self.contact_confidence = 0.0
             self.contact_mode = "NO_CONTACT"
+            self.contact_stable = False
             self.recommended_action = "IDLE"
         self.cart_force = [0.02, 0.01, round(self.pressure_current, 3), 0.0, 0.0, 0.0]
 
@@ -449,8 +498,8 @@ class MockCoreRuntime:
             return "CONTROLLED_RETRACT"
         if self.execution_state == SystemState.PAUSED_HOLD:
             return "HOLDING"
-        if self.execution_state in {SystemState.RETREATING, SystemState.SCAN_COMPLETE}:
-            return "RETRY_READY"
+        if self.execution_state in {SystemState.RETREATING, SystemState.SCAN_COMPLETE, SystemState.CONTACT_STABLE}:
+            return "RETRY_READY" if self.execution_state != SystemState.CONTACT_STABLE else "IDLE"
         return "IDLE"
 
     def _safety_status(self) -> dict[str, Any]:
@@ -498,6 +547,8 @@ class MockCoreRuntime:
             "safe_to_arm": safe_to_arm,
             "safe_to_scan": safe_to_scan,
             "active_interlocks": interlocks,
+            "recovery_reason": self.recovery_reason,
+            "last_recovery_action": self.last_recovery_action,
             "max_z_force_n": self.force_control["max_z_force_n"],
             "warning_z_force_n": self.force_control["warning_z_force_n"],
             "max_xy_force_n": self.force_control["max_xy_force_n"],
@@ -541,6 +592,9 @@ class MockCoreRuntime:
         if self.execution_state == SystemState.SCANNING and current_stale_ms >= timeout_ms and not self.force_sensor_estop_alarm:
             self.execution_state = SystemState.PAUSED_HOLD
             self.contact_mode = "SENSOR_STALE"
+            self.contact_stable = False
+            self.recovery_reason = "sensor_timeout"
+            self.last_recovery_action = "pause_hold"
             self.recommended_action = "CONTROLLED_RETRACT"
             self._queue_alarm(
                 "RECOVERABLE_FAULT",
@@ -553,6 +607,9 @@ class MockCoreRuntime:
         if self.execution_state in {SystemState.SCANNING, SystemState.PAUSED_HOLD} and current_stale_ms >= timeout_ms * 2 and self.fault_code != "SENSOR_TIMEOUT":
             self.execution_state = SystemState.ESTOP
             self.fault_code = "SENSOR_TIMEOUT"
+            self.contact_stable = False
+            self.recovery_reason = "sensor_timeout_escalated"
+            self.last_recovery_action = "estop"
             self._queue_alarm(
                 "FATAL_FAULT",
                 "sensor",
@@ -580,6 +637,7 @@ class MockCoreRuntime:
             "confidence": self.contact_confidence,
             "pressure_current": self.pressure_current,
             "recommended_action": self.recommended_action,
+            "contact_stable": self.contact_stable,
         }
         progress_payload = {
             "execution_state": self.execution_state.value,
@@ -631,7 +689,36 @@ class MockCoreRuntime:
         self.last_controller_log = message
         if severity == "FATAL_FAULT":
             self.fault_code = source.upper()
+            self.recovery_reason = source
+            self.last_recovery_action = auto_action or severity.lower()
             self.execution_state = SystemState.FAULT if self.execution_state != SystemState.ESTOP else SystemState.ESTOP
+
+    @staticmethod
+    def _plan_hash(plan_payload: dict[str, Any]) -> str:
+        import hashlib
+        import json
+        return hashlib.sha256(json.dumps(plan_payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _validate_scan_plan(plan_payload: dict[str, Any]) -> str:
+        segments = list(plan_payload.get("segments") or [])
+        if not segments:
+            return "scan plan missing segments"
+        if not isinstance(plan_payload.get("approach_pose"), dict) or not isinstance(plan_payload.get("retreat_pose"), dict):
+            return "scan plan missing approach/retreat poses"
+        previous_segment = 0
+        for segment in segments:
+            segment_id = int(segment.get("segment_id", 0) or 0)
+            if segment_id <= 0:
+                return "scan plan contains invalid segment id"
+            if previous_segment and segment_id != previous_segment + 1:
+                return "scan plan segment ids must be contiguous"
+            previous_segment = segment_id
+            waypoints = list(segment.get("waypoints") or [])
+            if not waypoints:
+                return f"segment {segment_id} has no waypoints"
+        return ""
+
 
     @staticmethod
     def _device(connected: bool, health: str, detail: str) -> Dict[str, Any]:

@@ -25,6 +25,7 @@ std::string stateName(RobotCoreState state) {
     case RobotCoreState::PathValidated: return "PATH_VALIDATED";
     case RobotCoreState::Approaching: return "APPROACHING";
     case RobotCoreState::ContactSeeking: return "CONTACT_SEEKING";
+    case RobotCoreState::ContactStable: return "CONTACT_STABLE";
     case RobotCoreState::Scanning: return "SCANNING";
     case RobotCoreState::PausedHold: return "PAUSED_HOLD";
     case RobotCoreState::Retreating: return "RETREATING";
@@ -62,6 +63,9 @@ CoreRuntime::CoreRuntime() {
 
 void CoreRuntime::setState(RobotCoreState state) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (execution_state_ != state) {
+    last_transition_ = stateName(state);
+  }
   execution_state_ = state;
 }
 
@@ -102,15 +106,20 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     session_id_.clear();
     session_dir_.clear();
     plan_id_.clear();
+    plan_hash_.clear();
     plan_loaded_ = false;
     total_points_ = 0;
     total_segments_ = 0;
     path_index_ = 0;
     frame_id_ = 0;
     active_segment_ = 0;
+    active_waypoint_index_ = 0;
     retreat_ticks_remaining_ = 0;
     progress_pct_ = 0.0;
     pressure_current_ = 0.0;
+    contact_stable_since_ns_ = 0;
+    last_transition_.clear();
+    state_reason_.clear();
     contact_state_ = ContactTelemetry{};
     pending_alarms_.clear();
     recovery_manager_.resetToIdle();
@@ -186,6 +195,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
       return replyJson(request_id, false, "scan plan missing segments");
     }
     execution_state_ = RobotCoreState::PathValidated;
+    state_reason_ = "scan_plan_validated";
     return replyJson(request_id, true, "load_scan_plan accepted", json::object({json::field("plan_id", json::quote(plan_id_))}));
   }
   if (command == "approach_prescan") {
@@ -194,30 +204,34 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     }
     nrt_motion_service_.approachPrescan();
     execution_state_ = RobotCoreState::Approaching;
+    state_reason_ = "approach_prescan";
     contact_state_.recommended_action = "SEEK_CONTACT";
     return replyJson(request_id, true, "approach_prescan accepted");
   }
   if (command == "seek_contact") {
-    if (execution_state_ != RobotCoreState::Approaching && execution_state_ != RobotCoreState::PathValidated) {
-      return replyJson(request_id, false, "cannot seek contact from current state");
+    std::string reason;
+    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
+      return replyJson(request_id, false, reason);
     }
     if (!rt_motion_service_.seekContact()) {
       return replyJson(request_id, false, "seek_contact failed");
     }
     execution_state_ = RobotCoreState::ContactSeeking;
+    state_reason_ = "waiting_for_contact_stability";
     contact_state_.mode = "SEEKING_CONTACT";
-    contact_state_.recommended_action = "START_SCAN";
+    contact_state_.recommended_action = "WAIT_CONTACT_STABLE";
     return replyJson(request_id, true, "seek_contact accepted");
   }
   if (command == "start_scan") {
-    if (execution_state_ != RobotCoreState::ContactSeeking && execution_state_ != RobotCoreState::PathValidated &&
-        execution_state_ != RobotCoreState::PausedHold) {
-      return replyJson(request_id, false, "cannot start scan from current state");
+    std::string reason;
+    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
+      return replyJson(request_id, false, reason);
     }
     if (!rt_motion_service_.startCartesianImpedance()) {
       return replyJson(request_id, false, "start_scan failed");
     }
     execution_state_ = RobotCoreState::Scanning;
+    state_reason_ = "scan_active";
     contact_state_.mode = "STABLE_CONTACT";
     contact_state_.recommended_action = "SCAN";
     return replyJson(request_id, true, "start_scan accepted");
@@ -229,6 +243,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     rt_motion_service_.pauseAndHold();
     recovery_manager_.pauseAndHold();
     execution_state_ = RobotCoreState::PausedHold;
+    state_reason_ = "pause_hold";
     contact_state_.mode = "HOLDING_CONTACT";
     contact_state_.recommended_action = "RESUME_OR_RETREAT";
     return replyJson(request_id, true, "pause_scan accepted");
@@ -242,6 +257,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     }
     recovery_manager_.cancelRetry();
     execution_state_ = RobotCoreState::Scanning;
+    state_reason_ = "scan_active";
     contact_state_.mode = "STABLE_CONTACT";
     contact_state_.recommended_action = "SCAN";
     return replyJson(request_id, true, "resume_scan accepted");
@@ -254,6 +270,7 @@ std::string CoreRuntime::handleCommandJson(const std::string& line) {
     nrt_motion_service_.safeRetreat();
     recovery_manager_.controlledRetract();
     execution_state_ = RobotCoreState::Retreating;
+    state_reason_ = "safe_retreat";
     retreat_ticks_remaining_ = 30;
     contact_state_.mode = "NO_CONTACT";
     contact_state_.recommended_action = "WAIT_RETREAT_COMPLETE";
@@ -350,6 +367,7 @@ void CoreRuntime::statePollStep() {
                             ? 220.0
                             : (execution_state_ == RobotCoreState::Retreating ? 230.0
                                                                                : (execution_state_ == RobotCoreState::ContactSeeking ||
+                                                                                          execution_state_ == RobotCoreState::ContactStable ||
                                                                                           execution_state_ == RobotCoreState::Scanning ||
                                                                                           execution_state_ == RobotCoreState::PausedHold
                                                                                       ? 205.0
@@ -379,6 +397,7 @@ void CoreRuntime::watchdogStep() {
       force_limits_,
       config_.pressure_target);
   const auto decision = decideSafetyAction(force_state);
+  const auto recovery_decision = recovery_policy_.evaluate(pressure_current_, config_.pressure_target, config_.pressure_upper, pressure_fresh_ ? 0.0 : static_cast<double>(config_.pressure_stale_ms));
   if (decision == SafetyDecision::WarnOnly && execution_state_ == RobotCoreState::Scanning) {
     queueAlarmLocked("WARN", "force_monitor", "力控接近告警阈值", "force_monitor", "", "warn_only");
   }
@@ -435,11 +454,32 @@ void CoreRuntime::updateContactAndProgressLocked() {
     input.cart_force_z = pressure_current_;
     input.quality_score = quality_score_;
     auto observed = contact_observer_.evaluate(input);
-    contact_state_.mode = pressure_current_ >= config_.pressure_target - 0.05 ? "STABLE_CONTACT" : observed.mode;
+    if (pressure_current_ >= config_.pressure_target - 0.05) {
+      if (contact_stable_since_ns_ <= 0) {
+        contact_stable_since_ns_ = json::nowNs();
+      }
+      const auto gate = contact_gate_.evaluate(pressure_current_, config_.pressure_target, contact_stable_since_ns_, json::nowNs());
+      contact_state_.mode = gate.mode;
+      if (gate.contact_stable) {
+        execution_state_ = RobotCoreState::ContactStable;
+        state_reason_ = "contact_stable";
+      }
+    } else {
+      contact_stable_since_ns_ = 0;
+      contact_state_.mode = observed.mode;
+    }
     contact_state_.confidence = 0.78;
     contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = "START_SCAN";
+    contact_state_.recommended_action = execution_state_ == RobotCoreState::ContactStable ? "START_SCAN" : "WAIT_CONTACT_STABLE";
     active_segment_ = std::max(active_segment_, 1);
+    return;
+  }
+  if (execution_state_ == RobotCoreState::ContactStable) {
+    pressure_current_ = config_.pressure_target;
+    contact_state_.mode = "STABLE_CONTACT";
+    contact_state_.confidence = 0.83;
+    contact_state_.pressure_current = pressure_current_;
+    contact_state_.recommended_action = "START_SCAN";
     return;
   }
   if (execution_state_ == RobotCoreState::Scanning) {
@@ -448,6 +488,7 @@ void CoreRuntime::updateContactAndProgressLocked() {
     }
     if (total_points_ > 0) {
       progress_pct_ = std::min(100.0, 100.0 * static_cast<double>(path_index_) / static_cast<double>(total_points_));
+      active_waypoint_index_ = std::min(total_points_, path_index_);
     }
     if (total_segments_ > 0) {
       const int points_per_segment = std::max(total_points_ / total_segments_, 1);
@@ -482,6 +523,7 @@ void CoreRuntime::updateContactAndProgressLocked() {
     return;
   }
   pressure_current_ = std::max(0.0, config_.pressure_target - 0.25);
+  contact_stable_since_ns_ = 0;
   contact_state_.mode = "NO_CONTACT";
   contact_state_.confidence = 0.0;
   contact_state_.pressure_current = pressure_current_;
@@ -507,7 +549,7 @@ void CoreRuntime::refreshDeviceHealthLocked(int64_t ts_ns) {
 }
 
 SafetyStatus CoreRuntime::evaluateSafetyLocked() const {
-  return safety_service_.evaluate(
+  auto status = safety_service_.evaluate(
       controller_online_,
       powered_,
       automatic_mode_,
@@ -520,6 +562,12 @@ SafetyStatus CoreRuntime::evaluateSafetyLocked() const {
       tool_ready_,
       tcp_ready_,
       load_ready_);
+  const auto recovery = recovery_policy_.evaluate(pressure_current_, config_.pressure_target, config_.pressure_upper, pressure_fresh_ ? 0.0 : static_cast<double>(config_.pressure_stale_ms));
+  status.recovery_reason = recovery.reason;
+  status.last_recovery_action = recovery.action;
+  status.sensor_freshness_ms = pressure_fresh_ ? 0 : config_.pressure_stale_ms;
+  status.pressure_band_state = std::fabs(pressure_current_ - config_.pressure_target) <= force_limits_.resume_force_band_n ? "WITHIN_RESUME_BAND" : "OUT_OF_BAND";
+  return status;
 }
 
 void CoreRuntime::queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step, const std::string& request_id, const std::string& auto_action) {
@@ -550,6 +598,12 @@ CoreStateSnapshot CoreRuntime::buildCoreSnapshotLocked() const {
   snapshot.progress_pct = progress_pct_;
   snapshot.session_id = session_id_;
   snapshot.recovery_state = recovery_manager_.currentStateName();
+  snapshot.plan_hash = plan_hash_;
+  snapshot.contact_stable = execution_state_ == RobotCoreState::ContactStable || execution_state_ == RobotCoreState::Scanning || execution_state_ == RobotCoreState::PausedHold;
+  snapshot.contact_stable_since_ns = contact_stable_since_ns_;
+  snapshot.active_waypoint_index = active_waypoint_index_;
+  snapshot.last_transition = last_transition_;
+  snapshot.state_reason = state_reason_;
   return snapshot;
 }
 
@@ -590,13 +644,21 @@ void CoreRuntime::applyConfigFromJsonLocked(const std::string& json_line) {
 }
 
 void CoreRuntime::loadPlanFromJsonLocked(const std::string& json_line) {
-  plan_id_ = json::extractString(json_line, "plan_id");
-  const auto segments = json::extractAllInts(json_line, "segment_id");
-  total_segments_ = static_cast<int>(segments.size());
+  const auto plan = scan_plan_parser_.parseJsonEnvelope(json_line);
+  std::string error;
+  if (!scan_plan_validator_.validate(plan, &error)) {
+    plan_loaded_ = false;
+    state_reason_ = error;
+    return;
+  }
+  plan_id_ = plan.plan_id;
+  plan_hash_ = !plan.plan_hash.empty() ? plan.plan_hash : json::extractString(json_line, "scan_plan_hash");
+  total_segments_ = static_cast<int>(plan.segments.size());
   total_points_ = std::max(total_segments_ * std::max(static_cast<int>(config_.segment_length_mm / std::max(config_.sample_step_mm, 0.1)), 2), 0);
   path_index_ = 0;
+  active_waypoint_index_ = 0;
   progress_pct_ = 0.0;
-  active_segment_ = total_segments_ > 0 ? segments.front() : 0;
+  active_segment_ = total_segments_ > 0 ? plan.segments.front().segment_id : 0;
   plan_loaded_ = total_segments_ > 0;
 }
 

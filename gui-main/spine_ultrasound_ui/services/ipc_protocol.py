@@ -65,7 +65,7 @@ COMMAND_SPECS: dict[str, dict[str, Any]] = {
     },
     "start_scan": {
         "required_payload_fields": [],
-        "state_preconditions": ["PATH_VALIDATED", "CONTACT_SEEKING", "PAUSED_HOLD"],
+        "state_preconditions": ["CONTACT_STABLE", "PAUSED_HOLD"],
     },
     "pause_scan": {
         "required_payload_fields": [],
@@ -95,7 +95,7 @@ COMMAND_SPECS: dict[str, dict[str, Any]] = {
 
 TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
     "core_state": {
-        "core_fields": ["execution_state", "armed", "fault_code", "active_segment", "progress_pct", "session_id"],
+        "core_fields": ["execution_state", "armed", "fault_code", "active_segment", "progress_pct", "session_id", "recovery_state", "plan_hash", "contact_stable"],
     },
     "robot_state": {
         "core_fields": [
@@ -111,7 +111,7 @@ TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
         ],
     },
     "contact_state": {
-        "core_fields": ["mode", "confidence", "pressure_current", "recommended_action"],
+        "core_fields": ["mode", "confidence", "pressure_current", "recommended_action", "contact_stable"],
     },
     "scan_progress": {
         "core_fields": ["active_segment", "path_index", "overall_progress", "frame_id"],
@@ -120,7 +120,7 @@ TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
         "core_fields": ["devices"],
     },
     "safety_status": {
-        "core_fields": ["safe_to_arm", "safe_to_scan", "active_interlocks"],
+        "core_fields": ["safe_to_arm", "safe_to_scan", "active_interlocks", "recovery_reason", "last_recovery_action"],
     },
     "recording_status": {
         "core_fields": ["session_id", "recording", "dropped_samples", "last_flush_ns"],

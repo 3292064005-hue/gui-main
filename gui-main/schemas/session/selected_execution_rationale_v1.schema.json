@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "selected_plan_id",
+    "ranking_snapshot"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "selected_candidate_id": {
+      "type": "string"
+    },
+    "selected_plan_id": {
+      "type": "string"
+    },
+    "selection_basis": {
+      "type": "object"
+    },
+    "tradeoff_summary": {
+      "type": "object"
+    },
+    "selected_score": {
+      "type": "object"
+    },
+    "ranking_snapshot": {
+      "type": "array"
+    },
+    "rejected_candidate_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

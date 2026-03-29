@@ -59,6 +59,7 @@ def test_mock_runtime_alarm_is_traceable(tmp_path):
             }
         },
     ).ok
+    assert runtime.handle_command("seek_contact").ok
     assert runtime.handle_command("start_scan").ok
     alarms = [env.data for env in runtime.tick() if env.topic == "alarm_event"]
     assert alarms

@@ -1,0 +1,23 @@
+{
+  "$id": "session/recovery_report.schema.json",
+  "type": "object",
+  "required": [
+    "session_id",
+    "summary",
+    "events"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object"
+    },
+    "events": {
+      "type": "array"
+    },
+    "generated_at": {
+      "type": "string"
+    }
+  }
+}

@@ -53,6 +53,7 @@ class _StubAdapter:
             'protocol_version': 1,
             'commands': {'start_scan': {'required_payload_fields': []}},
             'telemetry_topics': {'core_state': {'core_fields': ['execution_state']}},
+            'topic_catalog': {'topics': [{'topic': 'core_state', 'category': 'runtime', 'delivery': 'telemetry', 'description': 'core state'}]},
             'force_control': {
                 'desired_contact_force_n': 10.0,
                 'stale_telemetry_ms': 250,
@@ -118,6 +119,33 @@ class _StubAdapter:
     def current_scan_protocol(self) -> dict:
         return {'session_id': 'S1', 'robot_model': 'xmate_er3', 'clinical_control_modes': {'scan': 'cartesianImpedance'}, 'contact_control': {}, 'path_policy': {}}
 
+    def current_lineage(self) -> dict:
+        return {'session_id': 'S1', 'lineage': [{'kind': 'plan'}]}
+
+    def current_resume_state(self) -> dict:
+        return {'session_id': 'S1', 'resume_ready': True, 'last_successful_segment': 1}
+
+    def current_recovery_report(self) -> dict:
+        return {'session_id': 'S1', 'summary': {'latest_recovery_state': 'IDLE'}, 'events': []}
+
+    def current_incidents(self) -> dict:
+        return {'session_id': 'S1', 'summary': {'count': 1}, 'incidents': [{'incident_type': 'force_excursion_incident'}]}
+
+    def current_resume_decision(self) -> dict:
+        return {'session_id': 'S1', 'resume_allowed': False, 'blocking_reasons': ['artifact_integrity_failed'], 'mode': 'restart_required'}
+
+    def current_event_log_index(self) -> dict:
+        return {'session_id': 'S1', 'events': [{'topic': 'command_trace'}], 'summary': {'event_count': 1}}
+
+    def current_recovery_timeline(self) -> dict:
+        return {'session_id': 'S1', 'timeline': [{'decision': 'hold'}], 'summary': {'decision_count': 1}}
+
+    def role_catalog(self) -> dict:
+        return {'roles': {'operator': {'runtime_read': True, 'session_read': True, 'command_groups': ['control'], 'export_allowed': True}}}
+
+    def topic_catalog(self) -> dict:
+        return {'topics': [{'topic': 'core_state', 'category': 'runtime', 'delivery': 'telemetry', 'description': 'core state'}], 'roles': {'operator': {'runtime_read': True, 'session_read': True, 'command_groups': ['control'], 'export_allowed': True}}}
+
     def command(self, command: str, payload: dict) -> dict:
         return {'ok': True, 'message': 'ok', 'request_id': 'r1', 'data': payload, 'protocol_version': 1}
 
@@ -136,6 +164,8 @@ def _client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 def test_extended_headless_endpoints(monkeypatch: pytest.MonkeyPatch):
     with _client(monkeypatch) as client:
         assert client.get('/api/v1/schema/artifacts').status_code == 200
+        assert client.get('/api/v1/topics').json()['topics'][0]['topic'] == 'core_state'
+        assert 'operator' in client.get('/api/v1/roles').json()['roles']
         assert client.get('/api/v1/sessions/current/quality').json()['summary']['coverage_ratio'] == 0.9
         assert client.get('/api/v1/sessions/current/alarms').json()['summary']['count'] == 0
         assert client.get('/api/v1/sessions/current/artifacts').json()['artifact_registry']['qa_pack']['path'] == 'export/qa_pack.json'
@@ -149,6 +179,13 @@ def test_extended_headless_endpoints(monkeypatch: pytest.MonkeyPatch):
         assert client.get('/api/v1/sessions/current/scan-protocol').json()['robot_model'] == 'xmate_er3'
         assert client.get('/api/v1/sessions/current/command-trace').json()['summary']['count'] == 1
         assert client.get('/api/v1/sessions/current/assessment').json()['requires_manual_review'] is True
+        assert client.get('/api/v1/sessions/current/lineage').json()['lineage'][0]['kind'] == 'plan'
+        assert client.get('/api/v1/sessions/current/resume-state').json()['resume_ready'] is True
+        assert client.get('/api/v1/sessions/current/recovery-report').json()['summary']['latest_recovery_state'] == 'IDLE'
+        assert client.get('/api/v1/sessions/current/incidents').json()['summary']['count'] == 1
+        assert client.get('/api/v1/sessions/current/resume-decision').json()['mode'] == 'restart_required'
+        assert client.get('/api/v1/sessions/current/event-log-index').json()['summary']['event_count'] == 1
+        assert client.get('/api/v1/sessions/current/recovery-timeline').json()['summary']['decision_count'] == 1
         assert 'schemas' in client.get('/api/v1/sessions/current/qa-pack').json()
 
 

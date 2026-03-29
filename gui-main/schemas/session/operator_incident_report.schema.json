@@ -1,0 +1,20 @@
+{
+  "$id": "session/operator_incident_report.schema.json",
+  "type": "object",
+  "required": [
+    "session_id",
+    "count",
+    "incidents"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "count": {
+      "type": "integer"
+    },
+    "incidents": {
+      "type": "array"
+    }
+  }
+}

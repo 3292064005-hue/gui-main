@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "decision_count",
+    "decisions"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "execution_state": {
+      "type": "string"
+    },
+    "contact_state": {
+      "type": "string"
+    },
+    "plan_state": {
+      "type": "string"
+    },
+    "resume_mode": {
+      "type": "string"
+    },
+    "decision_count": {
+      "type": "integer"
+    },
+    "decisions": {
+      "type": "object"
+    },
+    "plan_hash": {
+      "type": "string"
+    }
+  }
+}

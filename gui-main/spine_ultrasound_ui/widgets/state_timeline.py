@@ -11,6 +11,7 @@ class StateTimeline(QListWidget):
         "PATH_VALIDATED",
         "APPROACHING",
         "CONTACT_SEEKING",
+        "CONTACT_STABLE",
         "SCANNING",
         "PAUSED_HOLD",
         "RETREATING",

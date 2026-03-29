@@ -27,6 +27,25 @@ _ARTIFACT_SCHEMA_HINTS = {
     "patient_registration": "patient_registration.schema.json",
     "scan_protocol": "scan_protocol.schema.json",
     "frame_sync_index": "frame_sync_index.schema.json",
+    "session_integrity": "artifact_registry.schema.json",
+    "lineage": "session/lineage.schema.json",
+    "resume_state": "session/resume_state.schema.json",
+    "recovery_report": "session/recovery_report.schema.json",
+    "operator_incident_report": "session/operator_incident_report.schema.json",
+    "session_incidents": "session/session_incidents.schema.json",
+    "resume_decision": "session/resume_decision.schema.json",
+    "event_log_index": "session/event_log_index_v1.schema.json",
+    "event_delivery_summary": "session/event_delivery_summary_v1.schema.json",
+    "selected_execution_rationale": "session/selected_execution_rationale_v1.schema.json",
+    "release_gate_decision": "runtime/release_gate_decision_v1.schema.json",
+    "recovery_decision_timeline": "session/recovery_timeline_v1.schema.json",
+    "resume_attempts": "session/resume_attempts_v1.schema.json",
+    "resume_attempt_outcomes": "session/resume_attempt_outcomes_v1.schema.json",
+    "contract_consistency": "session/contract_consistency_v1.schema.json",
+    "release_evidence_pack": "session/release_evidence_pack_v1.schema.json",
+    "command_state_policy": "runtime/command_state_policy_v1.schema.json",
+    "command_policy_snapshot": "session/command_policy_snapshot_v1.schema.json",
+    "contract_kernel_diff": "session/contract_kernel_diff_v1.schema.json",
 }
 
 
@@ -84,6 +103,14 @@ class ExperimentManager:
         scan_plan: ScanPlan,
         *,
         protocol_version: int = 1,
+        planner_version: str = "deterministic_planner_v2",
+        registration_version: str = "camera_backed_registration_v2",
+        core_protocol_version: int = 1,
+        frontend_build_id: str = "",
+        environment_snapshot: Dict[str, Any] | None = None,
+        force_control_hash: str = "",
+        robot_profile_hash: str = "",
+        patient_registration_hash: str = "",
         force_sensor_provider: str = "mock_force_sensor",
         safety_thresholds: Dict[str, Any] | None = None,
         device_health_snapshot: Dict[str, Any] | None = None,
@@ -121,6 +148,14 @@ class ExperimentManager:
             device_roster=device_roster,
             software_version=software_version,
             build_id=build_id,
+            planner_version=planner_version,
+            registration_version=registration_version,
+            core_protocol_version=core_protocol_version,
+            frontend_build_id=frontend_build_id,
+            environment_snapshot=environment_snapshot or {},
+            force_control_hash=force_control_hash,
+            robot_profile_hash=robot_profile_hash,
+            patient_registration_hash=patient_registration_hash,
             protocol_version=protocol_version,
             force_sensor_provider=force_sensor_provider,
             safety_thresholds=safety_thresholds or {},
@@ -252,7 +287,7 @@ class ExperimentManager:
             return "preprocess"
         if name in {"frame_sync_index", "replay_index"}:
             return "reconstruction"
-        if name in {"session_report", "session_compare", "session_trends", "diagnostics_pack", "qa_pack"}:
+        if name in {"session_report", "session_compare", "session_trends", "diagnostics_pack", "qa_pack", "session_integrity", "lineage", "resume_state", "resume_decision", "resume_attempts", "resume_attempt_outcomes", "recovery_report", "operator_incident_report", "session_incidents", "event_log_index", "recovery_decision_timeline", "contract_consistency", "release_evidence_pack", "release_gate_decision", "command_state_policy", "event_delivery_summary", "selected_execution_rationale"}:
             return "assessment"
         return "session_service"
 
@@ -269,5 +304,22 @@ class ExperimentManager:
             "session_trends": ["session_report", "diagnostics_pack"],
             "diagnostics_pack": ["command_journal", "alarm_timeline", "quality_timeline", "annotations"],
             "qa_pack": ["session_report", "replay_index", "quality_timeline", "alarm_timeline", "session_compare", "session_trends", "diagnostics_pack"],
+            "session_integrity": ["scan_plan", "device_readiness", "xmate_profile", "patient_registration", "scan_protocol"],
+            "lineage": ["scan_plan", "patient_registration", "command_journal", "session_report"],
+            "resume_state": ["scan_plan", "command_journal", "session_integrity", "recovery_report"],
+            "recovery_report": ["command_journal", "alarm_timeline", "annotations"],
+            "operator_incident_report": ["annotations", "alarm_timeline"],
+            "session_incidents": ["operator_incident_report", "recovery_report", "quality_timeline"],
+            "resume_decision": ["resume_state", "session_incidents", "recovery_report", "session_integrity"],
+            "event_log_index": ["command_journal", "alarm_timeline", "annotations", "recovery_report", "resume_decision"],
+            "recovery_decision_timeline": ["recovery_report", "resume_decision"],
+            "resume_attempts": ["resume_decision", "command_journal"],
+            "resume_attempt_outcomes": ["resume_attempts", "resume_decision", "contract_consistency", "command_state_policy"],
+            "command_state_policy": ["scan_plan"],
+            "event_delivery_summary": ["event_log_index", "resume_attempt_outcomes", "contract_consistency"],
+            "selected_execution_rationale": ["scan_plan"],
+            "contract_consistency": ["scan_plan", "session_integrity", "diagnostics_pack", "resume_decision", "event_log_index"],
+            "release_evidence_pack": ["contract_consistency", "session_integrity", "diagnostics_pack", "event_log_index", "recovery_decision_timeline", "session_report", "qa_pack"],
+            "release_gate_decision": ["contract_consistency", "release_evidence_pack", "event_delivery_summary", "resume_attempt_outcomes", "selected_execution_rationale"],
         }
         return list(mapping.get(name, []))

@@ -15,6 +15,10 @@ import type {
   SessionReportEnvelope,
   SessionTrendsEnvelope,
   XMateProfileEnvelope,
+  SelectedExecutionRationaleEnvelope,
+  ReleaseGateDecisionEnvelope,
+  CommandPolicySnapshotEnvelope,
+  ContractKernelDiffEnvelope,
 } from '../api/client';
 import { create } from 'zustand';
 
@@ -56,6 +60,10 @@ interface SessionState {
   compare: SessionCompareEnvelope | null;
   trends: SessionTrendsEnvelope | null;
   diagnostics: DiagnosticsPackEnvelope | null;
+  selectedExecutionRationale: SelectedExecutionRationaleEnvelope | null;
+  releaseGateDecision: ReleaseGateDecisionEnvelope | null;
+  commandPolicySnapshot: CommandPolicySnapshotEnvelope | null;
+  contractKernelDiff: ContractKernelDiffEnvelope | null;
   commandTrace: CommandTraceEnvelope | null;
   assessment: AssessmentEnvelope | null;
   profile: XMateProfileEnvelope | null;
@@ -80,6 +88,10 @@ interface SessionState {
   setCompare: (compare: SessionCompareEnvelope | null) => void;
   setTrends: (trends: SessionTrendsEnvelope | null) => void;
   setDiagnostics: (diagnostics: DiagnosticsPackEnvelope | null) => void;
+  setSelectedExecutionRationale: (payload: SelectedExecutionRationaleEnvelope | null) => void;
+  setReleaseGateDecision: (payload: ReleaseGateDecisionEnvelope | null) => void;
+  setCommandPolicySnapshot: (payload: CommandPolicySnapshotEnvelope | null) => void;
+  setContractKernelDiff: (payload: ContractKernelDiffEnvelope | null) => void;
   setCommandTrace: (commandTrace: CommandTraceEnvelope | null) => void;
   setAssessment: (assessment: AssessmentEnvelope | null) => void;
   setProfile: (profile: XMateProfileEnvelope | null) => void;
@@ -131,6 +143,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   compare: null,
   trends: null,
   diagnostics: null,
+  selectedExecutionRationale: null,
+  releaseGateDecision: null,
+  commandPolicySnapshot: null,
+  contractKernelDiff: null,
   commandTrace: null,
   assessment: null,
   profile: null,
@@ -187,6 +203,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setCompare: (compare) => set({ compare }),
   setTrends: (trends) => set({ trends }),
   setDiagnostics: (diagnostics) => set({ diagnostics }),
+  setSelectedExecutionRationale: (selectedExecutionRationale) => set({ selectedExecutionRationale }),
+  setReleaseGateDecision: (releaseGateDecision) => set({ releaseGateDecision }),
+  setCommandPolicySnapshot: (commandPolicySnapshot) => set({ commandPolicySnapshot }),
+  setContractKernelDiff: (contractKernelDiff) => set({ contractKernelDiff }),
   setCommandTrace: (commandTrace) => set({ commandTrace }),
   setAssessment: (assessment) => set({ assessment }),
   setProfile: (profile) => set({ profile }),

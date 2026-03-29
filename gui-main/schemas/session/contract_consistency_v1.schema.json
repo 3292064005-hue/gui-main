@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["session_id", "summary", "required_artifacts", "mismatches", "warnings"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "summary": {"type": "object"},
+    "version_alignment": {"type": "object"},
+    "hash_alignment": {"type": "object"},
+    "required_artifacts": {"type": "array", "items": {"type": "object"}},
+    "mismatches": {"type": "array", "items": {"type": "object"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "evidence_refs": {"type": "array", "items": {"type": "object"}}
+  }
+}

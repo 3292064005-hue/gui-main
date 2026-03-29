@@ -156,9 +156,10 @@ class AppController(QObject):
         self.workflow_artifacts.preview_plan_hash = self.preview_scan_plan.template_hash()
         self.workflow_artifacts.scan_plan = status
         self.experiments_updated.emit(self.experiments)
+        validation = dict(self.preview_scan_plan.validation_summary)
         self._log(
             "INFO",
-            f"[{status.implementation}] 扫查路径预览已生成：{status.detail} 预览文件 {preview_path}",
+            f"[{status.implementation}] 扫查路径预览已生成：{status.detail} 预览文件 {preview_path}；segments={validation.get('segment_count', 0)} waypoints={validation.get('total_waypoints', 0)} duration_ms={validation.get('estimated_duration_ms', 0)}",
         )
         self._emit_status()
 
@@ -481,6 +482,12 @@ class AppController(QObject):
             "safety": asdict(self.telemetry.safety_status),
             "recording": asdict(self.telemetry.recorder_status),
             "workflow": self.workflow_artifacts.to_dict(),
+            "planning": self.preview_scan_plan.to_dict() if self.preview_scan_plan is not None else {},
+            "localization": {
+                "registration_hash": self.localization_result.registration_hash() if self.localization_result is not None else "",
+                "confidence": self.localization_result.confidence if self.localization_result is not None else 0.0,
+                "registration_version": self.localization_result.registration_version if self.localization_result is not None else "",
+            },
         }
 
     def _emit_status(self) -> None:
@@ -550,3 +557,4 @@ class AppController(QObject):
         self.workflow_artifacts.preprocess = statuses["preprocess"]
         self.workflow_artifacts.reconstruction = statuses["reconstruction"]
         self.workflow_artifacts.assessment = statuses["assessment"]
+        self.session_service.refresh_session_intelligence()

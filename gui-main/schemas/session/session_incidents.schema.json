@@ -1,0 +1,11 @@
+{
+  "$id": "session/session_incidents.schema.json",
+  "type": "object",
+  "required": ["session_id", "summary", "incidents"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "summary": {"type": "object"},
+    "incidents": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

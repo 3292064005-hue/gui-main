@@ -181,6 +181,93 @@ inline std::string extractObject(const std::string& json_line, const std::string
   return fallback;
 }
 
+
+inline std::string extractArray(const std::string& json_line, const std::string& key, const std::string& fallback = "[]") {
+  const auto token = """ + key + """;
+  auto key_pos = json_line.find(token);
+  if (key_pos == std::string::npos) {
+    return fallback;
+  }
+  auto colon_pos = json_line.find(':', key_pos + token.size());
+  if (colon_pos == std::string::npos) {
+    return fallback;
+  }
+  auto start = json_line.find_first_not_of(" 	
+", colon_pos + 1);
+  if (start == std::string::npos || json_line[start] != '[') {
+    return fallback;
+  }
+  int depth = 0;
+  bool in_string = false;
+  bool escaped = false;
+  for (size_t idx = start; idx < json_line.size(); ++idx) {
+    const char ch = json_line[idx];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch == '\') {
+      escaped = true;
+      continue;
+    }
+    if (ch == '"') {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) {
+      continue;
+    }
+    if (ch == '[') {
+      ++depth;
+    } else if (ch == ']') {
+      --depth;
+      if (depth == 0) {
+        return json_line.substr(start, idx - start + 1);
+      }
+    }
+  }
+  return fallback;
+}
+
+inline std::vector<std::string> splitTopLevelObjects(const std::string& json_array) {
+  std::vector<std::string> objects;
+  bool in_string = false;
+  bool escaped = false;
+  int depth = 0;
+  size_t start = std::string::npos;
+  for (size_t idx = 0; idx < json_array.size(); ++idx) {
+    const char ch = json_array[idx];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch == '\') {
+      escaped = true;
+      continue;
+    }
+    if (ch == '"') {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) {
+      continue;
+    }
+    if (ch == '{') {
+      if (depth == 0) {
+        start = idx;
+      }
+      ++depth;
+    } else if (ch == '}') {
+      --depth;
+      if (depth == 0 && start != std::string::npos) {
+        objects.push_back(json_array.substr(start, idx - start + 1));
+        start = std::string::npos;
+      }
+    }
+  }
+  return objects;
+}
+
 inline size_t countToken(const std::string& json_line, const std::string& token) {
   size_t count = 0;
   size_t pos = 0;

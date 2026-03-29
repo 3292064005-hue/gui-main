@@ -41,6 +41,9 @@ class TelemetryStore:
                 active_segment=int(data.get("active_segment", 0)),
                 progress_pct=float(data.get("progress_pct", 0.0)),
                 session_id=str(data.get("session_id", "")),
+                recovery_state=str(data.get("recovery_state", self.core_state.recovery_state)),
+                plan_hash=str(data.get("plan_hash", self.core_state.plan_hash)),
+                contact_stable=bool(data.get("contact_stable", self.core_state.contact_stable)),
             )
             self.robot["armed"] = self.core_state.armed
             self.robot["fault_code"] = self.core_state.fault_code
@@ -87,6 +90,8 @@ class TelemetryStore:
                 safe_to_arm=bool(data.get("safe_to_arm", False)),
                 safe_to_scan=bool(data.get("safe_to_scan", False)),
                 active_interlocks=list(data.get("active_interlocks", [])),
+                recovery_reason=str(data.get("recovery_reason", "")),
+                last_recovery_action=str(data.get("last_recovery_action", "")),
             )
             return None
         if env.topic == "recording_status":

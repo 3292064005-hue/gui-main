@@ -38,6 +38,26 @@ const TOPICS_BY_WORKSPACE: Record<Workspace, string[]> = {
     'frame_sync_updated',
     'qa_pack_updated',
     'annotations_updated',
+    'event_log_index_updated',
+    'recovery_timeline_updated',
+  ],
+  qa: [
+    'session_product_update',
+    'artifact_ready',
+    'diagnostics_updated',
+    'event_log_index_updated',
+    'recovery_timeline_updated',
+    'resume_decision_updated',
+    'incidents_updated',
+  ],
+  review: [
+    'session_product_update',
+    'artifact_ready',
+    'report_updated',
+    'replay_updated',
+    'annotations_updated',
+    'event_log_index_updated',
+    'recovery_timeline_updated',
   ],
 };
 

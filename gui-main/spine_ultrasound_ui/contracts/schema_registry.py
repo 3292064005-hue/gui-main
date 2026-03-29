@@ -14,6 +14,6 @@ def load_schema(name: str) -> dict[str, Any]:
 
 def schema_catalog() -> dict[str, dict[str, Any]]:
     return {
-        path.name: json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(SCHEMA_ROOT.glob("*.schema.json"))
+        str(path.relative_to(SCHEMA_ROOT)).replace('\\', '/'): json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted(SCHEMA_ROOT.rglob("*.schema.json"))
     }

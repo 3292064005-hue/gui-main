@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -16,8 +17,12 @@ enum class RobotCoreState {
   PathValidated,
   Approaching,
   ContactSeeking,
+  ContactStable,
   Scanning,
   PausedHold,
+  RecoveryRetract,
+  SegmentAborted,
+  PlanAborted,
   Retreating,
   ScanComplete,
   Fault,
@@ -49,6 +54,20 @@ struct ScanWaypoint {
   double rx{0.0};
   double ry{0.0};
   double rz{0.0};
+  int sequence_index{0};
+  int dwell_ms{0};
+  bool probe_required{false};
+  std::string checkpoint_tag;
+  std::string transition_hint;
+};
+
+struct ExecutionConstraints {
+  int max_segment_duration_ms{0};
+  std::map<std::string, double> allowed_contact_band;
+  std::string transition_smoothing{"standard"};
+  std::string recovery_checkpoint_policy{"segment_boundary"};
+  double probe_spacing_mm{0.0};
+  double probe_depth_mm{0.0};
 };
 
 struct ScanSegment {
@@ -57,6 +76,15 @@ struct ScanSegment {
   double target_pressure{1.5};
   std::string scan_direction{"caudal_to_cranial"};
   bool needs_resample{false};
+  int estimated_duration_ms{0};
+  bool requires_contact_probe{false};
+  int segment_priority{0};
+  int rescan_origin_segment{0};
+  double quality_target{0.0};
+  double coverage_target{0.0};
+  std::string segment_hash;
+  std::map<std::string, double> contact_band;
+  std::string transition_policy{"serpentine"};
 };
 
 struct ScanPlan {
@@ -65,6 +93,15 @@ struct ScanPlan {
   ScanWaypoint approach_pose;
   ScanWaypoint retreat_pose;
   std::vector<ScanSegment> segments;
+  std::string planner_version;
+  std::string registration_hash;
+  std::string plan_kind{"preview"};
+  std::string plan_hash;
+  std::string validation_summary;
+  std::string score_summary;
+  std::string surface_model_hash;
+  ExecutionConstraints execution_constraints;
+  int64_t created_ts_ns{0};
 };
 
 struct CoreStateSnapshot {
@@ -75,6 +112,13 @@ struct CoreStateSnapshot {
   double progress_pct{0.0};
   std::string session_id;
   std::string recovery_state;
+  std::string plan_hash;
+  bool contact_stable{false};
+  int64_t contact_stable_since_ns{0};
+  int active_waypoint_index{0};
+  std::string last_transition;
+  std::string state_reason;
+  std::string resume_token;
 };
 
 struct DeviceHealth {
@@ -89,6 +133,12 @@ struct SafetyStatus {
   bool safe_to_arm{false};
   bool safe_to_scan{false};
   std::vector<std::string> active_interlocks;
+  std::string recovery_reason;
+  std::string last_recovery_action;
+  int sensor_freshness_ms{0};
+  std::string pressure_band_state{"UNKNOWN"};
+  int force_excursion_count{0};
+  int contact_instability_count{0};
 };
 
 struct RecorderStatus {

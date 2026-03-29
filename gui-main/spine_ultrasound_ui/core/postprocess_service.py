@@ -10,6 +10,7 @@ from spine_ultrasound_ui.services.algorithms import PluginExecutor, PluginPlane,
 from spine_ultrasound_ui.services.diagnostics_pack_service import DiagnosticsPackService
 from spine_ultrasound_ui.services.frame_sync_indexer import FrameSyncIndexer
 from spine_ultrasound_ui.services.qa_pack_service import QAPackService
+from spine_ultrasound_ui.services.session_integrity_service import SessionIntegrityService
 from spine_ultrasound_ui.services.session_analytics import SessionAnalyticsService
 from spine_ultrasound_ui.utils import now_text
 
@@ -24,6 +25,7 @@ class PostprocessService:
         self.diagnostics_service = DiagnosticsPackService()
         self.analytics = SessionAnalyticsService(exp_manager.root)
         self.sync_indexer = FrameSyncIndexer()
+        self.integrity_service = SessionIntegrityService()
 
     def preprocess(self, session_dir: Path | None) -> CapabilityStatus:
         if session_dir is None:
@@ -103,11 +105,13 @@ class PostprocessService:
         trends_target = self._build_session_trends(session_dir)
         diagnostics_target = self._build_diagnostics_pack(session_dir)
         qa_target = self._build_qa_pack(session_dir)
+        integrity_target = self._build_session_integrity(session_dir)
         self.exp_manager.append_artifact(session_dir, "session_report", report_target)
         self.exp_manager.append_artifact(session_dir, "session_compare", compare_target)
         self.exp_manager.append_artifact(session_dir, "session_trends", trends_target)
         self.exp_manager.append_artifact(session_dir, "diagnostics_pack", diagnostics_target)
         self.exp_manager.append_artifact(session_dir, "qa_pack", qa_target)
+        self.exp_manager.append_artifact(session_dir, "session_integrity", integrity_target)
         self.exp_manager.append_processing_step(
             session_dir,
             self.plugin_executor.run(
@@ -150,6 +154,10 @@ class PostprocessService:
             "reconstruction": self.reconstruct(session_dir),
             "assessment": self.assess(session_dir),
         }
+
+    def _build_session_integrity(self, session_dir: Path) -> Path:
+        payload = self.integrity_service.build(session_dir)
+        return self.exp_manager.save_json_artifact(session_dir, "export/session_integrity.json", payload)
 
     @staticmethod
     def _blocked(label: str) -> CapabilityStatus:

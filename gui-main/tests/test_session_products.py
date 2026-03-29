@@ -43,6 +43,9 @@ def test_session_products_are_materialized_and_registered(tmp_path):
     assert manifest["artifacts"]["replay_index"] == "replay/replay_index.json"
     assert manifest["artifacts"]["session_report"] == "export/session_report.json"
     assert manifest["artifacts"]["frame_sync_index"] == "derived/sync/frame_sync_index.json"
+    assert manifest["artifacts"]["lineage"] == "meta/lineage.json"
+    assert manifest["artifacts"]["resume_state"] == "meta/resume_state.json"
+    assert manifest["artifacts"]["recovery_report"] == "export/recovery_report.json"
 
 
 

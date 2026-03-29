@@ -4,10 +4,15 @@
 #include <string>
 #include <vector>
 
+#include "robot_core/contact_gate.h"
 #include "robot_core/contact_observer.h"
 #include "robot_core/force_control_config.h"
 #include "robot_core/nrt_motion_service.h"
 #include "robot_core/recording_service.h"
+#include "robot_core/recovery_policy.h"
+#include "robot_core/scan_plan_parser.h"
+#include "robot_core/scan_plan_validator.h"
+#include "robot_core/state_machine_guard.h"
 #include "robot_core/recovery_manager.h"
 #include "robot_core/robot_state_hub.h"
 #include "robot_core/rt_motion_service.h"
@@ -58,16 +63,21 @@ private:
   std::string session_id_;
   std::string session_dir_;
   std::string plan_id_;
+  std::string plan_hash_;
   bool plan_loaded_{false};
   int total_points_{0};
   int total_segments_{0};
   int path_index_{0};
   int frame_id_{0};
   int active_segment_{0};
+  int active_waypoint_index_{0};
   int retreat_ticks_remaining_{0};
   double progress_pct_{0.0};
   double phase_{0.0};
   double pressure_current_{0.0};
+  int64_t contact_stable_since_ns_{0};
+  std::string last_transition_;
+  std::string state_reason_;
   double image_quality_{0.82};
   double feature_confidence_{0.76};
   double quality_score_{0.79};
@@ -77,10 +87,15 @@ private:
   RobotStateHub robot_state_hub_{};
   RecordingService recording_service_{};
   SafetyService safety_service_{};
+  ContactGate contact_gate_{};
   ContactObserver contact_observer_{};
   NrtMotionService nrt_motion_service_{};
   RtMotionService rt_motion_service_{};
   RecoveryManager recovery_manager_{};
+  RecoveryPolicy recovery_policy_{};
+  ScanPlanParser scan_plan_parser_{};
+  ScanPlanValidator scan_plan_validator_{};
+  StateMachineGuard state_machine_guard_{};
   ForceControlLimits force_limits_{loadForceControlLimits()};
 };
 

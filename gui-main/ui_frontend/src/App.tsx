@@ -1,25 +1,5 @@
-import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
-  fetchCurrentAlarms,
-  fetchCurrentAnnotations,
-  fetchCurrentArtifacts,
-  fetchCurrentAssessment,
-  fetchCurrentCommandTrace,
-  fetchCurrentCompare,
-  fetchCurrentDiagnostics,
-  fetchCurrentFrameSync,
-  fetchCurrentPatientRegistration,
-  fetchCurrentProfile,
-  fetchCurrentQaPack,
-  fetchCurrentQuality,
-  fetchCurrentReadiness,
-  fetchCurrentReplay,
-  fetchCurrentReport,
-  fetchCurrentScanProtocol,
-  fetchCurrentSession,
-  fetchCurrentTrends,
-  fetchHealth,
-  fetchProtocolSchema,
   postCommand,
   type CurrentSessionEnvelope,
   type DeviceReadinessEnvelope,
@@ -30,7 +10,8 @@ import { useTelemetryStore } from './store/telemetryStore';
 import { useSessionStore } from './store/sessionStore';
 import { useUIStore } from './store/uiStore';
 import { useTelemetrySocket } from './hooks/useWebSocket';
-
+import { useHeadlessSessionSync } from './hooks/useHeadlessSessionSync';
+import { useCommandPolicySync } from './hooks/useCommandPolicySync';
 import Sidebar from './components/Sidebar';
 import SessionTimer from './components/SessionTimer';
 import StatusBar from './components/StatusBar';
@@ -56,6 +37,10 @@ import RescanRecommendationPanel from './components/RescanRecommendationPanel';
 import CommandTracePanel from './components/CommandTracePanel';
 import ArtifactDependencyPanel from './components/ArtifactDependencyPanel';
 import AssessmentReviewDesk from './components/AssessmentReviewDesk';
+import CommandPolicyPanel from './components/CommandPolicyPanel';
+import ReleaseGatePanel from './components/ReleaseGatePanel';
+import SelectedExecutionRationalePanel from './components/SelectedExecutionRationalePanel';
+import ContractKernelDiffPanel from './components/ContractKernelDiffPanel';
 import ExportCenterPanel from './components/ExportCenterPanel';
 import { Activity, AlertTriangle, Loader2, Power, RefreshCw, ShieldAlert, WifiOff, Zap } from 'lucide-react';
 
@@ -88,7 +73,6 @@ export default function App() {
     scanState,
     executionState,
     sessionId,
-    productUpdateTick,
     triggerHalt,
     resetHalt,
     addLog,
@@ -107,25 +91,8 @@ export default function App() {
     qaPack,
     commandTrace,
     assessment,
-    consumeProductTopics,
-    setAlarmTimeline,
-    setSessionReport,
-    setReplayIndex,
-    setQualityTimeline,
-    setFrameSync,
-    setArtifacts,
-    setCompare,
-    setTrends,
-    setDiagnostics,
-    setCommandTrace,
-    setAssessment,
-    setProfile,
-    setPatientRegistration,
-    setScanProtocol,
-    setQaPack,
-    setAnnotations,
+    commandPolicySnapshot,
   } = useSessionStore();
-  const pendingProductTopics = useSessionStore((s) => s.pendingProductTopics);
   const exportCSV = useSessionStore((s) => s.exportCSV);
   const {
     showCamera,
@@ -150,19 +117,20 @@ export default function App() {
   const readOnlyMode = health?.read_only_mode ?? false;
   const effectiveSessionId = currentSession?.session_id ?? sessionId;
   const operatorRole = workspace === 'operator';
-
   useEffect(() => {
     useTelemetryStore.getState().setTelemetryStale(telemetryStale);
   }, [telemetryStale]);
 
-  const commandAllowed = useMemo(() => {
-    return (command: string) => {
-      if (readOnlyMode || !operatorRole) return false;
-      const preconditions = protocolSchema?.commands?.[command]?.state_preconditions as string[] | undefined;
-      if (!preconditions || preconditions.length === 0) return true;
-      return preconditions.includes('*') || preconditions.includes(executionState);
-    };
-  }, [executionState, operatorRole, protocolSchema, readOnlyMode]);
+
+  const { commandPolicyCatalog, commandAllowed } = useCommandPolicySync({
+    workspace,
+    executionState,
+    contactState: String((health as Record<string, unknown> | null)?.contact_state ?? 'UNKNOWN'),
+    planState: currentSession?.scan_protocol_available ? 'execution_plan_loaded' : 'preview_plan_ready',
+    resumeMode: diagnostics?.summary?.resume_mode ? String(diagnostics.summary.resume_mode) : (scanState === 'paused' ? 'segment_restart' : 'initial_start'),
+    readOnlyMode,
+  });
+
 
   const fireCommand = async (command: (typeof WRITE_COMMANDS)[number], successMessage: string) => {
     if (commandPending) return;
@@ -191,107 +159,9 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchProtocolSchema()
-      .then((schema) => {
-        if (!cancelled) startTransition(() => setProtocolSchema(schema));
-      })
-      .catch((error) => addLog('warn', `schema 加载失败: ${error instanceof Error ? error.message : 'unknown'}`));
-    return () => {
-      cancelled = true;
-    };
-  }, [addLog]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const sync = async () => {
-      try {
-        const [healthPayload, sessionPayload] = await Promise.all([fetchHealth(), fetchCurrentSession().catch(() => null)]);
-        if (cancelled) return;
-        startTransition(() => {
-          setHealth(healthPayload);
-          setCurrentSession(sessionPayload);
-        });
-        useSessionStore.getState().syncCoreState(healthPayload.execution_state, sessionPayload?.session_id ?? null, sessionPayload?.session_started_at ?? null);
-        if (!sessionPayload) {
-          startTransition(() => {
-            setSessionReport(null);
-            setReplayIndex(null);
-            setQualityTimeline(null);
-            setFrameSync(null);
-            setArtifacts(null);
-            setCompare(null);
-            setTrends(null);
-            setDiagnostics(null);
-            setCommandTrace(null);
-            setAssessment(null);
-            setProfile(null);
-            setPatientRegistration(null);
-            setScanProtocol(null);
-            setQaPack(null);
-            setAnnotations([]);
-            setReadiness(null);
-            setAlarmTimeline(null);
-          });
-          return;
-        }
+  useHeadlessSessionSync({ workspace, setProtocolSchema, setHealth, setCurrentSession, setReadiness });
 
-        const changedTopics = consumeProductTopics();
-        const fullSync = changedTopics.length === 0;
-        const shouldFetch = (...topics: string[]) => fullSync || topics.some((topic) => changedTopics.includes(topic));
-
-        const promises = await Promise.all([
-          shouldFetch('report_updated') && sessionPayload.report_available ? fetchCurrentReport().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('replay_updated') && sessionPayload.replay_available ? fetchCurrentReplay().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('quality_updated', 'session_product_update') ? fetchCurrentQuality().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('frame_sync_updated') && sessionPayload.frame_sync_available ? fetchCurrentFrameSync().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('alarms_updated', 'session_product_update') ? fetchCurrentAlarms().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('artifact_ready', 'manifest_updated') ? fetchCurrentArtifacts().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('compare_updated') && sessionPayload.compare_available ? fetchCurrentCompare().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('trends_updated') && sessionPayload.trends_available ? fetchCurrentTrends().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('diagnostics_updated') && sessionPayload.diagnostics_available ? fetchCurrentDiagnostics().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('annotations_updated', 'session_product_update') ? fetchCurrentAnnotations().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('readiness_updated') && sessionPayload.readiness_available ? fetchCurrentReadiness().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('profile_updated') && sessionPayload.profile_available ? fetchCurrentProfile().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('registration_updated') && sessionPayload.patient_registration_available ? fetchCurrentPatientRegistration().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('scan_protocol_updated') && sessionPayload.scan_protocol_available ? fetchCurrentScanProtocol().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('qa_pack_updated') && sessionPayload.qa_pack_available ? fetchCurrentQaPack().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('command_trace_updated') && sessionPayload.command_trace_available ? fetchCurrentCommandTrace().catch(() => null) : Promise.resolve(undefined),
-          shouldFetch('assessment_updated') && sessionPayload.assessment_available ? fetchCurrentAssessment().catch(() => null) : Promise.resolve(undefined),
-        ]);
-        if (cancelled) return;
-        const [report, replay, quality, frameSyncPayload, alarmPayload, artifactsPayload, comparePayload, trendsPayload, diagnosticsPayload, annotationsPayload, readinessPayload, profilePayload, registrationPayload, scanProtocolPayload, qaPayload, commandTracePayload, assessmentPayload] = promises;
-        startTransition(() => {
-          if (report !== undefined) setSessionReport(report ?? null);
-          if (replay !== undefined) setReplayIndex(replay ?? null);
-          if (quality !== undefined) setQualityTimeline(quality ?? null);
-          if (frameSyncPayload !== undefined) setFrameSync(frameSyncPayload ?? null);
-          if (alarmPayload !== undefined) setAlarmTimeline(alarmPayload ?? null);
-          if (artifactsPayload !== undefined) setArtifacts(artifactsPayload ?? null);
-          if (comparePayload !== undefined) setCompare(comparePayload ?? null);
-          if (trendsPayload !== undefined) setTrends(trendsPayload ?? null);
-          if (diagnosticsPayload !== undefined) setDiagnostics(diagnosticsPayload ?? null);
-          if (annotationsPayload !== undefined) setAnnotations(annotationsPayload?.annotations ?? []);
-          if (readinessPayload !== undefined) setReadiness(readinessPayload ?? null);
-          if (profilePayload !== undefined) setProfile(profilePayload ?? null);
-          if (registrationPayload !== undefined) setPatientRegistration(registrationPayload ?? null);
-          if (scanProtocolPayload !== undefined) setScanProtocol(scanProtocolPayload ?? null);
-          if (qaPayload !== undefined) setQaPack(qaPayload ?? null);
-          if (commandTracePayload !== undefined) setCommandTrace(commandTracePayload ?? null);
-          if (assessmentPayload !== undefined) setAssessment(assessmentPayload ?? null);
-        });
-      } catch (error) {
-        addLog('warn', `headless 健康检查失败: ${error instanceof Error ? error.message : 'unknown'}`);
-      }
-    };
-    void sync();
-    const interval = window.setInterval(sync, workspace === 'researcher' ? 3500 : 2000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [addLog, consumeProductTopics, pendingProductTopics, productUpdateTick, setAlarmTimeline, setAnnotations, setArtifacts, setAssessment, setCommandTrace, setCompare, setDiagnostics, setFrameSync, setPatientRegistration, setProfile, setQaPack, setQualityTimeline, setReplayIndex, setScanProtocol, setSessionReport, setTrends, workspace]);
 
   const commandButtons = (
     <div className="glass-panel p-2 flex flex-wrap gap-2 pointer-events-auto shadow-[0_0_20px_rgba(0,0,0,0.5)]">
@@ -342,6 +212,9 @@ export default function App() {
                     <ScanProtocolPanel protocol={scanProtocol} />
                     <LockFreezePanel profile={profile} readiness={readiness} registration={patientRegistration} protocol={scanProtocol} />
                     <RecoveryStatusPanel health={health} alarms={alarms} />
+                    <CommandPolicyPanel catalog={commandPolicyCatalog} snapshot={commandPolicySnapshot} />
+                    <ContractKernelDiffPanel payload={contractKernelDiff} />
+                    <ReleaseGatePanel decision={releaseGateDecision} />
                   </div>
                   <div className="col-span-6 space-y-3">
                     {showUltrasound ? <Suspense fallback={<PanelFallback className="h-[240px]" />}><UltrasoundFeed /></Suspense> : null}
@@ -387,6 +260,11 @@ export default function App() {
                     <ArtifactExplorerPanel artifacts={artifacts} />
                     <ArtifactDependencyPanel artifacts={artifacts} />
                     <DiagnosticsSummaryPanel diagnostics={diagnostics} />
+                    <SelectedExecutionRationalePanel rationale={selectedExecutionRationale} />
+                    <ReleaseGatePanel decision={releaseGateDecision} />
+                    <CommandPolicyPanel catalog={commandPolicyCatalog} snapshot={commandPolicySnapshot} />
+                    <ContractKernelDiffPanel payload={contractKernelDiff} />
+                    <ReleaseGatePanel decision={releaseGateDecision} />
                     <PatientRegistrationPanel registration={patientRegistration} />
                     <ScanProtocolPanel protocol={scanProtocol} />
                     {showLog ? <Suspense fallback={<PanelFallback className="h-[220px]" />}><SystemLog /></Suspense> : null}

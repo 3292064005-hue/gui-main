@@ -41,6 +41,10 @@ def build_scan_protocol(
                 "start_pose": waypoints[0] if waypoints else {},
                 "end_pose": waypoints[-1] if waypoints else {},
                 "segment_length_mm": round(max(0.0, float(config.segment_length_mm)), 2),
+                "estimated_duration_ms": int(segment.estimated_duration_ms),
+                "requires_contact_probe": bool(segment.requires_contact_probe),
+                "quality_target": float(segment.quality_target),
+                "coverage_target": float(segment.coverage_target),
                 "rescan_allowed": True,
             }
         )
@@ -70,6 +74,10 @@ def build_scan_protocol(
         },
         "path_policy": {
             "plan_id": plan.plan_id,
+            "plan_kind": plan.plan_kind,
+            "planner_version": plan.planner_version,
+            "registration_hash": plan.registration_hash,
+            "validation_summary": dict(plan.validation_summary),
             "segment_count": len(plan.segments),
             "sample_step_mm": float(config.sample_step_mm),
             "segment_length_mm": float(config.segment_length_mm),
@@ -77,6 +85,7 @@ def build_scan_protocol(
             "strip_width_mm": float(robot_profile.strip_width_mm),
             "strip_overlap_mm": float(robot_profile.strip_overlap_mm),
             "corridor": corridor,
+            "rescan_policy": {"enabled": True, "mode": "low_quality_patch", "quality_threshold": float(config.image_quality_threshold)},
         },
         "registration_contract": {
             "patient_frame": dict((patient_registration or {}).get("patient_frame", {})),

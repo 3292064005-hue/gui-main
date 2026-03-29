@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import hashlib
+import json
+import platform
 import shutil
 from typing import Any, Optional
 
@@ -13,6 +16,7 @@ from spine_ultrasound_ui.services.xmate_profile import load_xmate_profile
 from spine_ultrasound_ui.core.session_recorders import FrameRecorder, JsonlRecorder
 from spine_ultrasound_ui.models import ExperimentRecord, RuntimeConfig, ScanPlan
 from spine_ultrasound_ui.services.export_service import export_text_report
+from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
 
 
 @dataclass
@@ -35,6 +39,7 @@ class SessionService:
         self.ultrasound_recorder: Optional[FrameRecorder] = None
         self.command_journal: Optional[JsonlRecorder] = None
         self.annotation_journal: Optional[JsonlRecorder] = None
+        self.session_intelligence = SessionIntelligenceService()
 
     def create_experiment(self, config: RuntimeConfig, note: str = "") -> ExperimentRecord:
         self.reset_for_new_experiment()
@@ -83,6 +88,7 @@ class SessionService:
                 manifest=self.exp_manager.load_manifest(self.current_session_dir),
             )
         robot_profile = load_xmate_profile().to_dict()
+        registration_payload = dict(patient_registration or {})
         locked = self.exp_manager.lock_session(
             exp_id=self.current_experiment.exp_id,
             config_snapshot=config.to_dict(),
@@ -91,11 +97,24 @@ class SessionService:
             build_id=config.build_id,
             scan_plan=preview_plan,
             protocol_version=protocol_version,
+            planner_version=preview_plan.planner_version,
+            registration_version=str(registration_payload.get("source", "camera_backed_registration_v2")),
+            core_protocol_version=protocol_version,
+            frontend_build_id=config.build_id,
+            environment_snapshot={
+                "platform": platform.platform(),
+                "tool_name": config.tool_name,
+                "tcp_name": config.tcp_name,
+                "robot_model": config.robot_model,
+            },
+            force_control_hash=self._hash_payload(safety_thresholds or {}),
+            robot_profile_hash=self._hash_payload(robot_profile),
+            patient_registration_hash=self._hash_payload(registration_payload),
             force_sensor_provider=config.force_sensor_provider,
-            safety_thresholds=safety_thresholds,
-            device_health_snapshot=device_health_snapshot,
-            robot_profile=robot_profile,
-            patient_registration=patient_registration or {},
+            safety_thresholds=safety_thresholds or {},
+            device_health_snapshot=device_health_snapshot or {},
+            robot_profile=robot_profile or {},
+            patient_registration=registration_payload,
             scan_protocol={},
         )
         self.current_session_dir = Path(locked["session_dir"])
@@ -109,7 +128,6 @@ class SessionService:
         self.exp_manager.append_artifact(self.current_session_dir, "device_readiness", readiness_path)
         xmate_profile_path = self.exp_manager.save_json_artifact(self.current_session_dir, "meta/xmate_profile.json", robot_profile)
         self.exp_manager.append_artifact(self.current_session_dir, "xmate_profile", xmate_profile_path)
-        registration_payload = dict(patient_registration or {})
         registration_path = self.exp_manager.save_json_artifact(self.current_session_dir, "meta/patient_registration.json", registration_payload)
         self.exp_manager.append_artifact(self.current_session_dir, "patient_registration", registration_path)
         scan_protocol = build_scan_protocol(
@@ -128,6 +146,7 @@ class SessionService:
             patient_registration=registration_payload,
             scan_protocol=scan_protocol,
         )
+        self.refresh_session_intelligence()
         return LockedSessionContext(
             session_id=locked["session_id"],
             session_dir=self.current_session_dir,
@@ -140,6 +159,7 @@ class SessionService:
             raise RuntimeError("session is not locked")
         path = self.exp_manager.save_summary(self.current_session_dir, payload)
         self.exp_manager.append_artifact(self.current_session_dir, "summary_json", path)
+        self.refresh_session_intelligence()
         return path
 
     def export_summary(self, title: str, lines: list[str]) -> Path:
@@ -148,6 +168,7 @@ class SessionService:
         target = self.current_session_dir / "export" / "summary.txt"
         export_text_report(target, title, lines)
         self.exp_manager.append_artifact(self.current_session_dir, "summary_text", target)
+        self.refresh_session_intelligence()
         return target
 
     def rollback_pending_lock(self, preview_plan: ScanPlan | None = None) -> None:
@@ -176,6 +197,39 @@ class SessionService:
     def record_ultrasound_pixmap(self, pixmap: Any) -> None:
         if self.ultrasound_recorder is not None:
             self.ultrasound_recorder.append_pixmap(pixmap, "ultrasound")
+
+    @staticmethod
+    def _hash_payload(payload: dict[str, Any]) -> str:
+        blob = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        return hashlib.sha256(blob).hexdigest() if blob else ""
+
+    def refresh_session_intelligence(self) -> None:
+        if self.current_session_dir is None:
+            return
+        products = self.session_intelligence.build_all(self.current_session_dir)
+        targets = {
+            "lineage": self.exp_manager.save_json_artifact(self.current_session_dir, "meta/lineage.json", products["lineage"]),
+            "resume_state": self.exp_manager.save_json_artifact(self.current_session_dir, "meta/resume_state.json", products["resume_state"]),
+            "resume_decision": self.exp_manager.save_json_artifact(self.current_session_dir, "meta/resume_decision.json", products["resume_decision"]),
+            "resume_attempts": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/resume_attempts.json", products["resume_attempts"]),
+            "resume_attempt_outcomes": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/resume_attempt_outcomes.json", products["resume_attempt_outcomes"]),
+            "command_state_policy": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/command_state_policy.json", products["command_state_policy"]),
+            "command_policy_snapshot": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/command_policy_snapshot.json", products["command_policy_snapshot"]),
+            "contract_kernel_diff": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/contract_kernel_diff.json", products["contract_kernel_diff"]),
+            "recovery_report": self.exp_manager.save_json_artifact(self.current_session_dir, "export/recovery_report.json", products["recovery_report"]),
+            "recovery_decision_timeline": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/recovery/recovery_decision_timeline.json", products["recovery_decision_timeline"]),
+            "operator_incident_report": self.exp_manager.save_json_artifact(self.current_session_dir, "export/operator_incident_report.json", products["operator_incident_report"]),
+            "session_incidents": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/incidents/session_incidents.json", products["session_incidents"]),
+            "event_log_index": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/events/event_log_index.json", products["event_log_index"]),
+            "event_delivery_summary": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/events/event_delivery_summary.json", products["event_delivery_summary"]),
+            "selected_execution_rationale": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/planning/selected_execution_rationale.json", products["selected_execution_rationale"]),
+            "contract_consistency": self.exp_manager.save_json_artifact(self.current_session_dir, "derived/session/contract_consistency.json", products["contract_consistency"]),
+            "release_evidence_pack": self.exp_manager.save_json_artifact(self.current_session_dir, "export/release_evidence_pack.json", products["release_evidence_pack"]),
+            "release_gate_decision": self.exp_manager.save_json_artifact(self.current_session_dir, "export/release_gate_decision.json", products["release_gate_decision"]),
+        }
+        for name, path in targets.items():
+            self.exp_manager.append_artifact(self.current_session_dir, name, path)
+
 
     def reset_for_new_experiment(self) -> None:
         self.current_session_dir = None
@@ -234,6 +288,7 @@ class SessionService:
                 "tags": list(tags or []),
             }
         )
+        self.refresh_session_intelligence()
 
     def record_command_journal(
         self,
@@ -263,3 +318,4 @@ class SessionService:
                 },
             }
         )
+        self.refresh_session_intelligence()

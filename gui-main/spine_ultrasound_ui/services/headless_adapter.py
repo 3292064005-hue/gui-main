@@ -3,11 +3,13 @@ from __future__ import annotations
 import base64
 import json
 import os
+import queue
 import socket
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 try:
     from PySide6.QtCore import QBuffer, QByteArray, QIODevice
@@ -27,6 +29,13 @@ from spine_ultrasound_ui.services.ipc_protocol import (
     validate_command_payload,
 )
 from spine_ultrasound_ui.services.mock_core_runtime import MockCoreRuntime
+from spine_ultrasound_ui.services.session_integrity_service import SessionIntegrityService
+from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
+from spine_ultrasound_ui.services.command_state_policy import CommandStatePolicyService
+from spine_ultrasound_ui.services.event_bus import EventBus, EventSubscription
+from spine_ultrasound_ui.services.role_matrix import RoleMatrix
+from spine_ultrasound_ui.services.session_dir_watcher import SessionDirWatcher
+from spine_ultrasound_ui.services.topic_registry import TopicRegistry
 from spine_ultrasound_ui.services.protobuf_transport import (
     DEFAULT_TLS_SERVER_NAME,
     create_client_ssl_context,
@@ -67,6 +76,7 @@ def _static_png_base64() -> str:
     return _MINIMAL_PNG_BASE64
 
 
+
 class HeadlessAdapter:
     def __init__(self, mode: str, command_host: str, command_port: int, telemetry_host: str, telemetry_port: int):
         self.mode = mode
@@ -87,6 +97,13 @@ class HeadlessAdapter:
         self._command_journal: JsonlRecorder | None = None
         self._last_product_signature = ""
         self._product_topic_signatures: dict[str, str] = {}
+        self.role_matrix = RoleMatrix()
+        self.event_bus = EventBus()
+        self.topic_registry = TopicRegistry(self.role_matrix)
+        self.command_policy_service = CommandStatePolicyService(self.role_matrix)
+        self.session_watcher = SessionDirWatcher()
+        self.integrity_service = SessionIntegrityService()
+        self.session_intelligence = SessionIntelligenceService()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -100,6 +117,7 @@ class HeadlessAdapter:
         self._stop.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.5)
+        self.event_bus.close()
 
     def status(self) -> dict[str, Any]:
         with self._lock:
@@ -168,7 +186,18 @@ class HeadlessAdapter:
         return payloads
 
     def schema(self) -> dict[str, Any]:
-        return protocol_schema()
+        payload = protocol_schema()
+        payload["topic_catalog"] = self.topic_catalog()
+        return payload
+
+    def topic_catalog(self) -> dict[str, Any]:
+        return self.topic_registry.catalog()
+
+    def role_catalog(self) -> dict[str, Any]:
+        return self.role_matrix.catalog()
+
+    def command_policy_catalog(self) -> dict[str, Any]:
+        return self.command_policy_service.catalog()
 
     def command(self, command: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         if command not in COMMANDS:
@@ -226,8 +255,221 @@ class HeadlessAdapter:
             "frame_sync_available": (session_dir / "derived" / "sync" / "frame_sync_index.json").exists(),
             "command_trace_available": (session_dir / "raw" / "ui" / "command_journal.jsonl").exists(),
             "assessment_available": report_path.exists() and (session_dir / "derived" / "sync" / "frame_sync_index.json").exists(),
+            "contact_available": True,
+            "recovery_available": True,
+            "integrity_available": (session_dir / "meta" / "manifest.json").exists(),
+            "operator_incidents_available": (session_dir / "derived" / "alarms" / "alarm_timeline.json").exists() or (session_dir / "raw" / "ui" / "annotations.jsonl").exists(),
+            "event_log_index_available": (session_dir / "derived" / "events" / "event_log_index.json").exists(),
+            "recovery_timeline_available": (session_dir / "derived" / "recovery" / "recovery_decision_timeline.json").exists(),
+            "resume_attempts_available": (session_dir / "derived" / "session" / "resume_attempts.json").exists(),
+            "resume_outcomes_available": (session_dir / "derived" / "session" / "resume_attempt_outcomes.json").exists(),
+            "command_policy_available": (session_dir / "derived" / "session" / "command_state_policy.json").exists(),
+            "command_policy_snapshot_available": (session_dir / "derived" / "session" / "command_policy_snapshot.json").exists(),
+            "contract_kernel_diff_available": (session_dir / "derived" / "session" / "contract_kernel_diff.json").exists(),
+            "contract_consistency_available": (session_dir / "derived" / "session" / "contract_consistency.json").exists(),
+            "event_delivery_summary_available": (session_dir / "derived" / "events" / "event_delivery_summary.json").exists(),
+            "selected_execution_rationale_available": (session_dir / "derived" / "planning" / "selected_execution_rationale.json").exists(),
+            "release_evidence_available": (session_dir / "export" / "release_evidence_pack.json").exists(),
+            "release_gate_available": (session_dir / "export" / "release_gate_decision.json").exists(),
             "status": self.status(),
         }
+
+    def current_contact(self) -> dict[str, Any]:
+        with self._lock:
+            core = dict(self.latest_by_topic.get("core_state", {}))
+            contact = dict(self.latest_by_topic.get("contact_state", {}))
+            progress = dict(self.latest_by_topic.get("scan_progress", {}))
+        return {
+            "session_id": str(core.get("session_id", self._current_session_id)),
+            "execution_state": str(core.get("execution_state", "BOOT")),
+            "contact_mode": str(contact.get("mode", "NO_CONTACT")),
+            "contact_confidence": float(contact.get("confidence", 0.0) or 0.0),
+            "pressure_current": float(contact.get("pressure_current", 0.0) or 0.0),
+            "recommended_action": str(contact.get("recommended_action", "IDLE")),
+            "contact_stable": bool(contact.get("contact_stable", core.get("contact_stable", False))),
+            "active_segment": int(progress.get("active_segment", core.get("active_segment", 0)) or 0),
+        }
+
+    def current_recovery(self) -> dict[str, Any]:
+        with self._lock:
+            core = dict(self.latest_by_topic.get("core_state", {}))
+            safety = dict(self.latest_by_topic.get("safety_status", {}))
+        return {
+            "session_id": str(core.get("session_id", self._current_session_id)),
+            "execution_state": str(core.get("execution_state", "BOOT")),
+            "recovery_state": str(core.get("recovery_state", self._derive_recovery_state(core))),
+            "recovery_reason": str(safety.get("recovery_reason", "")),
+            "last_recovery_action": str(safety.get("last_recovery_action", "")),
+            "active_interlocks": list(safety.get("active_interlocks", [])),
+        }
+
+    def current_integrity(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        return self.integrity_service.build(session_dir)
+
+    def current_lineage(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "meta" / "lineage.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["lineage"]
+
+    def current_resume_state(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "meta" / "resume_state.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["resume_state"]
+
+    def current_recovery_report(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "export" / "recovery_report.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["recovery_report"]
+
+    def current_operator_incidents(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "export" / "operator_incident_report.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["operator_incident_report"]
+
+    def current_incidents(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "incidents" / "session_incidents.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["session_incidents"]
+
+    def current_resume_decision(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "meta" / "resume_decision.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["resume_decision"]
+
+    def current_event_log_index(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "events" / "event_log_index.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["event_log_index"]
+
+    def current_recovery_timeline(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "recovery" / "recovery_decision_timeline.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["recovery_decision_timeline"]
+
+    def current_resume_attempts(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "session" / "resume_attempts.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["resume_attempts"]
+
+    def current_resume_outcomes(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "session" / "resume_attempt_outcomes.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["resume_attempt_outcomes"]
+
+    def current_command_policy(self) -> dict[str, Any]:
+        session_dir = self._resolve_session_dir()
+        if session_dir is not None:
+            path = session_dir / "derived" / "session" / "command_state_policy.json"
+            if path.exists():
+                return self._read_json(path)
+        return self.command_policy_service.catalog()
+
+    def current_contract_kernel_diff(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / 'derived' / 'session' / 'contract_kernel_diff.json'
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)['contract_kernel_diff']
+
+    def current_command_policy_snapshot(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / 'derived' / 'session' / 'command_policy_snapshot.json'
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)['command_policy_snapshot']
+
+    def current_event_delivery_summary(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "events" / "event_delivery_summary.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["event_delivery_summary"]
+
+    def current_contract_consistency(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "derived" / "session" / "contract_consistency.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["contract_consistency"]
+
+
+    def current_selected_execution_rationale(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / 'derived' / 'planning' / 'selected_execution_rationale.json'
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)['selected_execution_rationale']
+
+    def current_release_gate_decision(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / 'export' / 'release_gate_decision.json'
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)['release_gate_decision']
+
+    def current_release_evidence(self) -> dict[str, Any]:
+        session_dir = self._require_session_dir()
+        path = session_dir / "export" / "release_evidence_pack.json"
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)["release_evidence_pack"]
+
+    def replay_events(
+        self,
+        *,
+        topics: set[str] | None = None,
+        session_id: str | None = None,
+        since_ts_ns: int | None = None,
+        until_ts_ns: int | None = None,
+        delivery: str | None = None,
+        category: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+        page_size: int | None = None,
+    ) -> dict[str, Any]:
+        resolved_page_size = max(1, int(page_size or limit or 100))
+        payload = self.event_bus.replay_page(
+            topics,
+            page_size=resolved_page_size,
+            session_id=session_id,
+            since_ts_ns=since_ts_ns,
+            until_ts_ns=until_ts_ns,
+            delivery=delivery,
+            category=category,
+            cursor=cursor,
+        )
+        payload["session_id"] = session_id or self._current_session_id
+        return payload
+
+    def event_bus_stats(self) -> dict[str, Any]:
+        return self.event_bus.stats()
+
+    def event_dead_letters(self) -> dict[str, Any]:
+        return self.event_bus.dead_letters()
+
+    def event_delivery_audit(self) -> dict[str, Any]:
+        return self.event_bus.delivery_audit()
 
     def current_report(self) -> dict[str, Any]:
         session_dir = self._require_session_dir()
@@ -369,86 +611,42 @@ class HeadlessAdapter:
 
     def _session_product_update_envelopes(self) -> list[dict[str, Any]]:
         session_dir = self._resolve_session_dir()
-        events: list[dict[str, Any]] = []
-        if session_dir is None:
-            signature = "no-session"
-            session_id = self._current_session_id or ""
-            status = {
-                "session_id": session_id,
-                "signature": signature,
-                "changed": self._last_product_signature != signature,
-                "changed_topics": [],
-            }
-            if status["changed"]:
-                self._last_product_signature = signature
-                self._product_topic_signatures = {}
-                events.append({"topic": "session_product_update", "ts_ns": now_ns(), "data": status})
-            return events
+        return self.session_watcher.poll(session_dir, session_id=self._read_manifest_if_available(session_dir).get("session_id", self._current_session_id or (session_dir.name if session_dir else "")))
 
-        watched = {
-            "manifest_updated": session_dir / "meta" / "manifest.json",
-            "readiness_updated": session_dir / "meta" / "device_readiness.json",
-            "profile_updated": session_dir / "meta" / "xmate_profile.json",
-            "registration_updated": session_dir / "meta" / "patient_registration.json",
-            "report_updated": session_dir / "export" / "session_report.json",
-            "compare_updated": session_dir / "export" / "session_compare.json",
-            "trends_updated": session_dir / "export" / "session_trends.json",
-            "qa_pack_updated": session_dir / "export" / "qa_pack.json",
-            "diagnostics_updated": session_dir / "export" / "diagnostics_pack.json",
-            "replay_updated": session_dir / "replay" / "replay_index.json",
-            "quality_updated": session_dir / "derived" / "quality" / "quality_timeline.json",
-            "alarms_updated": session_dir / "derived" / "alarms" / "alarm_timeline.json",
-            "frame_sync_updated": session_dir / "derived" / "sync" / "frame_sync_index.json",
-            "scan_protocol_updated": session_dir / "derived" / "preview" / "scan_protocol.json",
-            "annotations_updated": session_dir / "raw" / "ui" / "annotations.jsonl",
-            "command_trace_updated": session_dir / "raw" / "ui" / "command_journal.jsonl",
-        }
-        changed_topics: list[str] = []
-        signature_parts: list[str] = [str(session_dir)]
-        for topic, watched_path in watched.items():
-            signature = "missing"
-            if watched_path.exists():
-                stat = watched_path.stat()
-                signature = f"{watched_path.name}:{stat.st_mtime_ns}:{stat.st_size}"
-                signature_parts.append(signature)
-            previous = self._product_topic_signatures.get(topic)
-            if previous != signature:
-                self._product_topic_signatures[topic] = signature
-                if previous is not None:
-                    changed_topics.append(topic)
-                    events.append({
-                        "topic": topic,
-                        "ts_ns": now_ns(),
-                        "data": {
-                            "session_id": self._read_manifest_if_available(session_dir).get("session_id", session_dir.name),
-                            "path": str(watched_path),
-                        },
-                    })
-        signature = "|".join(signature_parts)
-        if signature != self._last_product_signature:
-            self._last_product_signature = signature
-            manifest = self._read_manifest_if_available(session_dir)
-            if changed_topics:
-                changed_topics.append("artifact_ready")
-                events.append({
-                    "topic": "artifact_ready",
-                    "ts_ns": now_ns(),
-                    "data": {
-                        "session_id": manifest.get("session_id", session_dir.name),
-                        "changed_topics": changed_topics,
-                    },
-                })
-            events.append({
-                "topic": "session_product_update",
-                "ts_ns": now_ns(),
-                "data": {
-                    "session_id": manifest.get("session_id", session_dir.name),
-                    "signature": signature,
-                    "changed": True,
-                    "changed_topics": changed_topics,
-                },
-            })
-        return events
+    def subscribe(
+        self,
+        topics: set[str] | None = None,
+        *,
+        include_snapshot: bool = True,
+        categories: set[str] | None = None,
+        deliveries: set[str] | None = None,
+    ) -> EventSubscription:
+        subscription = self.event_bus.subscribe(topics, categories=categories, deliveries=deliveries, subscriber_name="websocket_feed")
+        if include_snapshot:
+            for item in self.snapshot(topics):
+                subscription.push(item)
+        return subscription
+
+    def unsubscribe(self, subscription: EventSubscription) -> None:
+        self.event_bus.unsubscribe(subscription)
+
+    def iter_events(self, topics: set[str] | None = None) -> Iterator[dict[str, Any]]:
+        subscription = self.subscribe(topics)
+        try:
+            while not self._stop.is_set() and not subscription.closed:
+                item = subscription.get(timeout=1.0)
+                if item is None:
+                    break
+                yield item
+        finally:
+            self.unsubscribe(subscription)
+
+    def _publish_event(self, item: dict[str, Any]) -> None:
+        topic = str(item.get("topic", ""))
+        category = "session" if topic.endswith("_updated") or topic in {"artifact_ready", "session_product_update"} else str(item.get("category", "runtime"))
+        delivery = "event" if category == "session" else str(item.get("delivery", "telemetry"))
+        self.topic_registry.ensure(topic, category=category, delivery=delivery)
+        self.event_bus.publish(item, category=category, delivery=delivery)
 
     def camera_frame(self) -> str:
         self.phase += 0.1
@@ -472,6 +670,8 @@ class HeadlessAdapter:
         payload["_ts_ns"] = env.ts_ns or now_ns()
         with self._lock:
             self.latest_by_topic[env.topic] = payload
+        self.topic_registry.ensure(env.topic, category="runtime", delivery="telemetry")
+        self.event_bus.publish(env.topic, {k: v for k, v in payload.items() if k != "_ts_ns"}, ts_ns=payload["_ts_ns"], session_id=str(payload.get("session_id", self._current_session_id)), category="runtime", delivery="telemetry", source="robot_core" if self.mode == "core" else "mock_core")
 
     def _store_messages(self, messages: list[TelemetryEnvelope]) -> None:
         for env in messages:
@@ -574,11 +774,16 @@ class HeadlessAdapter:
             return "RETRY_READY"
         return "IDLE"
 
+    def _publish_session_product_updates(self) -> None:
+        for event in self._session_product_update_envelopes():
+            self._publish_event(event)
+
     def _mock_loop(self) -> None:
         assert self.runtime is not None
         while not self._stop.is_set():
             messages = self.runtime.tick()
             self._store_messages(messages)
+            self._publish_session_product_updates()
             time.sleep(0.1)
 
     def _core_loop(self) -> None:
@@ -591,6 +796,7 @@ class HeadlessAdapter:
                         while not self._stop.is_set():
                             message_bytes = recv_length_prefixed_message(tls_sock)
                             self._store_message(parse_telemetry_payload(message_bytes))
+                            self._publish_session_product_updates()
             except OSError:
                 if not self._stop.is_set():
                     time.sleep(1.0)

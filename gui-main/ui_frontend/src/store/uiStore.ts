@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Workspace = 'operator' | 'researcher';
+export type Workspace = 'operator' | 'researcher' | 'qa' | 'review';
 
 type ToastType = 'info' | 'success' | 'error' | 'warn';
 type PanelKey = 'showCamera' | 'showUltrasound' | 'showForceGraph' | 'show3DView' | 'showJoints' | 'showLog' | 'showReport' | 'showAlarms' | 'showConsole';

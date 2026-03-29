@@ -1,5 +1,0 @@
-Collecting protobuf
-  Using cached protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
-Using cached protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl (324 kB)
-Installing collected packages: protobuf
-Successfully installed protobuf-7.34.1

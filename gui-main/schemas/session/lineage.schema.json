@@ -1,0 +1,19 @@
+{
+  "$id": "session/lineage.schema.json",
+  "type": "object",
+  "required": [
+    "session_id",
+    "lineage"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "lineage": {
+      "type": "array"
+    },
+    "generated_at": {
+      "type": "string"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import { apiUrl, wsUrl } from './config';
 
-export type WorkspaceRole = 'operator' | 'researcher';
+export type WorkspaceRole = 'operator' | 'researcher' | 'reviewer' | 'service' | 'admin' | 'read_only';
 
 export interface ReplyEnvelope {
   ok: boolean;
@@ -110,6 +110,14 @@ export interface CurrentSessionEnvelope {
   frame_sync_available?: boolean;
   command_trace_available?: boolean;
   assessment_available?: boolean;
+  command_policy_snapshot_available?: boolean;
+  contract_kernel_diff_available?: boolean;
+  selected_execution_rationale_available?: boolean;
+  release_gate_available?: boolean;
+  contact_available?: boolean;
+  recovery_available?: boolean;
+  integrity_available?: boolean;
+  operator_incidents_available?: boolean;
   status: Record<string, unknown>;
 }
 
@@ -205,6 +213,27 @@ export interface DiagnosticsPackEnvelope {
   summary?: Record<string, number | string>;
 }
 
+
+export interface SelectedExecutionRationaleEnvelope {
+  session_id?: string;
+  selected_candidate_id?: string;
+  selected_plan_id?: string;
+  selection_basis?: Record<string, unknown>;
+  tradeoff_summary?: Record<string, unknown>;
+  selected_score?: Record<string, unknown>;
+  ranking_snapshot?: Array<Record<string, unknown>>;
+  rejected_candidate_reasons?: string[];
+}
+
+export interface ReleaseGateDecisionEnvelope {
+  session_id?: string;
+  release_allowed: boolean;
+  blocking_reasons?: string[];
+  warning_reasons?: string[];
+  required_remediations?: string[];
+  checks?: Record<string, boolean>;
+}
+
 export interface AnnotationEntry {
   kind?: string;
   message?: string;
@@ -297,6 +326,43 @@ export interface AssessmentEnvelope {
   open_issues?: string[];
 }
 
+export interface ContactEnvelope {
+  session_id: string;
+  execution_state: string;
+  contact_mode: string;
+  contact_confidence: number;
+  pressure_current: number;
+  recommended_action: string;
+  contact_stable: boolean;
+  active_segment: number;
+}
+
+export interface RecoveryEnvelope {
+  session_id: string;
+  execution_state: string;
+  recovery_state: string;
+  recovery_reason: string;
+  last_recovery_action: string;
+  active_interlocks: string[];
+}
+
+export interface SessionIntegrityEnvelope {
+  session_id: string;
+  session_dir: string;
+  artifacts: Array<Record<string, unknown>>;
+  summary: Record<string, number | boolean>;
+  manifest_consistency: Record<string, unknown>;
+  missing_artifacts: string[];
+  checksum_mismatch_artifacts: string[];
+  warnings: string[];
+}
+
+export interface OperatorIncidentsEnvelope {
+  session_id: string;
+  count: number;
+  incidents: Array<Record<string, unknown>>;
+}
+
 function readErrorDetail(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return 'adapter request failed';
   const detail = (payload as { detail?: unknown }).detail;
@@ -341,6 +407,10 @@ export async function fetchCurrentScanProtocol(): Promise<ScanProtocolEnvelope> 
 export async function fetchCurrentQaPack(): Promise<QaPackEnvelope> { return fetchJson('/api/v1/sessions/current/qa-pack'); }
 export async function fetchCurrentCommandTrace(): Promise<CommandTraceEnvelope> { return fetchJson('/api/v1/sessions/current/command-trace'); }
 export async function fetchCurrentAssessment(): Promise<AssessmentEnvelope> { return fetchJson('/api/v1/sessions/current/assessment'); }
+export async function fetchCurrentContact(): Promise<ContactEnvelope> { return fetchJson('/api/v1/sessions/current/contact'); }
+export async function fetchCurrentRecovery(): Promise<RecoveryEnvelope> { return fetchJson('/api/v1/sessions/current/recovery'); }
+export async function fetchCurrentIntegrity(): Promise<SessionIntegrityEnvelope> { return fetchJson('/api/v1/sessions/current/integrity'); }
+export async function fetchCurrentOperatorIncidents(): Promise<OperatorIncidentsEnvelope> { return fetchJson('/api/v1/sessions/current/operator-incidents'); }
 
 export function buildTelemetryWsUrl(topics?: string[]): string {
   const base = wsUrl('/ws/telemetry');
@@ -372,4 +442,245 @@ async function fetchJson<T>(path: string): Promise<T> {
   const body = (await response.json()) as unknown;
   if (!response.ok) throw new Error(readErrorDetail(body));
   return body as T;
+}
+
+
+export interface SessionIncidentsEnvelope {
+  session_id: string;
+  summary: Record<string, unknown>;
+  incidents: Array<Record<string, unknown>>;
+}
+
+export interface ResumeDecisionEnvelope {
+  session_id: string;
+  resume_allowed: boolean;
+  mode: string;
+  blocking_reasons: string[];
+  resume_from?: Record<string, unknown>;
+  recommended_patch_segments?: number[];
+}
+
+export interface RoleCatalogEnvelope {
+  roles: Record<string, Record<string, unknown>>;
+  command_groups?: Record<string, string[]>;
+}
+
+export interface EventLogIndexEnvelope {
+  session_id: string;
+  events: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+  continuity_gaps?: Array<Record<string, unknown>>;
+}
+
+export interface RecoveryTimelineEnvelope {
+  session_id: string;
+  timeline: Array<Record<string, unknown>>;
+  summary?: Record<string, unknown>;
+}
+
+export interface ResumeAttemptsEnvelope {
+  session_id: string;
+  summary: Record<string, unknown>;
+  attempts: Array<Record<string, unknown>>;
+}
+
+export interface ContractConsistencyEnvelope {
+  session_id: string;
+  summary: Record<string, unknown>;
+  version_alignment?: Record<string, unknown>;
+  hash_alignment?: Record<string, unknown>;
+  required_artifacts?: Array<Record<string, unknown>>;
+  mismatches?: Array<Record<string, unknown>>;
+  warnings?: string[];
+}
+
+export interface ReleaseEvidenceEnvelope {
+  session_id: string;
+  release_candidate: boolean;
+  release_readiness?: Record<string, unknown>;
+  version_lock?: Record<string, unknown>;
+  diagnostics_summary?: Record<string, unknown>;
+  integrity_summary?: Record<string, unknown>;
+  contract_summary?: Record<string, unknown>;
+  evidence_index?: Array<Record<string, unknown>>;
+  open_gaps?: string[];
+}
+
+export interface CommandPolicyCatalogEnvelope {
+  generated_at?: string;
+  schema?: string;
+  known_states?: string[];
+  policies: Array<Record<string, unknown>>;
+}
+
+
+
+export interface ContractKernelDiffEnvelope {
+  session_id?: string;
+  service_version?: string;
+  summary?: { consistent?: boolean; diff_count?: number; checked_object_count?: number };
+  checks?: Record<string, boolean>;
+  diffs?: Array<Record<string, unknown>>;
+}
+
+export interface CommandPolicySnapshotEnvelope {
+  session_id: string;
+  policy_version?: string;
+  execution_state?: string;
+  contact_state?: string;
+  plan_state?: string;
+  resume_mode?: string;
+  role?: string;
+  read_only?: boolean;
+  decision_count?: number;
+  decisions?: Record<string, Record<string, unknown>>;
+  plan_hash?: string;
+}
+export interface EventDeliverySummaryEnvelope {
+  session_id: string;
+  summary: Record<string, unknown>;
+  continuity_gaps?: Array<Record<string, unknown>>;
+  delivery_classes?: Record<string, number>;
+  resume_outcome_summary?: Record<string, unknown>;
+  contract_consistency_summary?: Record<string, unknown>;
+}
+
+export interface EventDeliveryAuditEnvelope {
+  generated_at_ns?: number;
+  delivery_rules?: Record<string, Record<string, unknown>>;
+  pending_acks?: Array<Record<string, unknown>>;
+  dead_letters?: Record<string, unknown>;
+  subscriber_health?: Record<string, unknown>;
+  replay?: Record<string, unknown>;
+}
+
+export interface DeadLetterEnvelope {
+  entries: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+}
+
+export interface ResumeAttemptOutcomesEnvelope {
+  session_id: string;
+  summary: Record<string, unknown>;
+  outcomes: Array<Record<string, unknown>>;
+}
+
+export interface EventBusStatsEnvelope {
+  published_events: number;
+  subscriber_count: number;
+  pending_ack_count?: number;
+  delivery_failures?: number;
+  delivery_retries?: number;
+  slow_subscribers?: number;
+  max_queue_depth?: number;
+  published_by_topic?: Record<string, number>;
+  published_by_delivery?: Record<string, number>;
+  published_by_category?: Record<string, number>;
+  replay?: Record<string, unknown>;
+}
+
+export interface EventReplayEnvelope {
+  session_id?: string;
+  events: Array<Record<string, unknown>>;
+  summary?: Record<string, unknown>;
+}
+
+export async function fetchCurrentIncidents(): Promise<SessionIncidentsEnvelope> {
+  return fetchJson<SessionIncidentsEnvelope>('/api/v1/sessions/current/incidents');
+}
+
+export async function fetchCurrentResumeDecision(): Promise<ResumeDecisionEnvelope> {
+  return fetchJson<ResumeDecisionEnvelope>('/api/v1/sessions/current/resume-decision');
+}
+
+export async function fetchRoleCatalog(): Promise<RoleCatalogEnvelope> {
+  return fetchJson<RoleCatalogEnvelope>('/api/v1/roles');
+}
+
+export async function fetchCommandPolicies(): Promise<CommandPolicyCatalogEnvelope> {
+  return fetchJson<CommandPolicyCatalogEnvelope>('/api/v1/command-policies');
+}
+
+export async function fetchCurrentEventLogIndex(): Promise<EventLogIndexEnvelope> {
+  return fetchJson<EventLogIndexEnvelope>('/api/v1/sessions/current/event-log-index');
+}
+
+export async function fetchCurrentRecoveryTimeline(): Promise<RecoveryTimelineEnvelope> {
+  return fetchJson<RecoveryTimelineEnvelope>('/api/v1/sessions/current/recovery-timeline');
+}
+
+
+export async function fetchCurrentResumeAttempts(): Promise<ResumeAttemptsEnvelope> {
+  return fetchJson<ResumeAttemptsEnvelope>('/api/v1/sessions/current/resume-attempts');
+}
+
+export async function fetchCurrentResumeOutcomes(): Promise<ResumeAttemptOutcomesEnvelope> {
+  return fetchJson<ResumeAttemptOutcomesEnvelope>('/api/v1/sessions/current/resume-outcomes');
+}
+
+export async function fetchCurrentCommandPolicy(): Promise<CommandPolicyCatalogEnvelope> {
+  return fetchJson<CommandPolicyCatalogEnvelope>('/api/v1/sessions/current/command-policy');
+}
+
+export async function fetchCurrentCommandPolicySnapshot(): Promise<CommandPolicySnapshotEnvelope> {
+  return fetchJson<CommandPolicySnapshotEnvelope>('/api/v1/sessions/current/command-policy-snapshot');
+}
+
+export async function fetchCurrentContractConsistency(): Promise<ContractConsistencyEnvelope> {
+  return fetchJson<ContractConsistencyEnvelope>('/api/v1/sessions/current/contract-consistency');
+}
+
+export async function fetchCurrentReleaseEvidence(): Promise<ReleaseEvidenceEnvelope> {
+  return fetchJson<ReleaseEvidenceEnvelope>('/api/v1/sessions/current/release-evidence');
+}
+
+export async function fetchCurrentEventDeliverySummary(): Promise<EventDeliverySummaryEnvelope> {
+  return fetchJson<EventDeliverySummaryEnvelope>('/api/v1/sessions/current/event-delivery-summary');
+}
+
+export async function fetchEventDeliveryAudit(): Promise<EventDeliveryAuditEnvelope> {
+  return fetchJson<EventDeliveryAuditEnvelope>('/api/v1/events/delivery-audit');
+}
+
+export async function fetchEventReplay(params: {
+  topics?: string[];
+  sessionId?: string;
+  sinceTsNs?: number;
+  untilTsNs?: number;
+  delivery?: string;
+  category?: string;
+  limit?: number;
+} = {}): Promise<EventReplayEnvelope> {
+  const query = new URLSearchParams();
+  if (params.topics?.length) query.set('topics', params.topics.join(','));
+  if (params.sessionId) query.set('session_id', params.sessionId);
+  if (params.sinceTsNs !== undefined) query.set('since_ts_ns', String(params.sinceTsNs));
+  if (params.untilTsNs !== undefined) query.set('until_ts_ns', String(params.untilTsNs));
+  if (params.delivery) query.set('delivery', params.delivery);
+  if (params.category) query.set('category', params.category);
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  const suffix = query.toString();
+  return fetchJson<EventReplayEnvelope>(`/api/v1/events/replay${suffix ? `?${suffix}` : ''}`);
+}
+
+
+export async function fetchEventBusStats(): Promise<EventBusStatsEnvelope> {
+  return fetchJson<EventBusStatsEnvelope>('/api/v1/events/bus-stats');
+}
+
+export async function fetchEventDeadLetters(): Promise<DeadLetterEnvelope> {
+  return fetchJson<DeadLetterEnvelope>('/api/v1/events/dead-letters');
+}
+
+
+export async function fetchCurrentSelectedExecutionRationale(): Promise<SelectedExecutionRationaleEnvelope> {
+  const response = await fetch(apiUrl('/api/v1/sessions/current/selected-execution-rationale'));
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+export async function fetchCurrentReleaseGateDecision(): Promise<ReleaseGateDecisionEnvelope> {
+  const response = await fetch(apiUrl('/api/v1/sessions/current/release-gate'));
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
 }

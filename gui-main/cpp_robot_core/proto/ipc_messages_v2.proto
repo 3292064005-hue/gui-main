@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package spine_core_v2;
+
+message ScanWaypoint {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double rx = 4;
+  double ry = 5;
+  double rz = 6;
+  int32 sequence_index = 7;
+  int32 dwell_ms = 8;
+  bool probe_required = 9;
+  string checkpoint_tag = 10;
+  string transition_hint = 11;
+}
+
+message ExecutionConstraints {
+  int32 max_segment_duration_ms = 1;
+  map<string, double> allowed_contact_band = 2;
+  string transition_smoothing = 3;
+  string recovery_checkpoint_policy = 4;
+  double probe_spacing_mm = 5;
+  double probe_depth_mm = 6;
+}
+
+message ScanSegment {
+  int32 segment_id = 1;
+  repeated ScanWaypoint waypoints = 2;
+  double target_pressure = 3;
+  string scan_direction = 4;
+  bool needs_resample = 5;
+  int32 estimated_duration_ms = 6;
+  bool requires_contact_probe = 7;
+  int32 segment_priority = 8;
+  int32 rescan_origin_segment = 9;
+  double quality_target = 10;
+  double coverage_target = 11;
+  string segment_hash = 12;
+  map<string, double> contact_band = 13;
+  string transition_policy = 14;
+}
+
+message ScanPlan {
+  string session_id = 1;
+  string plan_id = 2;
+  ScanWaypoint approach_pose = 3;
+  ScanWaypoint retreat_pose = 4;
+  repeated ScanSegment segments = 5;
+  string planner_version = 6;
+  string registration_hash = 7;
+  string plan_kind = 8;
+  string plan_hash = 9;
+  string validation_summary_json = 10;
+  int64 created_ts_ns = 11;
+  string score_summary_json = 12;
+  string surface_model_hash = 13;
+  ExecutionConstraints execution_constraints = 14;
+}

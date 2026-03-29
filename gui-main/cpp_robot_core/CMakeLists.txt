@@ -27,12 +27,17 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/ipc_messages.proto)
 set(CORE_RUNTIME_SOURCES
     src/command_server.cpp
     src/core_runtime.cpp
+    src/contact_gate.cpp
     src/contact_observer.cpp
     src/nrt_motion_service.cpp
     src/recording_service.cpp
     src/protobuf_protocol.cpp
     src/recovery_manager.cpp
+    src/recovery_policy.cpp
     src/robot_state_hub.cpp
+    src/scan_plan_parser.cpp
+    src/scan_plan_validator.cpp
+    src/state_machine_guard.cpp
     src/rt_motion_service.cpp
     src/safety_service.cpp
     src/sdk_robot_facade.cpp
