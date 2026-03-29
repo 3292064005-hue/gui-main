@@ -626,6 +626,10 @@ export async function fetchCurrentCommandPolicySnapshot(): Promise<CommandPolicy
   return fetchJson<CommandPolicySnapshotEnvelope>('/api/v1/sessions/current/command-policy-snapshot');
 }
 
+export async function fetchCurrentContractKernelDiff(): Promise<ContractKernelDiffEnvelope> {
+  return fetchJson<ContractKernelDiffEnvelope>('/api/v1/sessions/current/contract-kernel-diff');
+}
+
 export async function fetchCurrentContractConsistency(): Promise<ContractConsistencyEnvelope> {
   return fetchJson<ContractConsistencyEnvelope>('/api/v1/sessions/current/contract-consistency');
 }

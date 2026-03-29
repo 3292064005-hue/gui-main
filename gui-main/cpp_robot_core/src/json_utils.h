@@ -183,7 +183,7 @@ inline std::string extractObject(const std::string& json_line, const std::string
 
 
 inline std::string extractArray(const std::string& json_line, const std::string& key, const std::string& fallback = "[]") {
-  const auto token = """ + key + """;
+  const auto token = "\"" + key + "\"";
   auto key_pos = json_line.find(token);
   if (key_pos == std::string::npos) {
     return fallback;
@@ -192,8 +192,7 @@ inline std::string extractArray(const std::string& json_line, const std::string&
   if (colon_pos == std::string::npos) {
     return fallback;
   }
-  auto start = json_line.find_first_not_of(" 	
-", colon_pos + 1);
+  auto start = json_line.find_first_not_of(" \t\r\n", colon_pos + 1);
   if (start == std::string::npos || json_line[start] != '[') {
     return fallback;
   }
@@ -206,7 +205,7 @@ inline std::string extractArray(const std::string& json_line, const std::string&
       escaped = false;
       continue;
     }
-    if (ch == '\') {
+    if (ch == '\\') {
       escaped = true;
       continue;
     }
@@ -241,7 +240,7 @@ inline std::vector<std::string> splitTopLevelObjects(const std::string& json_arr
       escaped = false;
       continue;
     }
-    if (ch == '\') {
+    if (ch == '\\') {
       escaped = true;
       continue;
     }

@@ -88,6 +88,7 @@ target_link_libraries(test_seqlock
 )
 
 target_link_libraries(test_force_control
+    spine_robot_core_runtime
     Threads::Threads
 )
 

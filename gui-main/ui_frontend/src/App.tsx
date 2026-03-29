@@ -5,10 +5,11 @@ import {
   type DeviceReadinessEnvelope,
   type HealthEnvelope,
   type ProtocolSchema,
+  type WorkspaceRole,
 } from './api/client';
 import { useTelemetryStore } from './store/telemetryStore';
 import { useSessionStore } from './store/sessionStore';
-import { useUIStore } from './store/uiStore';
+import { useUIStore, type Workspace } from './store/uiStore';
 import { useTelemetrySocket } from './hooks/useWebSocket';
 import { useHeadlessSessionSync } from './hooks/useHeadlessSessionSync';
 import { useCommandPolicySync } from './hooks/useCommandPolicySync';
@@ -58,6 +59,20 @@ function PanelFallback({ className = '' }: { className?: string }) {
 
 const WRITE_COMMANDS = ['connect_robot', 'power_on', 'set_auto_mode', 'validate_setup', 'start_scan', 'resume_scan', 'safe_retreat', 'emergency_stop', 'clear_fault'] as const;
 
+function workspaceToRole(workspace: Workspace): WorkspaceRole {
+  switch (workspace) {
+    case 'review':
+      return 'reviewer';
+    case 'qa':
+      return 'service';
+    case 'researcher':
+      return 'researcher';
+    case 'operator':
+    default:
+      return 'operator';
+  }
+}
+
 export default function App() {
   const workspace = useUIStore((s) => s.workspace);
   useTelemetrySocket(workspace);
@@ -91,7 +106,10 @@ export default function App() {
     qaPack,
     commandTrace,
     assessment,
+    selectedExecutionRationale,
+    releaseGateDecision,
     commandPolicySnapshot,
+    contractKernelDiff,
   } = useSessionStore();
   const exportCSV = useSessionStore((s) => s.exportCSV);
   const {
@@ -140,7 +158,7 @@ export default function App() {
     }
     try {
       setCommandPending(true);
-      const reply = await postCommand(command, {}, workspace);
+      const reply = await postCommand(command, {}, workspaceToRole(workspace));
       if (!reply.ok) {
         addLog('error', `${command} 失败: ${reply.message}`);
         addToast(reply.message || `${command} 失败`, 'error');
