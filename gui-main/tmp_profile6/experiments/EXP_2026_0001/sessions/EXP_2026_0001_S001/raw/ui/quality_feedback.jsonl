@@ -1,5 +1,0 @@
-{"monotonic_ns": 1774942795963661476, "source_ts_ns": 1774942795712395720, "seq": 1, "session_id": "EXP_2026_0001_S001", "data": {"image_quality": 0.82, "feature_confidence": 0.76, "quality_score": 0.79, "need_resample": false}}
-{"monotonic_ns": 1774942796306534227, "source_ts_ns": 1774942796083457272, "seq": 2, "session_id": "EXP_2026_0001_S001", "data": {"image_quality": 0.82, "feature_confidence": 0.76, "quality_score": 0.79, "need_resample": false}}
-{"monotonic_ns": 1774942796650246585, "source_ts_ns": 1774942796414018736, "seq": 3, "session_id": "EXP_2026_0001_S001", "data": {"image_quality": 0.82, "feature_confidence": 0.76, "quality_score": 0.79, "need_resample": false}}
-{"monotonic_ns": 1774942797099966940, "source_ts_ns": 1774942796859838824, "seq": 4, "session_id": "EXP_2026_0001_S001", "data": {"image_quality": 0.82, "feature_confidence": 0.76, "quality_score": 0.79, "need_resample": false}}
-{"monotonic_ns": 1774942797528816097, "source_ts_ns": 1774942797301238706, "seq": 5, "session_id": "EXP_2026_0001_S001", "data": {"image_quality": 0.82, "feature_confidence": 0.76, "quality_score": 0.79, "need_resample": false}}

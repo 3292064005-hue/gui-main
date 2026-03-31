@@ -1,3 +1,0 @@
-{"monotonic_ns": 1774942796762477058, "source_ts_ns": 0, "seq": 1, "session_id": "EXP_2026_0001_S001", "data": {"kind": "workflow", "message": "approach_prescan ok", "ts_ns": 0, "segment_id": 0, "severity": "INFO", "tags": ["approach_prescan"]}}
-{"monotonic_ns": 1774942797208617818, "source_ts_ns": 0, "seq": 2, "session_id": "EXP_2026_0001_S001", "data": {"kind": "workflow", "message": "seek_contact ok", "ts_ns": 0, "segment_id": 0, "severity": "INFO", "tags": ["seek_contact"]}}
-{"monotonic_ns": 1774942797634450809, "source_ts_ns": 0, "seq": 3, "session_id": "EXP_2026_0001_S001", "data": {"kind": "workflow", "message": "start_scan ok", "ts_ns": 0, "segment_id": 0, "severity": "INFO", "tags": ["start_scan"]}}
