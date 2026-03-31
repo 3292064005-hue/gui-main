@@ -8,6 +8,7 @@ Thumbs.db
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
+gui-main/.pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .venv/
@@ -31,3 +32,6 @@ gui-main/**/CMakeCache.txt
 gui-main/**/cmake_install.cmake
 gui-main/**/Testing/
 gui-main/**/compile_commands.json
+
+# Local debug scratch directories
+gui-main/tmp_profile*/
