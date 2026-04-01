@@ -1,8 +1,0 @@
-name,position_only,success,stop_reason,final_pos_err,final_ori_err,elapsed_ms,restarts_used,metadata
-home_pose,False,True,converged,0.0,0.0,1.0959020000882447,0,"{'seed': 'home_q', 'pack_version': 'v7'}"
-mid_pose,False,True,converged,0.0,0.0,0.8865810013958253,0,"{'seed': 'q_mid', 'pack_version': 'v7'}"
-orientation_shifted,False,False,workspace_precheck,nan,nan,0.0,0,"{'seed': 'home_q', 'pack_version': 'v7'}"
-position_only_hard,True,False,workspace_precheck,nan,nan,0.0,0,"{'seed': 'home_q', 'pack_version': 'v7'}"
-near_limit_pose,False,True,converged,0.0,0.0,0.937537999561755,0,"{'seed': 'q_mid', 'pack_version': 'v7'}"
-near_singular_pose,False,True,converged,0.0,0.0,0.9864040002867114,0,"{'seed': 'q_mid', 'pack_version': 'v7'}"
-unreachable_far,False,False,workspace_precheck,nan,nan,0.0,0,"{'seed': 'home_q', 'pack_version': 'v7'}"

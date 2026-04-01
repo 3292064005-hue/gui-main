@@ -1,0 +1,7 @@
+function(robot_core_apply_build_options target_name)
+  target_compile_features(${target_name} PUBLIC cxx_std_17)
+  target_compile_options(${target_name} PRIVATE -pthread)
+  if(ROBOT_CORE_ENABLE_NATIVE_ARCH)
+    target_compile_options(${target_name} PRIVATE -march=native)
+  endif()
+endfunction()

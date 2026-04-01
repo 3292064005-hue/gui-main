@@ -1,0 +1,18 @@
+{
+  "$id": "runtime/topic_catalog.schema.json",
+  "type": "object",
+  "required": [
+    "topics"
+  ],
+  "properties": {
+    "topics": {
+      "type": "array"
+    },
+    "roles": {
+      "type": "object"
+    },
+    "generated_at": {
+      "type": "string"
+    }
+  }
+}

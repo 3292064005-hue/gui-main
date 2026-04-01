@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "resume_allowed",
+    "resume_mode"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "resume_allowed": {
+      "type": "boolean"
+    },
+    "resume_mode": {
+      "type": "string"
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resume_cursor": {
+      "type": "object"
+    },
+    "pre_resume_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_level": {
+      "type": "string"
+    },
+    "resume_token": {
+      "type": "string"
+    }
+  }
+}

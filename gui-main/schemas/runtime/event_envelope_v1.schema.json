@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "topic",
+    "ts_ns",
+    "data",
+    "event_id",
+    "schema_version"
+  ],
+  "properties": {
+    "topic": {
+      "type": "string"
+    },
+    "ts_ns": {
+      "type": "integer"
+    },
+    "data": {
+      "type": "object"
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": "string"
+    },
+    "causation_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "delivery": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "release_allowed",
+    "checks",
+    "check_results",
+    "gate_version"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "release_allowed": {
+      "type": "boolean"
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warning_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_remediations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checks": {
+      "type": "object"
+    },
+    "diagnostics_summary": {
+      "type": "object"
+    },
+    "gate_version": {
+      "type": "string"
+    },
+    "evaluated_ts": {
+      "type": "string"
+    },
+    "check_results": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evaluated_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

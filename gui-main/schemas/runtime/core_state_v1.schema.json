@@ -1,0 +1,53 @@
+{
+  "$id": "runtime/core_state_v1.schema.json",
+  "type": "object",
+  "required": [
+    "execution_state",
+    "armed",
+    "active_segment",
+    "progress_pct",
+    "session_id",
+    "recovery_state"
+  ],
+  "properties": {
+    "execution_state": {
+      "type": "string"
+    },
+    "armed": {
+      "type": "boolean"
+    },
+    "fault_code": {
+      "type": "string"
+    },
+    "active_segment": {
+      "type": "integer"
+    },
+    "progress_pct": {
+      "type": "number"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "recovery_state": {
+      "type": "string"
+    },
+    "plan_hash": {
+      "type": "string"
+    },
+    "contact_stable": {
+      "type": "boolean"
+    },
+    "contact_stable_since_ns": {
+      "type": "integer"
+    },
+    "active_waypoint_index": {
+      "type": "integer"
+    },
+    "last_transition": {
+      "type": "string"
+    },
+    "state_reason": {
+      "type": "string"
+    }
+  }
+}

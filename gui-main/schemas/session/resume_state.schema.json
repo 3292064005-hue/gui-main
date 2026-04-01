@@ -1,0 +1,31 @@
+{
+  "$id": "session/resume_state.schema.json",
+  "type": "object",
+  "required": [
+    "session_id",
+    "resume_ready"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "resume_ready": {
+      "type": "boolean"
+    },
+    "plan_hash": {
+      "type": "string"
+    },
+    "last_successful_segment": {
+      "type": "integer"
+    },
+    "last_successful_waypoint": {
+      "type": "integer"
+    },
+    "recovery_state": {
+      "type": "string"
+    },
+    "artifact_integrity_ok": {
+      "type": "boolean"
+    }
+  }
+}

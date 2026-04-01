@@ -1,0 +1,283 @@
+{
+  "generated_at": "2026-04-01 15:58:31",
+  "session_id": "P2_ACCEPTANCE_STATIC",
+  "schema": "session/session_intelligence_manifest_v1.schema.json",
+  "products": [
+    {
+      "product": "lineage",
+      "output_artifact": "meta/lineage.json",
+      "dependencies": [
+        "meta/manifest.json",
+        "meta/scan_plan.json",
+        "export/session_report.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "resume_state",
+      "output_artifact": "meta/resume_state.json",
+      "dependencies": [
+        "meta/manifest.json",
+        "meta/scan_plan.json",
+        "export/recovery_report.json",
+        "export/session_integrity.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "resume_decision",
+      "output_artifact": "meta/resume_decision.json",
+      "dependencies": [
+        "meta/resume_state.json",
+        "export/recovery_report.json",
+        "derived/incidents/session_incidents.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "resume_attempts",
+      "output_artifact": "derived/session/resume_attempts.json",
+      "dependencies": [
+        "meta/resume_decision.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "resume_attempt_outcomes",
+      "output_artifact": "derived/session/resume_attempt_outcomes.json",
+      "dependencies": [
+        "derived/session/resume_attempts.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "command_state_policy",
+      "output_artifact": "derived/session/command_state_policy.json",
+      "dependencies": [
+        "raw/ui/command_journal.jsonl"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "command_policy_snapshot",
+      "output_artifact": "derived/session/command_policy_snapshot.json",
+      "dependencies": [
+        "derived/session/command_state_policy.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "contract_kernel_diff",
+      "output_artifact": "derived/session/contract_kernel_diff.json",
+      "dependencies": [
+        "meta/manifest.json",
+        "derived/session/command_policy_snapshot.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "recovery_report",
+      "output_artifact": "export/recovery_report.json",
+      "dependencies": [
+        "raw/ui/command_journal.jsonl",
+        "derived/alarms/alarm_timeline.json",
+        "raw/ui/annotations.jsonl"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1200,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "recovery_decision_timeline",
+      "output_artifact": "derived/recovery/recovery_decision_timeline.json",
+      "dependencies": [
+        "export/recovery_report.json",
+        "meta/resume_decision.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1200,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "operator_incident_report",
+      "output_artifact": "export/operator_incident_report.json",
+      "dependencies": [
+        "derived/incidents/session_incidents.json",
+        "export/recovery_report.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1200,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "session_incidents",
+      "output_artifact": "derived/incidents/session_incidents.json",
+      "dependencies": [
+        "raw/ui/annotations.jsonl",
+        "derived/alarms/alarm_timeline.json",
+        "derived/quality/quality_timeline.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "event_log_index",
+      "output_artifact": "derived/events/event_log_index.json",
+      "dependencies": [
+        "raw/core/alarm_event.jsonl",
+        "raw/ui/annotations.jsonl",
+        "raw/ui/command_journal.jsonl"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1200,
+      "owner_domain": "eventing",
+      "materialized": false
+    },
+    {
+      "product": "event_delivery_summary",
+      "output_artifact": "derived/events/event_delivery_summary.json",
+      "dependencies": [
+        "derived/events/event_log_index.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1200,
+      "owner_domain": "eventing",
+      "materialized": false
+    },
+    {
+      "product": "selected_execution_rationale",
+      "output_artifact": "derived/planning/selected_execution_rationale.json",
+      "dependencies": [
+        "meta/scan_plan.json",
+        "meta/manifest.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "planning",
+      "materialized": false
+    },
+    {
+      "product": "release_evidence_pack",
+      "output_artifact": "export/release_evidence_pack.json",
+      "dependencies": [
+        "derived/session/contract_consistency.json",
+        "export/session_integrity.json",
+        "meta/resume_decision.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1500,
+      "owner_domain": "release",
+      "materialized": false
+    },
+    {
+      "product": "release_gate_decision",
+      "output_artifact": "export/release_gate_decision.json",
+      "dependencies": [
+        "export/release_evidence_pack.json",
+        "derived/events/event_delivery_summary.json",
+        "derived/session/command_policy_snapshot.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "release",
+      "materialized": false
+    },
+    {
+      "product": "contract_consistency",
+      "output_artifact": "derived/session/contract_consistency.json",
+      "dependencies": [
+        "meta/manifest.json",
+        "derived/session/contract_kernel_diff.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "control_plane_snapshot",
+      "output_artifact": "derived/session/control_plane_snapshot.json",
+      "dependencies": [
+        "meta/manifest.json",
+        "export/release_gate_decision.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "control_authority_snapshot",
+      "output_artifact": "derived/session/control_authority_snapshot.json",
+      "dependencies": [
+        "meta/manifest.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "governance",
+      "materialized": false
+    },
+    {
+      "product": "bridge_observability_report",
+      "output_artifact": "derived/events/bridge_observability_report.json",
+      "dependencies": [
+        "derived/events/event_log_index.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 1000,
+      "owner_domain": "eventing",
+      "materialized": false
+    },
+    {
+      "product": "artifact_registry_snapshot",
+      "output_artifact": "derived/session/artifact_registry_snapshot.json",
+      "dependencies": [
+        "meta/manifest.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "session-evidence",
+      "materialized": false
+    },
+    {
+      "product": "session_evidence_seal",
+      "output_artifact": "meta/session_evidence_seal.json",
+      "dependencies": [
+        "meta/manifest.json"
+      ],
+      "retryable": true,
+      "performance_budget_ms": 800,
+      "owner_domain": "release",
+      "materialized": false
+    }
+  ]
+}

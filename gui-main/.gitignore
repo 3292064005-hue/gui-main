@@ -1,8 +1,29 @@
-.pytest_cache/
+# Local TLS material generated for robot_core / headless IPC
+configs/tls/runtime/*.crt
+configs/tls/runtime/*.key
+configs/tls/*.key
+
+# Runtime workspace state
+workspace/
+data/runtime/*.json
+
+# Python cache
 __pycache__/
-*.py[cod]
-*.egg-info/
-.ruff_cache/
+*.pyc
+.pytest_cache/
 .mypy_cache/
-.coverage
-htmlcov/
+
+# Native build trees
+cpp_robot_core/build/
+cpp_robot_core/build*/
+
+# Frontend build artifacts and dependencies
+ui_frontend/node_modules/
+ui_frontend/dist/
+ui_frontend/playwright-report/
+ui_frontend/test-results/
+ui_frontend/coverage/
+ui_frontend/openapi/spine-openapi.json
+
+# Generated browser/cache files
+*.tsbuildinfo

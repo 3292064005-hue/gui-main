@@ -1,0 +1,10 @@
+{
+  "$id": "frame_sync_index.schema.json",
+  "type": "object",
+  "required": ["session_id", "rows", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "rows": {"type": "array"},
+    "summary": {"type": "object"}
+  }
+}

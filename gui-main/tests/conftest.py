@@ -1,17 +1,13 @@
 from __future__ import annotations
+import sys
 from pathlib import Path
-import pytest
 
-from robot_sim.application.services.robot_registry import RobotRegistry
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-@pytest.fixture
-def project_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+from tests.bootstrap_env import configure_test_environment
+from tests.runtime_compat import enable_runtime_compat
 
-@pytest.fixture
-def planar_spec(project_root):
-    return RobotRegistry(project_root / "configs" / "robots").load("planar_2dof")
-
-@pytest.fixture
-def puma_spec(project_root):
-    return RobotRegistry(project_root / "configs" / "robots").load("puma_like_6dof")
+configure_test_environment()
+enable_runtime_compat()

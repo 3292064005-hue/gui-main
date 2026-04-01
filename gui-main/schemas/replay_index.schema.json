@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReplayIndex",
+  "type": "object",
+  "required": ["session_id", "streams", "timeline", "channels"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "streams": {"type": "object"},
+    "timeline": {"type": "array", "items": {"type": "object"}},
+    "channels": {"type": "array", "items": {"type": "string"}},
+    "alarm_segments": {"type": "array", "items": {"type": "object"}},
+    "quality_segments": {"type": "array", "items": {"type": "object"}},
+    "notable_events": {"type": "array", "items": {"type": "object"}}
+  }
+}

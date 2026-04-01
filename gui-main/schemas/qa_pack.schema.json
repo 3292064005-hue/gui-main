@@ -1,0 +1,19 @@
+{
+  "$id": "qa_pack.schema.json",
+  "type": "object",
+  "required": ["session_dir", "manifest", "report", "replay", "quality", "alarms", "schemas"],
+  "properties": {
+    "session_dir": {"type": "string"},
+    "manifest": {"type": "object"},
+    "report": {"type": "object"},
+    "replay": {"type": "object"},
+    "quality": {"type": "object"},
+    "alarms": {"type": "object"},
+    "frame_sync": {"type": "object"},
+    "compare": {"type": "object"},
+    "trends": {"type": "object"},
+    "diagnostics": {"type": "object"},
+    "annotations": {"type": "array"},
+    "schemas": {"type": "object"}
+  }
+}

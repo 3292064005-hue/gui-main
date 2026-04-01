@@ -1,0 +1,6 @@
+mode_default: cartesianImpedance
+stable_contact_force_n: 1.5
+overpressure_force_n: 2.4
+slip_score_threshold: 0.4
+z_bias_step_mm: 0.2
+speed_scale_min: 0.35

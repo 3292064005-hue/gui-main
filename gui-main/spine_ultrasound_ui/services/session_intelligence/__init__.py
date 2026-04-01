@@ -1,0 +1,1 @@
+"""Structured session-intelligence builders."""

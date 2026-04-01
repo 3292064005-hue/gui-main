@@ -1,7 +1,0 @@
-window:
-  title: "Robot Sim Engine"
-  width: 1600
-  height: 960
-  splitter_sizes: [320, 900, 320]
-plots:
-  max_points: 5000

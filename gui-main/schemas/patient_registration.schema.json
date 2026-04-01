@@ -1,0 +1,16 @@
+{
+  "$id": "patient_registration.schema.json",
+  "type": "object",
+  "required": ["status", "patient_frame", "scan_corridor"],
+  "properties": {
+    "status": {"type": "string"},
+    "source": {"type": "string"},
+    "patient_frame": {"type": "object"},
+    "scan_corridor": {"type": "object"},
+    "landmarks": {"type": "array"},
+    "body_surface": {"type": "object"},
+    "camera_observations": {"type": "object"},
+    "registration_quality": {"type": "object"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

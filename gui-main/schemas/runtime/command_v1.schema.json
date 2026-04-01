@@ -1,0 +1,24 @@
+{
+  "$id": "runtime/command_v1.schema.json",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "command",
+    "payload_json",
+    "request_id"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "integer"
+    },
+    "command": {
+      "type": "string"
+    },
+    "payload_json": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    }
+  }
+}

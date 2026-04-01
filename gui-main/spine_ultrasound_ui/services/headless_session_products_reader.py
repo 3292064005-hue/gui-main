@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Callable
+
+from spine_ultrasound_ui.services.headless_telemetry_cache import HeadlessTelemetryCache
+from spine_ultrasound_ui.services.session_evidence_seal_service import SessionEvidenceSealService
+from spine_ultrasound_ui.services.session_integrity_service import SessionIntegrityService
+from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
+
+
+class HeadlessSessionProductsReader:
+    """Owns session-derived read APIs so HeadlessAdapter can stay transport-focused."""
+
+    def __init__(
+        self,
+        *,
+        telemetry_cache: HeadlessTelemetryCache,
+        resolve_session_dir: Callable[[], Path | None],
+        current_session_id: Callable[[], str],
+        manifest_reader: Callable[[Path | None], dict[str, Any]],
+        json_reader: Callable[[Path], dict[str, Any]],
+        json_if_exists_reader: Callable[[Path], dict[str, Any]],
+        jsonl_reader: Callable[[Path], list[dict[str, Any]]],
+        status_reader: Callable[[], dict[str, Any]],
+        derive_recovery_state: Callable[[dict[str, Any]], str],
+        command_policy_catalog: Callable[[], dict[str, Any]],
+        integrity_service: SessionIntegrityService,
+        session_intelligence: SessionIntelligenceService,
+        evidence_seal_service: SessionEvidenceSealService,
+    ) -> None:
+        self.telemetry_cache = telemetry_cache
+        self._resolve_session_dir = resolve_session_dir
+        self._current_session_id = current_session_id
+        self._read_manifest_if_available = manifest_reader
+        self._read_json = json_reader
+        self._read_json_if_exists = json_if_exists_reader
+        self._read_jsonl = jsonl_reader
+        self._status = status_reader
+        self._derive_recovery_state = derive_recovery_state
+        self._command_policy_catalog = command_policy_catalog
+        self.integrity_service = integrity_service
+        self.session_intelligence = session_intelligence
+        self.evidence_seal_service = evidence_seal_service
+
+    def require_session_dir(self) -> Path:
+        session_dir = self._resolve_session_dir()
+        if session_dir is None:
+            raise FileNotFoundError('no active session')
+        return session_dir
+
+    def current_session(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        manifest = self._read_manifest_if_available(session_dir)
+        report_path = session_dir / 'export' / 'session_report.json'
+        replay_path = session_dir / 'replay' / 'replay_index.json'
+        qa_path = session_dir / 'export' / 'qa_pack.json'
+        compare_path = session_dir / 'export' / 'session_compare.json'
+        trends_path = session_dir / 'export' / 'session_trends.json'
+        diagnostics_path = session_dir / 'export' / 'diagnostics_pack.json'
+        return {
+            'session_id': manifest.get('session_id', self._current_session_id() or session_dir.name),
+            'session_dir': str(session_dir),
+            'session_started_at': manifest.get('created_at', ''),
+            'artifacts': manifest.get('artifacts', {}),
+            'artifact_registry': manifest.get('artifact_registry', {}),
+            'report_available': report_path.exists(),
+            'replay_available': replay_path.exists(),
+            'qa_pack_available': qa_path.exists(),
+            'compare_available': compare_path.exists(),
+            'trends_available': trends_path.exists(),
+            'diagnostics_available': diagnostics_path.exists(),
+            'readiness_available': (session_dir / 'meta' / 'device_readiness.json').exists(),
+            'profile_available': (session_dir / 'meta' / 'xmate_profile.json').exists(),
+            'patient_registration_available': (session_dir / 'meta' / 'patient_registration.json').exists(),
+            'scan_protocol_available': (session_dir / 'derived' / 'preview' / 'scan_protocol.json').exists(),
+            'frame_sync_available': (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists(),
+            'command_trace_available': (session_dir / 'raw' / 'ui' / 'command_journal.jsonl').exists(),
+            'assessment_available': report_path.exists() and (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists(),
+            'contact_available': True,
+            'recovery_available': True,
+            'integrity_available': (session_dir / 'meta' / 'manifest.json').exists(),
+            'operator_incidents_available': (session_dir / 'derived' / 'alarms' / 'alarm_timeline.json').exists() or (session_dir / 'raw' / 'ui' / 'annotations.jsonl').exists(),
+            'event_log_index_available': (session_dir / 'derived' / 'events' / 'event_log_index.json').exists(),
+            'recovery_timeline_available': (session_dir / 'derived' / 'recovery' / 'recovery_decision_timeline.json').exists(),
+            'resume_attempts_available': (session_dir / 'derived' / 'session' / 'resume_attempts.json').exists(),
+            'resume_outcomes_available': (session_dir / 'derived' / 'session' / 'resume_attempt_outcomes.json').exists(),
+            'command_policy_available': (session_dir / 'derived' / 'session' / 'command_state_policy.json').exists(),
+            'command_policy_snapshot_available': (session_dir / 'derived' / 'session' / 'command_policy_snapshot.json').exists(),
+            'contract_kernel_diff_available': (session_dir / 'derived' / 'session' / 'contract_kernel_diff.json').exists(),
+            'contract_consistency_available': (session_dir / 'derived' / 'session' / 'contract_consistency.json').exists(),
+            'event_delivery_summary_available': (session_dir / 'derived' / 'events' / 'event_delivery_summary.json').exists(),
+            'selected_execution_rationale_available': (session_dir / 'derived' / 'planning' / 'selected_execution_rationale.json').exists(),
+            'release_evidence_available': (session_dir / 'export' / 'release_evidence_pack.json').exists(),
+            'release_gate_available': (session_dir / 'export' / 'release_gate_decision.json').exists(),
+            'control_plane_snapshot_available': (session_dir / 'derived' / 'session' / 'control_plane_snapshot.json').exists(),
+            'control_authority_snapshot_available': (session_dir / 'derived' / 'session' / 'control_authority_snapshot.json').exists(),
+            'bridge_observability_report_available': (session_dir / 'derived' / 'events' / 'bridge_observability_report.json').exists(),
+            'session_evidence_seal_available': (session_dir / 'meta' / 'session_evidence_seal.json').exists(),
+            'evidence_seal_available': (session_dir / 'meta' / 'session_evidence_seal.json').exists(),
+            'status': self._status(),
+        }
+
+    def current_contact(self) -> dict[str, Any]:
+        core = dict(self.telemetry_cache.latest_by_topic.get('core_state', {}))
+        contact = dict(self.telemetry_cache.latest_by_topic.get('contact_state', {}))
+        progress = dict(self.telemetry_cache.latest_by_topic.get('scan_progress', {}))
+        return {
+            'session_id': str(core.get('session_id', self._current_session_id())),
+            'execution_state': str(core.get('execution_state', 'BOOT')),
+            'contact_mode': str(contact.get('mode', 'NO_CONTACT')),
+            'contact_confidence': float(contact.get('confidence', 0.0) or 0.0),
+            'pressure_current': float(contact.get('pressure_current', 0.0) or 0.0),
+            'recommended_action': str(contact.get('recommended_action', 'IDLE')),
+            'contact_stable': bool(contact.get('contact_stable', core.get('contact_stable', False))),
+            'active_segment': int(progress.get('active_segment', core.get('active_segment', 0)) or 0),
+        }
+
+    def current_recovery(self) -> dict[str, Any]:
+        core = dict(self.telemetry_cache.latest_by_topic.get('core_state', {}))
+        safety = dict(self.telemetry_cache.latest_by_topic.get('safety_status', {}))
+        return {
+            'session_id': str(core.get('session_id', self._current_session_id())),
+            'execution_state': str(core.get('execution_state', 'BOOT')),
+            'recovery_state': str(core.get('recovery_state', self._derive_recovery_state(core))),
+            'recovery_reason': str(safety.get('recovery_reason', '')),
+            'last_recovery_action': str(safety.get('last_recovery_action', '')),
+            'active_interlocks': list(safety.get('active_interlocks', [])),
+        }
+
+    def current_integrity(self) -> dict[str, Any]:
+        return self.integrity_service.build(self.require_session_dir())
+
+    def current_lineage(self) -> dict[str, Any]:
+        return self._read_or_build('meta/lineage.json', 'lineage')
+
+    def current_resume_state(self) -> dict[str, Any]:
+        return self._read_or_build('meta/resume_state.json', 'resume_state')
+
+    def current_recovery_report(self) -> dict[str, Any]:
+        return self._read_or_build('export/recovery_report.json', 'recovery_report')
+
+    def current_operator_incidents(self) -> dict[str, Any]:
+        return self._read_or_build('export/operator_incident_report.json', 'operator_incident_report')
+
+    def current_incidents(self) -> dict[str, Any]:
+        return self._read_or_build('derived/incidents/session_incidents.json', 'session_incidents')
+
+    def current_resume_decision(self) -> dict[str, Any]:
+        return self._read_or_build('meta/resume_decision.json', 'resume_decision')
+
+    def current_event_log_index(self) -> dict[str, Any]:
+        return self._read_or_build('derived/events/event_log_index.json', 'event_log_index')
+
+    def current_recovery_timeline(self) -> dict[str, Any]:
+        return self._read_or_build('derived/recovery/recovery_decision_timeline.json', 'recovery_decision_timeline')
+
+    def current_resume_attempts(self) -> dict[str, Any]:
+        return self._read_or_build('derived/session/resume_attempts.json', 'resume_attempts')
+
+    def current_resume_outcomes(self) -> dict[str, Any]:
+        return self._read_or_build('derived/session/resume_attempt_outcomes.json', 'resume_attempt_outcomes')
+
+    def current_command_policy(self) -> dict[str, Any]:
+        session_dir = self._resolve_session_dir()
+        if session_dir is not None:
+            path = session_dir / 'derived' / 'session' / 'command_state_policy.json'
+            if path.exists():
+                return self._read_json(path)
+        return self._command_policy_catalog()
+
+    def current_contract_kernel_diff(self) -> dict[str, Any]:
+        return self._read_or_build('derived/session/contract_kernel_diff.json', 'contract_kernel_diff')
+
+    def current_command_policy_snapshot(self) -> dict[str, Any]:
+        return self._read_or_build('derived/session/command_policy_snapshot.json', 'command_policy_snapshot')
+
+    def current_event_delivery_summary(self) -> dict[str, Any]:
+        return self._read_or_build('derived/events/event_delivery_summary.json', 'event_delivery_summary')
+
+    def current_contract_consistency(self) -> dict[str, Any]:
+        return self._read_or_build('derived/session/contract_consistency.json', 'contract_consistency')
+
+    def current_selected_execution_rationale(self) -> dict[str, Any]:
+        return self._read_or_build('derived/planning/selected_execution_rationale.json', 'selected_execution_rationale')
+
+    def current_release_gate_decision(self) -> dict[str, Any]:
+        return self._read_or_build('export/release_gate_decision.json', 'release_gate_decision')
+
+    def current_release_evidence(self) -> dict[str, Any]:
+        return self._read_or_build('export/release_evidence_pack.json', 'release_evidence_pack')
+
+    def current_evidence_seal(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        path = session_dir / 'meta' / 'session_evidence_seal.json'
+        if path.exists():
+            return self._read_json(path)
+        return self.evidence_seal_service.build(session_dir, manifest=self._read_manifest_if_available(session_dir))
+
+    def current_report(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'export' / 'session_report.json')
+
+    def current_replay(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'replay' / 'replay_index.json')
+
+    def current_quality(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'derived' / 'quality' / 'quality_timeline.json')
+
+    def current_frame_sync(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'derived' / 'sync' / 'frame_sync_index.json')
+
+    def current_alarms(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'derived' / 'alarms' / 'alarm_timeline.json')
+
+    def current_artifacts(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        manifest = self._read_manifest_if_available(session_dir)
+        return {
+            'session_id': manifest.get('session_id', session_dir.name),
+            'artifacts': manifest.get('artifacts', {}),
+            'artifact_registry': manifest.get('artifact_registry', {}),
+            'processing_steps': manifest.get('processing_steps', []),
+            'algorithm_registry': manifest.get('algorithm_registry', {}),
+            'warnings': manifest.get('warnings', []),
+        }
+
+    def current_compare(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'export' / 'session_compare.json')
+
+    def current_qa_pack(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'export' / 'qa_pack.json')
+
+    def current_trends(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'export' / 'session_trends.json')
+
+    def current_diagnostics(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'export' / 'diagnostics_pack.json')
+
+    def current_annotations(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        return {
+            'session_id': self._read_manifest_if_available(session_dir).get('session_id', session_dir.name),
+            'annotations': [entry.get('data', {}) for entry in self._read_jsonl(session_dir / 'raw' / 'ui' / 'annotations.jsonl')],
+        }
+
+    def current_readiness(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'meta' / 'device_readiness.json')
+
+    def current_profile(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'meta' / 'xmate_profile.json')
+
+    def current_patient_registration(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'meta' / 'patient_registration.json')
+
+    def current_scan_protocol(self) -> dict[str, Any]:
+        return self._read_json(self.require_session_dir() / 'derived' / 'preview' / 'scan_protocol.json')
+
+    def current_command_trace(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        manifest = self._read_manifest_if_available(session_dir)
+        rows = [entry.get('data', {}) for entry in self._read_jsonl(session_dir / 'raw' / 'ui' / 'command_journal.jsonl')]
+        return {
+            'session_id': manifest.get('session_id', session_dir.name),
+            'entries': rows,
+            'summary': {
+                'count': len(rows),
+                'failed': sum(1 for row in rows if not bool(dict(row.get('reply', {})).get('ok', True))),
+                'latest_command': rows[-1].get('command', '') if rows else '',
+            },
+        }
+
+    def current_assessment(self) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        manifest = self._read_manifest_if_available(session_dir)
+        report = self._read_json(session_dir / 'export' / 'session_report.json')
+        qa_pack = self._read_json_if_exists(session_dir / 'export' / 'qa_pack.json')
+        frame_sync = self._read_json_if_exists(session_dir / 'derived' / 'sync' / 'frame_sync_index.json')
+        annotations = [entry.get('data', {}) for entry in self._read_jsonl(session_dir / 'raw' / 'ui' / 'annotations.jsonl')]
+        quality_summary = dict(report.get('quality_summary', {}))
+        usable_ratio = float(quality_summary.get('usable_sync_ratio', frame_sync.get('summary', {}).get('usable_ratio', 0.0) or 0.0))
+        avg_quality = float(quality_summary.get('avg_quality_score', 0.0) or 0.0)
+        confidence = round(min(1.0, max(0.0, (avg_quality * 0.65) + (usable_ratio * 0.35))), 4)
+        manual_review = confidence < 0.82 or len(annotations) > 0
+        evidence_frames: list[dict[str, Any]] = []
+        for row in frame_sync.get('rows', []):
+            if not bool(row.get('usable', True)):
+                continue
+            evidence_frames.append({
+                'frame_id': row.get('frame_id', row.get('seq', len(evidence_frames))),
+                'segment_id': row.get('segment_id', 0),
+                'ts_ns': row.get('ts_ns', 0),
+                'quality_score': row.get('quality_score', row.get('image_quality', 0.0)),
+                'contact_confidence': row.get('contact_confidence', 0.0),
+            })
+            if len(evidence_frames) >= 8:
+                break
+        landmark_candidates = [
+            annotation
+            for annotation in annotations
+            if str(annotation.get('kind', '')).lower() in {'landmark_hint', 'anatomy_marker', 'manual_review_note'}
+        ][:10]
+        open_issues = list(report.get('open_issues', []))
+        return {
+            'session_id': manifest.get('session_id', session_dir.name),
+            'robot_model': manifest.get('robot_profile', {}).get('robot_model', ''),
+            'summary': {
+                'avg_quality_score': avg_quality,
+                'usable_sync_ratio': usable_ratio,
+                'annotation_count': len(annotations),
+                'confidence': confidence,
+            },
+            'curve_candidate': {
+                'status': 'plugin_ready',
+                'source': 'session_report',
+                'description': 'Clinical scoliosis assessment remains plugin-driven; current workspace exposes evidence and review anchors.',
+            },
+            'cobb_candidate_deg': qa_pack.get('assessment', {}).get('cobb_candidate_deg') if isinstance(qa_pack.get('assessment'), dict) else None,
+            'confidence': confidence,
+            'requires_manual_review': manual_review,
+            'landmark_candidates': landmark_candidates,
+            'evidence_frames': evidence_frames,
+            'open_issues': open_issues,
+        }
+
+    def _read_or_build(self, relative_path: str, intelligence_key: str) -> dict[str, Any]:
+        session_dir = self.require_session_dir()
+        path = session_dir.joinpath(*relative_path.split('/'))
+        if path.exists():
+            return self._read_json(path)
+        return self.session_intelligence.build_all(session_dir)[intelligence_key]

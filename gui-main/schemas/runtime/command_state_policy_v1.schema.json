@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommandStatePolicyCatalog",
+  "type": "object",
+  "required": [
+    "policies"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "known_states": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "command",
+          "allowed_states",
+          "blocked_states",
+          "reject_reason_code",
+          "fallback_action",
+          "recovery_escalation",
+          "ui_visibility",
+          "role_write_gate",
+          "required_contact_state",
+          "required_plan_state",
+          "required_resume_mode",
+          "policy_version"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "allowed_states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocked_states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reject_reason_code": {
+            "type": "string"
+          },
+          "fallback_action": {
+            "type": "string"
+          },
+          "recovery_escalation": {
+            "type": "string"
+          },
+          "ui_visibility": {
+            "type": "string"
+          },
+          "role_write_gate": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_contact_state": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_plan_state": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_resume_mode": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policy_version": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

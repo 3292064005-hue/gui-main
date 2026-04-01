@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResumeAttemptOutcomes",
+  "type": "object",
+  "required": ["session_id", "summary", "outcomes"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "session_id": {"type": "string"},
+    "summary": {"type": "object"},
+    "outcomes": {"type": "array", "items": {"type": "object"}}
+  }
+}

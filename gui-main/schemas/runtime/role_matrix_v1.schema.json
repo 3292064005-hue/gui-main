@@ -1,0 +1,10 @@
+{
+  "$id": "runtime/role_matrix_v1.schema.json",
+  "type": "object",
+  "required": ["roles", "command_groups"],
+  "properties": {
+    "roles": {"type": "object"},
+    "command_groups": {"type": "object"}
+  },
+  "additionalProperties": true
+}
