@@ -45,10 +45,11 @@ class MainWindowLayoutBuilder:
         self.build_statusbar()
 
         root = QWidget()
+        root.setObjectName("MainShell")
         w.setCentralWidget(root)
         main_layout = QVBoxLayout(root)
-        main_layout.setContentsMargins(12, 12, 12, 12)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(6, 6, 6, 6)
+        main_layout.setSpacing(6)
 
         w.hero_card = self.build_header_banner()
         w.alarm_banner = AlarmBanner()
@@ -63,7 +64,7 @@ class MainWindowLayoutBuilder:
         w.main_splitter.setSizes([360, 1020, 340])
 
         w.log_box = LogConsole()
-        w.log_box.setMinimumHeight(170)
+        w.log_box.setMinimumHeight(88)
         main_layout.addWidget(w.log_box)
 
     def build_toolbar(self) -> None:
@@ -109,9 +110,10 @@ class MainWindowLayoutBuilder:
     def build_header_banner(self) -> QWidget:
         w = self.window
         card = QFrame()
+        card.setObjectName("HeroCard")
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(18)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(12)
 
         text_col = QVBoxLayout()
         title = QLabel("脊柱侧弯自动检测研究平台")
@@ -141,7 +143,7 @@ class MainWindowLayoutBuilder:
         metrics_col = QHBoxLayout()
         w.header_cards = []
         for title_text, tone in [("机器人链路", "accent"), ("实时状态", "warning"), ("结果输出", "success")]:
-            card_widget = StatusCard(title_text, tone=tone)
+            card_widget = StatusCard(title_text, tone=tone, compact=True)
             card_widget.setMinimumWidth(170)
             metrics_col.addWidget(card_widget)
             w.header_cards.append(card_widget)
@@ -160,7 +162,7 @@ class MainWindowLayoutBuilder:
         panel.setWidget(content)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(8)
 
         device_box = QGroupBox("设备链路")
         device_layout = QVBoxLayout(device_box)
@@ -174,6 +176,8 @@ class MainWindowLayoutBuilder:
 
         governance = QGroupBox("治理与审计")
         governance_layout = QVBoxLayout(governance)
+        governance_layout.setContentsMargins(8, 8, 8, 8)
+        governance_layout.setSpacing(8)
         w.governance_summary = QLabel("控制面、控制权、证据链状态将在此处收敛显示。")
         w.governance_summary.setWordWrap(True)
         governance_layout.addWidget(w.governance_summary)
@@ -243,18 +247,7 @@ class MainWindowLayoutBuilder:
         panel.setWidget(content)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-
-        header = QGroupBox("运行摘要")
-        header_layout = QVBoxLayout(header)
-        head_title = QLabel("实时关键指标")
-        head_title.setObjectName("SectionTitle")
-        head_hint = QLabel("右侧卡片用于快速查看状态、压力、位姿、图像质量与结果摘要。")
-        head_hint.setObjectName("SectionHint")
-        head_hint.setWordWrap(True)
-        header_layout.addWidget(head_title)
-        header_layout.addWidget(head_hint)
-        layout.addWidget(header)
+        layout.setSpacing(8)
 
         for attr, title, tone in [
             ("card_state", "系统状态", "accent"),
@@ -265,7 +258,7 @@ class MainWindowLayoutBuilder:
             ("card_quality", "图像质量", "warning"),
             ("card_result", "结果摘要", None),
         ]:
-            card = StatusCard(title, tone=tone) if tone else StatusCard(title)
+            card = StatusCard(title, tone=tone, compact=True) if tone else StatusCard(title, compact=True)
             setattr(w, attr, card)
             layout.addWidget(card)
         layout.addStretch(1)
@@ -313,8 +306,9 @@ class MainWindowLayoutBuilder:
         w = self.window
         box = QGroupBox(title)
         grid = QGridLayout(box)
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        grid.setContentsMargins(6, 8, 6, 8)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
         buttons = []
         for attr, text, backend_method in spec:
             button = self._make_button(text, getattr(w.backend, backend_method, lambda: QMessageBox.information(w, "提示", f"{text} 暂未接线")))

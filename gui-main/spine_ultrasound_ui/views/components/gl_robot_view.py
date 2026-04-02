@@ -37,8 +37,8 @@ class GLRobotView(QWidget):
         # 扫描路径预览
         self.preview_path = None
 
-        # 设置背景色 (医疗深色主题)
-        self.gl_view.setBackgroundColor('#1a1a1a')
+        # 设置背景色，与浅色工作台主题保持一致
+        self.gl_view.setBackgroundColor('#F7F8FA')
 
         # 性能优化：减少重绘频率
         self.update_timer = QTimer()

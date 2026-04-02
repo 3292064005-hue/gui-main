@@ -63,10 +63,42 @@ def join_lines(lines: list[str], fallback: str = "-") -> str:
 
 def html_summary(lines: list[tuple[str, str]]) -> str:
     return "".join(
-        f"<p><span style='color:#8FA2BF;'>{escape(str(key))}</span><br>"
-        f"<span style='color:#F8FAFC; font-weight:700;'>{escape(str(value))}</span></p>"
+        f"<p><span style='color:#6B7280;'>{escape(str(key))}</span><br>"
+        f"<span style='color:#111827; font-weight:700;'>{escape(str(value))}</span></p>"
         for key, value in lines
     )
+
+
+def set_text_edit_plain_preserve_scroll(editor: Any, content: str) -> None:
+    _set_text_edit_content_preserve_scroll(editor, content, mode="plain")
+
+
+def set_text_edit_html_preserve_scroll(editor: Any, content: str) -> None:
+    _set_text_edit_content_preserve_scroll(editor, content, mode="html")
+
+
+def _set_text_edit_content_preserve_scroll(editor: Any, content: str, *, mode: str) -> None:
+    cache_key = f"_presenter_last_{mode}"
+    if hasattr(editor, "property") and editor.property(cache_key) == content:
+        return
+
+    vertical = editor.verticalScrollBar() if hasattr(editor, "verticalScrollBar") else None
+    horizontal = editor.horizontalScrollBar() if hasattr(editor, "horizontalScrollBar") else None
+    old_v = vertical.value() if vertical is not None else 0
+    old_h = horizontal.value() if horizontal is not None else 0
+
+    if mode == "html":
+        editor.setHtml(content)
+    else:
+        editor.setPlainText(content)
+
+    if hasattr(editor, "setProperty"):
+        editor.setProperty(cache_key, content)
+
+    if vertical is not None:
+        vertical.setValue(min(old_v, vertical.maximum()))
+    if horizontal is not None:
+        horizontal.setValue(min(old_h, horizontal.maximum()))
 
 
 def build_status_context(window: Any, payload: dict[str, Any]) -> StatusViewContext:

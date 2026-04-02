@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGroupBox, QHeaderView, QLabel, QSplitter, QVBoxLayout, QWidget, QTableView
+from PySide6.QtWidgets import QGroupBox, QHeaderView, QLabel, QScrollArea, QSplitter, QVBoxLayout, QWidget, QTableView
 
 from spine_ultrasound_ui.widgets import ConfigForm, ExperimentTableModel
 
@@ -19,16 +19,26 @@ class ExperimentPage(QWidget):
 
         splitter = QSplitter()
         splitter.setChildrenCollapsible(False)
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, 1)
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QScrollArea.NoFrame)
+        left_content = QWidget()
+        left_scroll.setWidget(left_content)
+        left_content_layout = QVBoxLayout(left_content)
+        left_content_layout.setContentsMargins(0, 0, 0, 0)
+        left_content_layout.setSpacing(10)
         note = QLabel("建议将常用参数配置保存为标准模板，保证不同受试者间的流程一致性。")
         note.setObjectName("MutedLabel")
-        left_layout.addWidget(note)
-        left_layout.addWidget(config_form)
+        left_content_layout.addWidget(note)
+        left_content_layout.addWidget(config_form)
+        left_content_layout.addStretch(1)
+        left_layout.addWidget(left_scroll)
         splitter.addWidget(left)
 
         right = QWidget()

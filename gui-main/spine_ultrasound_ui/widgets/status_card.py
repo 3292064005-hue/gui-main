@@ -2,13 +2,18 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 
 class StatusCard(QFrame):
-    def __init__(self, title: str, tone: str = "default"):
+    def __init__(self, title: str, tone: str = "default", *, compact: bool = False):
         super().__init__()
         self.setObjectName("StatusCard")
         self.setProperty("tone", tone)
+        self.setProperty("compact", compact)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(6)
+        if compact:
+            layout.setContentsMargins(10, 8, 10, 8)
+            layout.setSpacing(4)
+        else:
+            layout.setContentsMargins(14, 12, 14, 12)
+            layout.setSpacing(6)
 
         self.title_label = QLabel(title)
         self.title_label.setObjectName("CardTitle")

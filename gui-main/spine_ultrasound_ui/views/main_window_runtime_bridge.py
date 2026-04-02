@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from PySide6.QtCore import Slot
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 
 class MainWindowRuntimeHost(Protocol):
@@ -17,8 +17,11 @@ class MainWindowRuntimeHost(Protocol):
     main_splitter: Any
     tabs: Any
 
+    def x(self) -> int: ...
+    def y(self) -> int: ...
     def width(self) -> int: ...
     def height(self) -> int: ...
+    def move(self, x: int, y: int) -> None: ...
     def resize(self, width: int, height: int) -> None: ...
     def statusBar(self) -> Any: ...
 
@@ -47,7 +50,12 @@ class MainWindowRuntimeBridge:
         prefs = self.host.backend.load_ui_preferences() or {}
         width = int(prefs.get("window_width", 1720))
         height = int(prefs.get("window_height", 1020))
+        width, height = _clamp_window_size(width, height)
+        pos_x = int(prefs.get("window_x", _default_window_x()))
+        pos_y = int(prefs.get("window_y", _default_window_y()))
+        pos_x, pos_y = _clamp_window_position(pos_x, pos_y, width, height)
         self.host.resize(width, height)
+        self.host.move(pos_x, pos_y)
         tab_index = int(prefs.get("tab_index", 0))
         if 0 <= tab_index < self.host.tabs.count():
             self.host.tabs.setCurrentIndex(tab_index)
@@ -61,6 +69,8 @@ class MainWindowRuntimeBridge:
         sizes = self.host.main_splitter.sizes() if hasattr(self.host.main_splitter, "sizes") else [360, 1020, 340]
         self.host.backend.save_ui_preferences(
             {
+                "window_x": self.host.x(),
+                "window_y": self.host.y(),
                 "window_width": self.host.width(),
                 "window_height": self.host.height(),
                 "tab_index": self.host.tabs.currentIndex(),
@@ -112,3 +122,48 @@ class MainWindowRuntimeBridge:
                 self.host.backend.emergency_stop()
             else:
                 self.host.backend.safe_retreat()
+
+
+def _clamp_window_size(width: int, height: int) -> tuple[int, int]:
+    screen = QApplication.primaryScreen()
+    if screen is None:
+        return width, height
+    available = screen.availableGeometry()
+    max_width = max(960, available.width() - 24)
+    max_height = max(640, available.height() - 24)
+    min_width = min(max_width, 1180)
+    min_height = min(max_height, 640)
+    clamped_width = min(max(width, min_width), max_width)
+    preferred_max_height = min(780, max_height)
+    clamped_height = min(max(height, min_height), preferred_max_height)
+    return clamped_width, clamped_height
+
+
+def _default_window_x() -> int:
+    screen = QApplication.primaryScreen()
+    if screen is None:
+        return 24
+    available = screen.availableGeometry()
+    return available.x() + 12
+
+
+def _default_window_y() -> int:
+    screen = QApplication.primaryScreen()
+    if screen is None:
+        return 24
+    available = screen.availableGeometry()
+    return available.y() + 12
+
+
+def _clamp_window_position(x: int, y: int, width: int, height: int) -> tuple[int, int]:
+    screen = QApplication.primaryScreen()
+    if screen is None:
+        return x, y
+    available = screen.availableGeometry()
+    min_x = available.x() + 12
+    min_y = available.y() + 12
+    max_x = max(min_x, available.x() + available.width() - width - 12)
+    max_y = max(min_y, available.y() + available.height() - height - 12)
+    clamped_x = min(max(x, min_x), max_x)
+    clamped_y = min(max(y, min_y), max_y)
+    return clamped_x, clamped_y

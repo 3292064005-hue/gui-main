@@ -25,7 +25,9 @@ class ScanPage(QWidget):
         imgs.addWidget(self.camera_pane)
         imgs.addWidget(self.ultrasound_pane)
         imgs.setSizes([540, 540])
-        layout.addWidget(imgs)
+        imgs.setStretchFactor(0, 1)
+        imgs.setStretchFactor(1, 1)
+        layout.addWidget(imgs, 3)
 
         stat_box = QGroupBox("扫查实时指标")
         stat_layout = QGridLayout(stat_box)
@@ -69,4 +71,4 @@ class ScanPage(QWidget):
         stat_layout.addWidget(self.progress, 3, 3)
         stat_layout.addWidget(QLabel("TCP 位姿"), 4, 0)
         stat_layout.addWidget(self.lbl_pose, 4, 1, 1, 3)
-        layout.addWidget(stat_box)
+        layout.addWidget(stat_box, 2)

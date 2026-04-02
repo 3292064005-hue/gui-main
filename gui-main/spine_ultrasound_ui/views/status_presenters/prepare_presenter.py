@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import StatusViewContext, join_lines
+from .common import StatusViewContext, join_lines, set_text_edit_plain_preserve_scroll
 
 
 class PreparePresenter:
@@ -33,7 +33,7 @@ class PreparePresenter:
             readiness_lines.extend(["", f"控制权：{ctx.control_authority.get('summary_label', '-')}", str(ctx.control_authority.get('detail', '-'))])
         if ctx.bridge_observability:
             readiness_lines.extend(["", f"桥接观测：{ctx.bridge_observability.get('summary_label', '-')}", str(ctx.bridge_observability.get('detail', '-'))])
-        window.prepare_page.txt_blockers.setPlainText(join_lines(readiness_lines, "暂无启动前检查结果。"))
+        set_text_edit_plain_preserve_scroll(window.prepare_page.txt_blockers, join_lines(readiness_lines, "暂无启动前检查结果。"))
         window.prepare_page.lbl_sdk_state.setText(f"SDK 状态：{ctx.sdk_alignment.get('summary_label', '-')}")
         sdk_check_lines = []
         for item in ctx.sdk_alignment.get('checks', []):
@@ -42,4 +42,4 @@ class PreparePresenter:
         if ctx.sdk_alignment.get('mainline_sequence'):
             sdk_check_lines.extend(["", "主线顺序:"])
             sdk_check_lines.extend([f"{idx + 1}. {step}" for idx, step in enumerate(ctx.sdk_alignment.get('mainline_sequence', []))])
-        window.prepare_page.txt_sdk.setPlainText(join_lines(sdk_check_lines, "暂无 SDK 检查结果。"))
+        set_text_edit_plain_preserve_scroll(window.prepare_page.txt_sdk, join_lines(sdk_check_lines, "暂无 SDK 检查结果。"))

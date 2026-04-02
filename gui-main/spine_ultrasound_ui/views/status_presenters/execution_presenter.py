@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import StatusViewContext
+from .common import StatusViewContext, set_text_edit_plain_preserve_scroll
 
 
 class ExecutionPresenter:
@@ -31,4 +31,4 @@ class ExecutionPresenter:
         window.assessment_page.lbl_feature_conf.setText(f"{metrics['feature_confidence']:.2f}")
         window.assessment_page.lbl_quality_score.setText(f"{metrics.get('quality_score', metrics['image_quality']):.2f}")
         window.assessment_page.lbl_assessment_state.setText(ctx.system_state)
-        window.assessment_page.assessment_text.setPlainText(assessment_text)
+        set_text_edit_plain_preserve_scroll(window.assessment_page.assessment_text, assessment_text)

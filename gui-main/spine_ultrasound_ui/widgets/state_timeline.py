@@ -22,15 +22,16 @@ class StateTimeline(QListWidget):
 
     def __init__(self):
         super().__init__()
+        self._current_state = ""
         self.setAlternatingRowColors(True)
         self.setSpacing(2)
         for item in self.ORDER:
             self.addItem(QListWidgetItem(item))
 
     def set_current(self, state: str):
+        if state == self._current_state:
+            return
+        self._current_state = state
         for i in range(self.count()):
             it = self.item(i)
-            active = it.text() == state
-            it.setSelected(active)
-            if active:
-                self.scrollToItem(it)
+            it.setSelected(it.text() == state)

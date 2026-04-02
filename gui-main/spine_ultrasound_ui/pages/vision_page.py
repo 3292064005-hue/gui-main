@@ -18,7 +18,7 @@ class VisionPage(QWidget):
         layout.addWidget(subtitle)
 
         self.camera_pane = ImagePane("背部定位视图", "建议叠加 ROI、中线、起止点和路径轨迹")
-        layout.addWidget(self.camera_pane)
+        layout.addWidget(self.camera_pane, 3)
 
         grid = QGridLayout()
         grid.setSpacing(12)
@@ -38,5 +38,7 @@ class VisionPage(QWidget):
         self.model_view.setPlaceholderText("DH 参数、包络盒、连续性与工作区检查将在这里显示。")
         model_layout.addWidget(self.model_view)
         grid.addWidget(model_box, 0, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
-        layout.addLayout(grid)
+        layout.addLayout(grid, 2)

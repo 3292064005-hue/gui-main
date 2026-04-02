@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QPushButton, QScrollArea, QTextEdit, QVBoxLayout, QWidget
 
 
 class SettingsPage(QWidget):
@@ -25,6 +25,16 @@ class SettingsPage(QWidget):
         subtitle.setObjectName("PageSubtitle")
         layout.addWidget(title)
         layout.addWidget(subtitle)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        self.page_scroll = scroll
+        content = QWidget()
+        scroll.setWidget(content)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(12)
 
         runtime_box = QGroupBox("配置持久化")
         runtime_form = QFormLayout(runtime_box)
@@ -52,7 +62,7 @@ class SettingsPage(QWidget):
         runtime_form.addRow("界面布局", self.lbl_ui_path)
         runtime_form.addRow("最近保存", self.lbl_last_saved)
         runtime_form.addRow("当前状态", self.lbl_profile_state)
-        layout.addWidget(runtime_box)
+        content_layout.addWidget(runtime_box)
 
         sdk_box = QGroupBox("SDK 主线对齐")
         sdk_form = QFormLayout(sdk_box)
@@ -68,7 +78,7 @@ class SettingsPage(QWidget):
         sdk_form.addRow("对齐状态", self.lbl_sdk_summary)
         sdk_form.addRow("机器人主线", self.lbl_robot_profile)
         sdk_form.addRow("网络链路", self.lbl_ip_link)
-        layout.addWidget(sdk_box)
+        content_layout.addWidget(sdk_box)
 
         action_box = QGroupBox("设置操作")
         action_layout = QVBoxLayout(action_box)
@@ -93,7 +103,7 @@ class SettingsPage(QWidget):
         self.btn_refresh_governance.clicked.connect(self.refresh_governance_requested.emit)
         for btn in [self.btn_save, self.btn_reload, self.btn_defaults, self.btn_layout, self.btn_apply_baseline, self.btn_export_governance, self.btn_refresh_governance]:
             action_layout.addWidget(btn)
-        layout.addWidget(action_box)
+        content_layout.addWidget(action_box)
 
         note_box = QGroupBox("SDK 治理说明")
         note_layout = QVBoxLayout(note_box)
@@ -101,8 +111,9 @@ class SettingsPage(QWidget):
         self.note_view.setReadOnly(True)
         self.note_view.setPlaceholderText("SDK 主线治理摘要、模块覆盖率、阻塞项与告警将在这里显示。")
         note_layout.addWidget(self.note_view)
-        layout.addWidget(note_box)
-        layout.addStretch(1)
+        content_layout.addWidget(note_box)
+        content_layout.addStretch(1)
+        layout.addWidget(scroll)
 
     def set_runtime_info(
         self,
@@ -134,4 +145,18 @@ class SettingsPage(QWidget):
         self.lbl_robot_profile.setText(robot_profile)
         self.lbl_ip_link.setText(ip_link)
         if sdk_note:
-            self.note_view.setPlainText(sdk_note)
+            page_vertical = self.page_scroll.verticalScrollBar()
+            page_horizontal = self.page_scroll.horizontalScrollBar()
+            note_vertical = self.note_view.verticalScrollBar()
+            note_horizontal = self.note_view.horizontalScrollBar()
+            old_page_v = page_vertical.value()
+            old_page_h = page_horizontal.value()
+            old_note_v = note_vertical.value()
+            old_note_h = note_horizontal.value()
+            if self.note_view.property("_last_sdk_note") != sdk_note:
+                self.note_view.setPlainText(sdk_note)
+                self.note_view.setProperty("_last_sdk_note", sdk_note)
+            page_vertical.setValue(min(old_page_v, page_vertical.maximum()))
+            page_horizontal.setValue(min(old_page_h, page_horizontal.maximum()))
+            note_vertical.setValue(min(old_note_v, note_vertical.maximum()))
+            note_horizontal.setValue(min(old_note_h, note_horizontal.maximum()))

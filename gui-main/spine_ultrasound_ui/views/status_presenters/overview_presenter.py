@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import StatusViewContext, html_summary
+from .common import StatusViewContext, html_summary, set_text_edit_html_preserve_scroll
 
 
 class OverviewPresenter:
@@ -72,7 +72,7 @@ class OverviewPresenter:
         ]
         window.overview_page.recommended_label.setText(f"建议下一步：{ctx.recommended_label}")
         window.overview_page.readiness_label.setText(f"流程就绪度：{ctx.readiness.get('passed', 0)} / {ctx.readiness.get('total', 0)}，阻塞项 {total_blockers}")
-        window.overview_page.overview_text.setHtml(html_summary(summary_lines))
+        set_text_edit_html_preserve_scroll(window.overview_page.overview_text, html_summary(summary_lines))
 
     @staticmethod
     def _set_optional_text(window, attr_name: str, text: str) -> None:

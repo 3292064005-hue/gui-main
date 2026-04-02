@@ -12,16 +12,16 @@ class LogConsole(QTextEdit):
 
     def append_colored(self, level: str, message: str):
         colors = {
-            "INFO": "#67E8F9",
-            "WARN": "#FBBF24",
-            "ERROR": "#FCA5A5",
-            "ALARM": "#F87171",
+            "INFO": "#4B5563",
+            "WARN": "#79643D",
+            "ERROR": "#7B4A4A",
+            "ALARM": "#7B4A4A",
         }
         ts = datetime.now().strftime("%H:%M:%S")
         level = (level or "INFO").upper()
-        color = colors.get(level, "#C7D2FE")
+        color = colors.get(level, "#4B5563")
         self.append(
-            f'<span style="color:#64748B;">[{ts}]</span> '
+            f'<span style="color:#6B7280;">[{ts}]</span> '
             f'<span style="color:{color}; font-weight:700;">[{level}]</span> '
-            f'<span style="color:#E2E8F0;">{message}</span>'
+            f'<span style="color:#1F2937;">{message}</span>'
         )

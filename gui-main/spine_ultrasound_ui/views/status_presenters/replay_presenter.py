@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import StatusViewContext, join_lines
+from .common import StatusViewContext, join_lines, set_text_edit_plain_preserve_scroll
 
 
 class ReplayPresenter:
@@ -18,7 +18,7 @@ class ReplayPresenter:
             f"会话治理：{ctx.session_governance.get('summary_label', '-')}",
             f"控制权：{ctx.control_authority.get('summary_label', '-')}",
         ]
-        window.replay_page.timeline.setPlainText("\n".join(replay_lines))
+        set_text_edit_plain_preserve_scroll(window.replay_page.timeline, "\n".join(replay_lines))
 
         plan_metrics = dict(ctx.model_report.get('plan_metrics', {}))
         selection = dict(ctx.model_report.get('execution_selection', {}))
@@ -37,7 +37,7 @@ class ReplayPresenter:
         selected_score = selection.get('selected_score', {})
         if isinstance(selected_score, dict) and selected_score:
             plan_lines.append(f"选择评分：{selected_score}")
-        window.vision_page.plan_view.setPlainText(join_lines(plan_lines, "暂无路径摘要。"))
+        set_text_edit_plain_preserve_scroll(window.vision_page.plan_view, join_lines(plan_lines, "暂无路径摘要。"))
 
         envelope = dict(ctx.model_report.get('envelope', {}))
         dh_params = list(ctx.model_report.get('dh_parameters', []))
@@ -53,4 +53,4 @@ class ReplayPresenter:
             model_lines.extend(["", "DH 参数(前 3 项):"])
             for item in dh_params[:3]:
                 model_lines.append(f"J{item.get('joint')}: a={item.get('a_mm')} mm, alpha={item.get('alpha_rad')}, d={item.get('d_mm')} mm")
-        window.vision_page.model_view.setPlainText(join_lines(model_lines, "暂无模型前检结果。"))
+        set_text_edit_plain_preserve_scroll(window.vision_page.model_view, join_lines(model_lines, "暂无模型前检结果。"))

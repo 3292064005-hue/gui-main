@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import StatusViewContext, join_lines
+from .common import StatusViewContext, join_lines, set_text_edit_plain_preserve_scroll
 
 
 class MonitorPresenter:
@@ -21,7 +21,7 @@ class MonitorPresenter:
 
         controller_logs = list(ctx.sdk_runtime.get('controller_logs', []))
         if controller_logs:
-            window.robot_monitor_page.log_view.setPlainText(join_lines([f"[{item.get('level', '-')}] {item.get('source', '-')}: {item.get('message', '-')}" for item in controller_logs], "暂无控制器日志。"))
+            set_text_edit_plain_preserve_scroll(window.robot_monitor_page.log_view, join_lines([f"[{item.get('level', '-')}] {item.get('source', '-')}: {item.get('message', '-')}" for item in controller_logs], "暂无控制器日志。"))
 
         rl_projects = list(ctx.sdk_runtime.get('rl_projects', []))
         io_snapshot = dict(ctx.sdk_runtime.get('io_snapshot', {}))
@@ -96,5 +96,5 @@ class MonitorPresenter:
         if ctx.session_governance:
             asset_lines.extend(["", f"会话治理：{ctx.session_governance.get('summary_label', '-')}", f"治理说明：{ctx.session_governance.get('detail', '-')}", f"发布门禁：{'PASS' if ctx.session_governance.get('release_gate', {}).get('release_allowed') else 'BLOCK'}", f"artifact ready={ctx.session_governance.get('artifact_counts', {}).get('ready', 0)} / {ctx.session_governance.get('artifact_counts', {}).get('registered', 0)}" ])
         asset_text = join_lines(asset_lines, "暂无 SDK 资产。")
-        window.robot_monitor_page.asset_view.setPlainText(asset_text)
-        window.replay_page.asset_view.setPlainText(asset_text)
+        set_text_edit_plain_preserve_scroll(window.robot_monitor_page.asset_view, asset_text)
+        set_text_edit_plain_preserve_scroll(window.replay_page.asset_view, asset_text)

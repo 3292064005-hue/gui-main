@@ -58,7 +58,7 @@ class OverviewPage(QWidget):
         self.readiness_label.setObjectName("MutedLabel")
         self.overview_text = QTextEdit()
         self.overview_text.setReadOnly(True)
-        self.overview_text.setMinimumHeight(220)
+        self.overview_text.setMinimumHeight(180)
         self.overview_text.setPlaceholderText("实验摘要、接触状态、质量评分与建议动作将在这里汇总。")
         info_layout.addWidget(self.recommended_label)
         info_layout.addWidget(self.readiness_label)

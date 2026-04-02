@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QPushButton, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QMessageBox, QPushButton, QWidget
 
 from spine_ultrasound_ui.models import ExperimentRecord
 from spine_ultrasound_ui.styles import MAIN_STYLESHEET
@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.backend = backend
         self.setWindowTitle("脊柱侧弯自动检测研究平台")
-        self.resize(1720, 1020)
+        self.resize(*self._recommended_window_size())
         self.exp_model = ExperimentTableModel([])
         self.status_presenter = MainWindowStatusPresenter()
         self.runtime_bridge = MainWindowRuntimeBridge(self)
@@ -26,6 +26,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_backend()
         self._restore_ui_preferences()
+        self._constrain_to_screen()
         self.setStyleSheet(MAIN_STYLESHEET)
 
     def _build_ui(self) -> None:
@@ -182,3 +183,37 @@ class MainWindow(QMainWindow):
             self._save_ui_preferences()
         finally:
             super().closeEvent(event)
+
+    @staticmethod
+    def _recommended_window_size() -> tuple[int, int]:
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return 1480, 760
+        available = screen.availableGeometry()
+        max_width = max(960, available.width() - 24)
+        max_height = max(640, available.height() - 24)
+        width = min(1600, int(available.width() * 0.94))
+        height = min(780, int(available.height() * 0.76))
+        width = min(max(width, min(max_width, 1180)), max_width)
+        height = min(max(height, min(max_height, 640)), max_height)
+        return width, height
+
+    def _constrain_to_screen(self) -> None:
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        max_width = max(960, available.width() - 12)
+        max_height = max(640, available.height() - 12)
+        self.setMaximumSize(max_width, max_height)
+        width = min(self.width(), max_width)
+        height = min(self.height(), max_height)
+        self.resize(width, height)
+        safe_x = available.x() + 12
+        safe_y = available.y() + 12
+        max_x = max(safe_x, available.x() + available.width() - width - 12)
+        max_y = max(safe_y, available.y() + available.height() - height - 12)
+        self.move(
+            min(max(self.x(), safe_x), max_x),
+            min(max(self.y(), safe_y), max_y),
+        )
