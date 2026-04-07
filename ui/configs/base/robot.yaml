@@ -1,0 +1,100 @@
+robot_model: xmate3
+sdk_robot_class: xMateRobot
+controller_series: xCore
+controller_version: v2.1+
+axis_count: 6
+remote_ip: 192.168.0.160
+local_ip: 192.168.0.100
+preferred_link: wired_direct
+requires_single_control_source: true
+realtime_client_language: C++
+rt_loop_hz: 1000
+rt_mode: cartesianImpedance
+supported_rt_modes:
+  - jointPosition
+  - cartesianPosition
+  - jointImpedance
+  - cartesianImpedance
+  - directTorque
+clinical_allowed_modes:
+  - MoveAbsJ
+  - MoveJ
+  - MoveL
+  - cartesianImpedance
+direct_torque_in_clinical_mainline: false
+tool_name: ultrasound_probe
+tcp_name: ultrasound_tcp
+work_object: patient_spine
+load_mass_kg: 0.85
+load_com_mm: [0.0, 0.0, 62.0]
+load_inertia: [0.0012, 0.0012, 0.0008, 0.0, 0.0, 0.0]
+rt_network_tolerance_percent: 15
+joint_filter_hz: 40.0
+cart_filter_hz: 30.0
+torque_filter_hz: 25.0
+cartesian_impedance: [1000.0, 1000.0, 1000.0, 80.0, 80.0, 80.0]
+desired_wrench_n: [0.0, 0.0, 8.0, 0.0, 0.0, 0.0]
+fc_frame_type: path
+fc_frame_matrix: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+tcp_frame_matrix: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 62.0, 0.0, 0.0, 0.0, 1.0]
+motion_sequence:
+  - approach_nrt
+  - seek_contact_rt_cartesian_impedance
+  - scan_rt_cartesian_impedance
+  - safe_retreat
+strip_width_mm: 18.0
+strip_overlap_mm: 6.0
+approach_clearance_mm: 24.0
+contact_guard_margin_mm: 5.0
+surface_tilt_limits_deg:
+  roll: 8.0
+  pitch: 6.0
+  yaw: 15.0
+contact_force_policy:
+  target_n: 8.0
+  warning_n: 12.0
+  hard_limit_n: 20.0
+  settle_band_n: 1.0
+  settle_window_ms: 200
+seek_contact_max_travel_mm: 8.0
+retract_travel_mm: 12.0
+scan_follow_lateral_amplitude_mm: 0.5
+scan_follow_frequency_hz: 0.25
+sweep_policy:
+  scan_speed_mm_s: 8.0
+  contact_seek_speed_mm_s: 3.0
+  retreat_speed_mm_s: 20.0
+  rescan_quality_threshold: 0.7
+  max_rescan_passes: 2
+dh_parameters:
+  - {joint: 1, a_mm: 0.0, alpha_rad: -1.57079632679, d_mm: 341.5, theta_rad: 0.0}
+  - {joint: 2, a_mm: 394.0, alpha_rad: 0.0, d_mm: 0.0, theta_rad: 0.0}
+  - {joint: 3, a_mm: 0.0, alpha_rad: 1.57079632679, d_mm: 0.0, theta_rad: 0.0}
+  - {joint: 4, a_mm: 0.0, alpha_rad: -1.57079632679, d_mm: 366.0, theta_rad: 0.0}
+  - {joint: 5, a_mm: 0.0, alpha_rad: 1.57079632679, d_mm: 0.0, theta_rad: 0.0}
+  - {joint: 6, a_mm: 0.0, alpha_rad: 0.0, d_mm: 250.3, theta_rad: 0.0}
+
+contact_control:
+  mode: normal_axis_admittance
+  virtual_mass: 0.8
+  virtual_damping: 120.0
+  virtual_stiffness: 40.0
+  force_deadband_n: 0.3
+  max_normal_step_mm: 0.08
+  max_normal_velocity_mm_s: 2.0
+  max_normal_acc_mm_s2: 30.0
+  max_normal_travel_mm: 8.0
+  anti_windup_limit_n: 10.0
+  integrator_leak: 0.02
+force_estimator:
+  preferred_source: fused
+  pressure_weight: 0.7
+  wrench_weight: 0.3
+  stale_timeout_ms: 100
+  timeout_ms: 250
+  auto_bias_zero: true
+  min_confidence: 0.4
+orientation_trim:
+  gain: 0.08
+  max_trim_deg: 1.5
+  lowpass_hz: 8.0

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionReport",
+  "type": "object",
+  "required": [
+    "session_id",
+    "session_overview",
+    "quality_summary",
+    "safety_summary",
+    "outputs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string"
+    },
+    "session_overview": {
+      "type": "object"
+    },
+    "workflow_trace": {
+      "type": "object"
+    },
+    "quality_summary": {
+      "type": "object"
+    },
+    "safety_summary": {
+      "type": "object"
+    },
+    "operator_actions": {
+      "type": "object"
+    },
+    "devices": {
+      "type": "object"
+    },
+    "outputs": {
+      "type": "object"
+    },
+    "replay": {
+      "type": "object"
+    },
+    "algorithm_versions": {
+      "type": "object"
+    },
+    "open_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "closure": {
+      "type": "object"
+    },
+    "reconstruction_summary": {
+      "type": "object"
+    },
+    "assessment_summary": {
+      "type": "object"
+    },
+    "cobb_measurement": {
+      "type": "object"
+    },
+    "uca_measurement": {
+      "type": "object"
+    },
+    "assessment_agreement": {
+      "type": "object"
+    },
+    "profile_config_path": {
+      "type": "string"
+    },
+    "profile_load_error": {
+      "type": "string"
+    }
+  }
+}

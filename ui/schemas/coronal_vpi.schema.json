@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "CoronalVPI",
+  "required": [
+    "session_id",
+    "method_version",
+    "stats"
+  ],
+  "properties": {
+    "session_id": {},
+    "method_version": {},
+    "stats": {}
+  }
+}

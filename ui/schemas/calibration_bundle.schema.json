@@ -1,0 +1,35 @@
+{
+  "$id": "calibration_bundle.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "bundle_id", "bundle_hash", "release_state", "bundle_role", "camera_device_id", "camera_intrinsics_hash", "camera_to_base_hash", "probe_tcp_hash", "support_frame_hash", "temporal_sync_hash", "valid_for_devices", "residual_metrics"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "bundle_id": {"type": "string", "minLength": 1},
+    "bundle_hash": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string"},
+    "release_state": {"type": "string", "enum": ["draft", "approved", "deprecated"]},
+    "bundle_role": {"type": "string", "const": "guidance_only"},
+    "camera_device_id": {"type": "string", "minLength": 1},
+    "camera_intrinsics": {"type": "object"},
+    "camera_to_base": {"type": "object"},
+    "probe_tcp": {"type": "object"},
+    "support_frame": {"type": "object"},
+    "temporal_sync": {"type": "object"},
+    "camera_intrinsics_hash": {"type": "string", "minLength": 1},
+    "camera_to_base_hash": {"type": "string", "minLength": 1},
+    "probe_tcp_hash": {"type": "string", "minLength": 1},
+    "support_frame_hash": {"type": "string", "minLength": 1},
+    "temporal_sync_hash": {"type": "string", "minLength": 1},
+    "valid_for_devices": {"type": "object"},
+    "residual_metrics": {
+      "type": "object",
+      "required": ["temporal_sync_jitter_ms"],
+      "properties": {
+        "temporal_sync_jitter_ms": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

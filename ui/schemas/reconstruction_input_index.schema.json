@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReconstructionInputIndex",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method_version",
+    "rows",
+    "selected_rows",
+    "segment_groups",
+    "evidence_refs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "method_version": {
+      "type": "string"
+    },
+    "usable_thresholds": {
+      "type": "object"
+    },
+    "patient_registration": {
+      "type": "object"
+    },
+    "sync_summary": {
+      "type": "object"
+    },
+    "quality_summary": {
+      "type": "object"
+    },
+    "source_counts": {
+      "type": "object"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "selected_rows": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "segment_groups": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "artifacts": {
+      "type": "object"
+    },
+    "profile_config_path": {
+      "type": "string"
+    },
+    "profile_load_error": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

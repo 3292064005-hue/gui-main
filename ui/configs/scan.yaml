@@ -1,0 +1,7 @@
+approach_speed_mm_s: 10.0
+contact_speed_mm_s: 3.0
+scan_speed_mm_s: 8.0
+retreat_speed_mm_s: 20.0
+sample_step_mm: 0.5
+segment_length_mm: 120.0
+max_recontact_attempts: 3

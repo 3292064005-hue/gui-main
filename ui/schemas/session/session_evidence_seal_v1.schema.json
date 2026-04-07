@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session/session_evidence_seal_v1.schema.json",
+  "title": "SessionEvidenceSealV1",
+  "type": "object",
+  "required": [
+    "session_id",
+    "generated_at",
+    "immutable_manifest_digest",
+    "manifest_digest",
+    "artifact_registry_digest",
+    "seal_digest"
+  ],
+  "properties": {
+    "schema": {"type": "string"},
+    "session_id": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "immutable_manifest_fields": {"type": "object"},
+    "immutable_manifest_digest": {"type": "string"},
+    "manifest_digest": {"type": "string"},
+    "artifact_registry_digest": {"type": "string"},
+    "artifact_count": {"type": "integer"},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "path", "exists", "checksum", "size_bytes"],
+        "properties": {
+          "artifact_id": {"type": "string"},
+          "path": {"type": "string"},
+          "exists": {"type": "boolean"},
+          "checksum": {"type": "string"},
+          "size_bytes": {"type": "integer"}
+        }
+      }
+    },
+    "command_journal_digest": {"type": "string"},
+    "seal_digest": {"type": "string"}
+  }
+}

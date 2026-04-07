@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReconstructionSummary",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method_version",
+    "point_count",
+    "segment_count",
+    "confidence",
+    "requires_manual_review",
+    "evidence_refs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "method_version": {
+      "type": "string"
+    },
+    "point_count": {
+      "type": "integer"
+    },
+    "selected_row_count": {
+      "type": "integer"
+    },
+    "segment_count": {
+      "type": "integer"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "coordinate_frame": {
+      "type": "string"
+    },
+    "requires_manual_review": {
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "runtime_profile": {
+      "type": "string"
+    },
+    "profile_release_state": {
+      "type": "string"
+    },
+    "closure_mode": {
+      "type": "string"
+    },
+    "manual_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "soft_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "closure_verdict": {
+      "type": "string"
+    },
+    "provenance_purity": {
+      "type": "string"
+    },
+    "source_contamination_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reconstruction_status": {
+      "type": "string"
+    },
+    "runtime_models": {
+      "type": "object"
+    },
+    "input_gates": {
+      "type": "object"
+    },
+    "frame_anatomy_point_count": {
+      "type": "integer"
+    },
+    "frame_anatomy_stable_frame_count": {
+      "type": "integer"
+    },
+    "lamina_candidate_count": {
+      "type": "integer"
+    },
+    "lamina_candidate_source": {
+      "type": "string"
+    },
+    "authoritative_row_count": {
+      "type": "integer"
+    },
+    "vpi_peak_intensity": {
+      "type": "number"
+    },
+    "bone_coverage_ratio": {
+      "type": "number"
+    },
+    "profile_config_path": {
+      "type": "string"
+    },
+    "profile_load_error": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

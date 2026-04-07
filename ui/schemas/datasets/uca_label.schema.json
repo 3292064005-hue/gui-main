@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "case_id", "best_slice_index", "uca_angle_deg"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "case_id": {"type": "string"},
+    "best_slice_index": {"type": "integer", "minimum": 0},
+    "uca_angle_deg": {"type": "number"},
+    "manual_review_required": {"type": "boolean"}
+  }
+}

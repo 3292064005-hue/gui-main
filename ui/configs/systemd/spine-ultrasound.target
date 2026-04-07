@@ -1,0 +1,7 @@
+[Unit]
+Description=Spine Ultrasound Platform composite target
+Wants=spine-cpp-core.service spine-python-api.service
+After=network.target
+
+[Install]
+WantedBy=multi-user.target

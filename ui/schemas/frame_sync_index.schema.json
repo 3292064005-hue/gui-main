@@ -1,0 +1,12 @@
+{
+  "$id": "frame_sync_index.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["session_id", "rows", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "rows": {"type": "array"},
+    "summary": {"type": "object"},
+    "guidance_refs": {"type": "array", "items": {"type": "string"}}
+  }
+}

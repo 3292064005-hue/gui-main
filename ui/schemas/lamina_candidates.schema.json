@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "LaminaCandidates",
+  "required": [
+    "session_id",
+    "method_version",
+    "candidates",
+    "summary"
+  ],
+  "properties": {
+    "session_id": {},
+    "method_version": {},
+    "candidates": {},
+    "summary": {}
+  }
+}

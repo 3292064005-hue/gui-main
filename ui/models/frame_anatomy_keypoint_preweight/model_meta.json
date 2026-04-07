@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-04-04 12:30:00",
+  "package_name": "frame_anatomy_keypoint_preweight",
+  "package_version": "1.0.0",
+  "backend": "deterministic_baseline",
+  "runtime_kind": "deterministic_baseline",
+  "task": "frame_anatomy_points",
+  "release_state": "research_preweight",
+  "clinical_claim": "non_clinical_research_only",
+  "input_contract": "raw_ultrasound_frame_sequence",
+  "trainer_backend": "deterministic_baseline",
+  "task_name": "frame_anatomy_keypoint_preweight"
+}

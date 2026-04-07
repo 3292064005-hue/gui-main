@@ -1,0 +1,19 @@
+[Unit]
+Description=Spine Ultrasound Platform: Kiosk Web HMI Dashboard
+After=spine-python-api.service
+# Requires X11 or Wayland minimal desktop to be up
+Requires=display-manager.service
+
+[Service]
+Type=simple
+User=spine_operator
+Environment=DISPLAY=:0
+
+# Assumes HTTP server (nginx or python static serving) is configured.
+# We boot Chromium completely stripped of UI (Kiosk Mode)
+ExecStart=/usr/bin/chromium-browser --noerrdialogs --disable-infobars --kiosk http://127.0.0.1:8000/
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=spine-ultrasound.target

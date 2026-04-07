@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuntimeModelPackageMeta",
+  "type": "object",
+  "required": ["generated_at", "model_name", "task_name", "trainer_backend", "training_spec", "parameter_path", "metrics"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "model_name": {"type": "string"},
+    "task_name": {"type": "string"},
+    "trainer_backend": {"type": "string"},
+    "training_spec": {"type": "object"},
+    "runtime_model_path": {"type": "string"},
+    "parameter_path": {"type": "string"},
+    "metrics": {"type": "object"},
+    "training_request_path": {"type": "string"},
+    "dependency_status": {"type": "object"},
+    "launch_plan": {"type": "object"}
+  }
+}

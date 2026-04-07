@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+from spine_ultrasound_ui.core.postprocess.stage_contracts import PostprocessStageSpec
+
+
+POSTPROCESS_STAGE_REGISTRY: tuple[PostprocessStageSpec, ...] = (
+    PostprocessStageSpec(
+        stage='preprocess',
+        label='图像预处理',
+        input_artifacts=(
+            'raw/ui/quality_feedback.jsonl',
+            'raw/core/alarm_event.jsonl',
+            'raw/ui/annotations.jsonl',
+        ),
+        output_artifacts=(
+            'derived/quality/quality_timeline.json',
+            'derived/alarms/alarm_timeline.json',
+        ),
+        retryable=True,
+        performance_budget_ms=2000,
+        owner_domain='postprocess',
+    ),
+    PostprocessStageSpec(
+        stage='reconstruction',
+        label='局部重建',
+        input_artifacts=(
+            'raw/camera/index.jsonl',
+            'raw/ultrasound/index.jsonl',
+            'raw/pressure/samples.jsonl',
+            'raw/core/contact_state.jsonl',
+            'raw/core/scan_progress.jsonl',
+            'derived/quality/quality_timeline.json',
+            'derived/alarms/alarm_timeline.json',
+            'raw/ui/annotations.jsonl',
+            'meta/patient_registration.json',
+        ),
+        output_artifacts=(
+            'derived/ultrasound/ultrasound_frame_metrics.json',
+            'derived/pressure/pressure_sensor_timeline.json',
+            'derived/sync/frame_sync_index.json',
+            'replay/replay_index.json',
+            'derived/reconstruction/reconstruction_input_index.json',
+            'derived/training_bridge/model_ready_input_index.json',
+            'derived/reconstruction/coronal_vpi.npz',
+            'derived/reconstruction/vpi_preview.png',
+            'derived/reconstruction/bone_mask.npz',
+            'derived/reconstruction/frame_anatomy_points.json',
+            'derived/reconstruction/lamina_candidates.json',
+            'derived/reconstruction/pose_series.json',
+            'derived/reconstruction/reconstruction_evidence.json',
+            'derived/reconstruction/spine_curve.json',
+            'derived/reconstruction/prior_assisted_curve.json',
+            'derived/reconstruction/landmark_track.json',
+            'derived/reconstruction/reconstruction_summary.json',
+        ),
+        retryable=True,
+        performance_budget_ms=5000,
+        owner_domain='postprocess',
+    ),
+    PostprocessStageSpec(
+        stage='assessment',
+        label='脊柱侧弯评估',
+        input_artifacts=(
+            'export/summary.json',
+            'derived/quality/quality_timeline.json',
+            'derived/alarms/alarm_timeline.json',
+            'derived/ultrasound/ultrasound_frame_metrics.json',
+            'derived/pressure/pressure_sensor_timeline.json',
+            'derived/sync/frame_sync_index.json',
+            'replay/replay_index.json',
+            'derived/reconstruction/coronal_vpi.npz',
+            'derived/reconstruction/vpi_preview.png',
+            'derived/reconstruction/bone_mask.npz',
+            'derived/reconstruction/frame_anatomy_points.json',
+            'derived/reconstruction/lamina_candidates.json',
+            'derived/reconstruction/spine_curve.json',
+            'derived/reconstruction/landmark_track.json',
+            'derived/reconstruction/reconstruction_summary.json',
+            'raw/ui/command_journal.jsonl',
+            'raw/ui/annotations.jsonl',
+        ),
+        output_artifacts=(
+            'derived/reconstruction/vpi_ranked_slices.json',
+            'derived/reconstruction/vpi_bone_feature_mask.npz',
+            'derived/assessment/vertebra_pairs.json',
+            'derived/assessment/tilt_candidates.json',
+            'derived/assessment/cobb_measurement.json',
+            'derived/assessment/prior_assisted_cobb.json',
+            'derived/assessment/uca_measurement.json',
+            'derived/assessment/assessment_agreement.json',
+            'derived/assessment/assessment_overlay.png',
+            'derived/assessment/assessment_summary.json',
+            'export/session_report.json',
+            'export/session_compare.json',
+            'export/session_trends.json',
+            'export/ultrasound_analysis.json',
+            'export/pressure_analysis.json',
+            'export/diagnostics_pack.json',
+            'export/qa_pack.json',
+            'export/session_integrity.json',
+        ),
+        retryable=True,
+        performance_budget_ms=7000,
+        owner_domain='postprocess',
+    ),
+)
+
+
+def iter_stage_specs() -> tuple[PostprocessStageSpec, ...]:
+    """Return the ordered postprocess stage registry."""
+    return POSTPROCESS_STAGE_REGISTRY

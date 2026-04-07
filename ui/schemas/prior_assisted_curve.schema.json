@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PriorAssistedCurve",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method_version",
+    "coordinate_frame",
+    "points",
+    "fit",
+    "evidence_refs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "method_version": {
+      "type": "string"
+    },
+    "coordinate_frame": {
+      "type": "string"
+    },
+    "patient_frame": {
+      "type": "object"
+    },
+    "scan_corridor": {
+      "type": "object"
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "fit": {
+      "type": "object"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "sidecar_role": {
+      "const": "prior_assisted_curve"
+    },
+    "measurement_source": {
+      "type": "string"
+    },
+    "runtime_profile": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,25 @@
+{
+  "$id": "midline_polyline.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["coordinate_frame", "points_mm", "confidence"],
+  "properties": {
+    "coordinate_frame": {"type": "string", "minLength": 1},
+    "points_mm": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["x", "y", "z"],
+        "properties": {
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "z": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "AssessmentAgreement",
+  "required": [
+    "primary_measurement_source",
+    "auxiliary_measurement_source",
+    "delta_deg",
+    "agreement_status"
+  ],
+  "properties": {
+    "primary_measurement_source": {},
+    "auxiliary_measurement_source": {},
+    "delta_deg": {},
+    "agreement_status": {}
+  }
+}

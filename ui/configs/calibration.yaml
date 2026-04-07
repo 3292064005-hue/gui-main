@@ -1,0 +1,51 @@
+# Spine Ultrasound Platform Calibration Configuration
+# Single source of truth for guidance-only camera registration and probe geometry.
+
+camera_guidance:
+  device_id: rgbd_back_camera
+  frame_type: rgbd
+  qualification_basis: guidance_release
+  resolution:
+    width: 1280
+    height: 720
+  intrinsics:
+    fx: 910.0
+    fy: 910.0
+    cx: 640.0
+    cy: 360.0
+    distortion_model: plumb_bob
+    distortion_coefficients: [0.01, -0.02, 0.0, 0.0, 0.0]
+  camera_to_base:
+    mount_id: guidance_back_mount
+    translation_m: [0.42, 0.0, 0.78]
+    rotation_rpy_deg: [180.0, 0.0, -90.0]
+    residual_rms_mm: 1.6
+    source: released_guidance_mount
+
+temporal_calibration:
+  # Positive value means camera frames arrived LATER than robot state.
+  dt_camera_latency_ms: 45.0
+  estimated_jitter_ms: 4.0
+  sync_method: cross_correlation
+  source: released_temporal_sync
+
+spatial_calibration:
+  # Hand-Eye Calibration Matrix: Probe relative to Robot TCP Flange.
+  T_probe:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.02]
+    - [0.0, 0.0, 1.0, 0.15]
+    - [0.0, 0.0, 0.0, 1.0]
+  probe_tcp_residual_rms_mm: 0.9
+  mm_per_pixel_x: 0.15
+  mm_per_pixel_y: 0.15
+
+support_frame_calibration:
+  frame_id: patient_support
+  translation_m: [0.50, 0.0, -0.20]
+  rotation_rpy_deg: [0.0, 0.0, 0.0]
+  bounds_m:
+    length: 1.0
+    width: 0.8
+    height: 0.5
+  source: released_support_frame

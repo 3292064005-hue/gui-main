@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "artifact_registry.schema.json",
+  "title": "ArtifactRegistry",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "required": [
+      "artifact_type",
+      "path",
+      "mime_type",
+      "producer",
+      "schema_version",
+      "ready",
+      "artifact_id"
+    ],
+    "properties": {
+      "artifact_type": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "mime_type": {
+        "type": "string"
+      },
+      "producer": {
+        "type": "string"
+      },
+      "schema": {
+        "type": "string"
+      },
+      "schema_version": {
+        "type": "string"
+      },
+      "artifact_id": {
+        "type": "string"
+      },
+      "ready": {
+        "type": "boolean"
+      },
+      "size_bytes": {
+        "type": "integer"
+      },
+      "checksum": {
+        "type": "string"
+      },
+      "created_at": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "source_stage": {
+        "type": "string"
+      },
+      "dependencies": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

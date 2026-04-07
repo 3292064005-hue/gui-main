@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-04-04 09:29:58",
+  "package_name": "frame_anatomy_keypoint_exported",
+  "package_version": "2.0.0",
+  "backend": "numpy_template_export",
+  "runtime_kind": "exported_weight_template",
+  "task": "frame_anatomy_points",
+  "release_state": "research_validated",
+  "clinical_claim": "non_clinical_research_only",
+  "input_contract": "raw_ultrasound_frame_sequence",
+  "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
+  "trainer_backend": "numpy_baseline",
+  "task_name": "frame_anatomy_keypoint_export",
+  "training_metrics": {
+    "sample_count": 6,
+    "avg_pair_separation_px": 25.0,
+    "avg_confidence": 1.0
+  },
+  "benchmark_manifest_path": "benchmark_manifest.json"
+}

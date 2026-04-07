@@ -1,0 +1,23 @@
+dataset_root: datasets/lamina_center
+split_file: datasets/lamina_center/splits/split_v1.json
+output_dir: training_outputs/lamina_center_nnunet
+task_name: lamina_center
+input_mode: vpi_2d
+segmentation_backbone: nnunetv2_2d
+keypoint_head: numpy_baseline_heatmap
+batch_size: 2
+max_epochs: 1000
+learning_rate: 0.001
+num_workers: 4
+mixed_precision: false
+export_onnx: false
+split_name: train
+trainer_backend: nnunetv2
+backend_options:
+  plans: nnUNetPlans
+  configuration: 2d
+  fold: '0'
+  dataset_id: 601
+  dataset_name: SpineUSLaminaCenter
+  nnunet_raw_root: training_outputs/nnunet_raw
+  lamina_point_radius_px: 3

@@ -1,0 +1,38 @@
+{
+  "profile_name": "preweight_deterministic",
+  "profile_release_state": "research_preweight",
+  "closure_mode": "measured_only",
+  "selection_policy": {
+    "authoritative_only": true,
+    "allow_quality_only": false,
+    "allow_all_rows_fallback": false
+  },
+  "runtime": {
+    "frame_anatomy_runtime_config": "configs/models/frame_anatomy_keypoint_preweight.json"
+  },
+  "thresholds": {
+    "min_reconstruction_points": 3,
+    "min_cobb_curve_points": 3
+  },
+  "closure_policy": {
+    "measured_only": true,
+    "hard_blockers": [
+      "no_reconstructable_rows",
+      "selection_empty",
+      "registration_prior_curve_used",
+      "curve_window_fallback_used",
+      "no_frame_level_anatomy_points",
+      "insufficient_curve_points_for_cobb"
+    ],
+    "contamination_reasons": [
+      "registration_prior_curve_used",
+      "curve_window_fallback_used"
+    ],
+    "blocked_reconstruction_sources": [
+      "registration_prior_curve"
+    ],
+    "blocked_measurement_sources": [
+      "curve_window_fallback"
+    ]
+  }
+}

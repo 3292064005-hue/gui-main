@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["dataset_root", "split_file", "output_dir"],
+  "properties": {
+    "dataset_root": {"type": "string"},
+    "split_file": {"type": "string"},
+    "output_dir": {"type": "string"},
+    "task_name": {"type": "string"},
+    "input_mode": {"type": "string"},
+    "segmentation_backbone": {"type": "string"},
+    "keypoint_head": {"type": "string"},
+    "batch_size": {"type": "integer", "minimum": 1},
+    "max_epochs": {"type": "integer", "minimum": 1},
+    "learning_rate": {"type": "number", "exclusiveMinimum": 0},
+    "num_workers": {"type": "integer", "minimum": 0},
+    "mixed_precision": {"type": "boolean"},
+    "export_onnx": {"type": "boolean"},
+    "split_name": {"type": "string"},
+    "trainer_backend": {"type": "string"}
+  }
+}

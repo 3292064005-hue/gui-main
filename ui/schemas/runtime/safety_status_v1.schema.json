@@ -1,0 +1,32 @@
+{
+  "$id": "runtime/safety_status_v1.schema.json",
+  "type": "object",
+  "required": [
+    "safe_to_arm",
+    "safe_to_scan",
+    "active_interlocks"
+  ],
+  "properties": {
+    "safe_to_arm": {
+      "type": "boolean"
+    },
+    "safe_to_scan": {
+      "type": "boolean"
+    },
+    "active_interlocks": {
+      "type": "array"
+    },
+    "recovery_reason": {
+      "type": "string"
+    },
+    "last_recovery_action": {
+      "type": "string"
+    },
+    "sensor_freshness_ms": {
+      "type": "integer"
+    },
+    "pressure_band_state": {
+      "type": "string"
+    }
+  }
+}

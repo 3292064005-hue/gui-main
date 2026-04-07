@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session_compare.schema.json",
+  "title": "SessionCompare",
+  "type": "object",
+  "required": ["session_id", "current", "fleet_summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "baseline_session_id": {"type": "string"},
+    "current": {"type": "object"},
+    "baseline": {"type": "object"},
+    "fleet_summary": {"type": "object"},
+    "delta_vs_baseline": {"type": "object"}
+  }
+}

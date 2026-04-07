@@ -1,0 +1,23 @@
+{
+  "$id": "body_surface.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["model", "normal", "surface_pitch_deg", "surface_yaw_deg", "probe_tilt_limits_deg", "contact_guard_margin_mm"],
+  "properties": {
+    "model": {"type": "string", "minLength": 1},
+    "normal": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "surface_pitch_deg": {"type": "number"},
+    "surface_yaw_deg": {"type": "number"},
+    "probe_tilt_limits_deg": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": {"type": "number"},
+        "max": {"type": "number"}
+      },
+      "additionalProperties": false
+    },
+    "contact_guard_margin_mm": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": false
+}

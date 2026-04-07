@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LandmarkTrack",
+  "type": "object",
+  "required": ["generated_at", "method_version", "landmarks", "summary"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "session_id": {"type": "string"},
+    "method_version": {"type": "string"},
+    "landmarks": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": true
+}

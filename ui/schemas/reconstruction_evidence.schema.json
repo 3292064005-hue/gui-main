@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "ReconstructionEvidence",
+  "required": [
+    "session_id",
+    "method_version"
+  ],
+  "properties": {
+    "session_id": {},
+    "method_version": {}
+  }
+}

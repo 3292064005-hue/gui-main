@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "case_id": "case_001",
+      "image_path": "synthetic_frames/case_001.png",
+      "left": {
+        "x_px": 18,
+        "y_px": 18
+      },
+      "right": {
+        "x_px": 46,
+        "y_px": 18
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    },
+    {
+      "case_id": "case_002",
+      "image_path": "synthetic_frames/case_002.png",
+      "left": {
+        "x_px": 20,
+        "y_px": 19
+      },
+      "right": {
+        "x_px": 44,
+        "y_px": 19
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    },
+    {
+      "case_id": "case_003",
+      "image_path": "synthetic_frames/case_003.png",
+      "left": {
+        "x_px": 22,
+        "y_px": 20
+      },
+      "right": {
+        "x_px": 42,
+        "y_px": 20
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    },
+    {
+      "case_id": "case_004",
+      "image_path": "synthetic_frames/case_004.png",
+      "left": {
+        "x_px": 17,
+        "y_px": 17
+      },
+      "right": {
+        "x_px": 45,
+        "y_px": 17
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    },
+    {
+      "case_id": "case_005",
+      "image_path": "synthetic_frames/case_005.png",
+      "left": {
+        "x_px": 21,
+        "y_px": 21
+      },
+      "right": {
+        "x_px": 43,
+        "y_px": 21
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    },
+    {
+      "case_id": "case_006",
+      "image_path": "synthetic_frames/case_006.png",
+      "left": {
+        "x_px": 19,
+        "y_px": 18
+      },
+      "right": {
+        "x_px": 47,
+        "y_px": 18
+      },
+      "metadata": {
+        "source": "synthetic_training_fixture_v1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "threshold_value": 0.52,
+  "postprocess_min_coverage": 0.02
+}

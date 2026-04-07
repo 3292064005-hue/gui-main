@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BackendTrainingRequest",
+  "type": "object",
+  "required": ["generated_at", "task_name", "trainer_backend", "runner_module", "runtime_target", "spec", "dataset_summary", "dependency_status", "launch_plan", "backend_payload"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "task_name": {"type": "string"},
+    "trainer_backend": {"type": "string"},
+    "runner_module": {"type": "string"},
+    "runtime_target": {"type": "string"},
+    "spec": {"type": "object"},
+    "dataset_summary": {"type": "object"},
+    "dependency_status": {"type": "object"},
+    "launch_plan": {"type": "object"},
+    "backend_payload": {"type": "object"}
+  }
+}

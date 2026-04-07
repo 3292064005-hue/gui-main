@@ -1,0 +1,10 @@
+{
+  "package_name": "uca_rank_baseline",
+  "package_version": "1.0.0",
+  "backend": "baseline",
+  "runtime_kind": "deterministic_baseline",
+  "task": "vpi_slice_ranking",
+  "release_state": "research_baseline",
+  "clinical_claim": "non_clinical",
+  "input_contract": "vpi_slice_metadata"
+}

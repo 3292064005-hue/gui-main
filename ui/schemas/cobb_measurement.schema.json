@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CobbMeasurement",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method_version",
+    "coordinate_frame",
+    "angle_deg",
+    "confidence",
+    "requires_manual_review",
+    "upper_line",
+    "lower_line",
+    "evidence_refs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "method_version": {
+      "type": "string"
+    },
+    "coordinate_frame": {
+      "type": "string"
+    },
+    "angle_deg": {
+      "type": "number"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "requires_manual_review": {
+      "type": "boolean"
+    },
+    "upper_end_vertebra_candidate": {
+      "type": "object"
+    },
+    "lower_end_vertebra_candidate": {
+      "type": "object"
+    },
+    "upper_line": {
+      "type": "object"
+    },
+    "lower_line": {
+      "type": "object"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "fit_diagnostics": {
+      "type": "object"
+    },
+    "runtime_profile": {
+      "type": "string"
+    },
+    "profile_release_state": {
+      "type": "string"
+    },
+    "closure_mode": {
+      "type": "string"
+    },
+    "measurement_source": {
+      "type": "string"
+    },
+    "measurement_status": {
+      "type": "string"
+    },
+    "manual_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "vertebra_pairs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "tilt_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "closure_verdict": {
+      "type": "string"
+    },
+    "provenance_purity": {
+      "type": "string"
+    },
+    "source_contamination_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "soft_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "profile_config_path": {
+      "type": "string"
+    },
+    "profile_load_error": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

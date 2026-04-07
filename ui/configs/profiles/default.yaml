@@ -1,0 +1,9 @@
+app_mode: demo
+workspace_root: data
+ui_theme: light
+logging_level: INFO
+robot_profile: robot.yaml
+scan_profile: scan.yaml
+contact_profile: contact.yaml
+quality_profile: quality.yaml
+export_profile: export.yaml

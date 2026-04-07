@@ -1,0 +1,24 @@
+{
+  "$id": "landmarks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "x", "y", "z"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "z": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

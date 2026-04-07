@@ -1,0 +1,7 @@
+{
+  "package_dir": "../../models/frame_anatomy_keypoint_preweight",
+  "backend": "deterministic_baseline",
+  "require_runtime_model": false,
+  "require_benchmark_gate": false,
+  "required_release_state": "research_preweight"
+}

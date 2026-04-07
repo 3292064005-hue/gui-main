@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UltrasoundAnalysis",
+  "type": "object",
+  "required": ["session_id", "summary", "recommendations"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "summary": {"type": "object"},
+    "best_detail_frame": {"type": "object"},
+    "lowest_quality_frame": {"type": "object"},
+    "coupling_issues": {"type": "array", "items": {"type": "object"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

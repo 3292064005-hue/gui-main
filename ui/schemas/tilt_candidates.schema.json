@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "TiltCandidates",
+  "required": [
+    "method_version",
+    "candidates",
+    "summary"
+  ],
+  "properties": {
+    "method_version": {},
+    "candidates": {},
+    "summary": {}
+  }
+}

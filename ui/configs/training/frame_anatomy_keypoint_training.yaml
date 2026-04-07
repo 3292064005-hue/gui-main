@@ -1,0 +1,15 @@
+dataset_manifest: models/frame_anatomy_keypoint/generated/frame_anatomy_training_manifest.json
+output_dir: models/frame_anatomy_keypoint/generated
+trainer_backend: numpy_baseline
+task_name: frame_anatomy_keypoint_export
+patch_radius_px: 4
+min_pair_separation_px: 18
+max_temporal_drift_px: 18.0
+min_stability_score: 0.55
+min_confidence: 0.35
+export_model_filename: frame_anatomy_keypoint_weights.npz
+benchmark_thresholds:
+  max_mean_error_px: 2.5
+  max_max_error_px: 6.0
+  min_detection_rate: 0.95
+  min_stable_detection_rate: 0.90

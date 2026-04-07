@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session_trends.schema.json",
+  "title": "SessionTrends",
+  "type": "object",
+  "required": ["session_id", "current", "history", "trends"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "history_window": {"type": "integer"},
+    "history_count": {"type": "integer"},
+    "current": {"type": "object"},
+    "history": {"type": "array", "items": {"type": "object"}},
+    "trends": {"type": "object"},
+    "fleet_summary": {"type": "object"}
+  }
+}

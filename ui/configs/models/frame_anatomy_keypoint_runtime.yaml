@@ -1,0 +1,12 @@
+package_dir: ../../models/frame_anatomy_keypoint
+backend: numpy_template_export
+runtime_model_path: ../../models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz
+benchmark_manifest: ../../models/frame_anatomy_keypoint/benchmark_manifest.json
+required_release_state: research_validated
+require_runtime_model: true
+require_benchmark_gate: true
+benchmark_thresholds:
+  max_mean_error_px: 2.5
+  max_max_error_px: 6.0
+  min_detection_rate: 0.95
+  min_stable_detection_rate: 0.90

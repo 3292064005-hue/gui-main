@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PressureSensorTimeline",
+  "type": "object",
+  "required": ["session_id", "samples", "summary", "thresholds"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "thresholds": {"type": "object"},
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts_ns", "pressure_current", "desired_force_n", "pressure_error", "contact_confidence", "force_status", "force_source", "overpressure", "underpressure", "stale"],
+        "properties": {
+          "ts_ns": {"type": "integer"},
+          "pressure_current": {"type": "number"},
+          "desired_force_n": {"type": "number"},
+          "pressure_error": {"type": "number"},
+          "contact_confidence": {"type": "number"},
+          "force_status": {"type": "string"},
+          "force_source": {"type": "string"},
+          "overpressure": {"type": "boolean"},
+          "underpressure": {"type": "boolean"},
+          "stale": {"type": "boolean"}
+        }
+      }
+    },
+    "summary": {"type": "object"}
+  }
+}

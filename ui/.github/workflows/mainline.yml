@@ -1,0 +1,106 @@
+name: mainline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repo hygiene
+        run: |
+          chmod +x scripts/check_repo_hygiene.sh
+          ./scripts/check_repo_hygiene.sh
+
+  canonical-import-gate:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Canonical import audit
+        run: |
+          python scripts/check_canonical_imports.py
+
+  protocol-sync-gate:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Protocol sync audit
+        run: |
+          python scripts/check_protocol_sync.py
+
+  runtime-core-gate:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev libeigen3-dev
+      - name: Build runtime core targets
+        run: |
+          cmake -S cpp_robot_core -B /tmp/runtime_core_gate -DROBOT_CORE_PROFILE=mock -DROBOT_CORE_WITH_XCORE_SDK=OFF -DROBOT_CORE_WITH_XMATE_MODEL=OFF
+          python scripts/build_cpp_targets.py --build-dir /tmp/runtime_core_gate spine_robot_core_runtime spine_robot_core test_protocol_bridge test_recovery_manager
+          ctest --test-dir /tmp/runtime_core_gate --output-on-failure -R 'cpp_(protocol_bridge|recovery_manager)'
+
+  evidence-gate:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Evidence/session structural tests
+        run: |
+          python scripts/run_pytest_mainline.py -q tests/test_p2_stage_manifests.py tests/test_p2_repository_gates.py tests/test_release_gate.py tests/test_protocol_sync_contract_metadata.py
+
+  mainline-verification:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev libeigen3-dev
+      - name: Run converged mainline verification
+        run: |
+          ./scripts/verify_mainline.sh
+
+  mock-e2e:
+    runs-on: ubuntu-22.04
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Run mock mainline integration slice
+        run: |
+          python scripts/run_pytest_mainline.py -q tests/test_mainline_mock_e2e.py tests/test_preweight_semantic_closure.py

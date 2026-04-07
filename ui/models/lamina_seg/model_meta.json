@@ -1,0 +1,10 @@
+{
+  "package_name": "lamina_seg_baseline",
+  "package_version": "1.0.0",
+  "backend": "baseline",
+  "runtime_kind": "deterministic_baseline",
+  "task": "lamina_segmentation",
+  "release_state": "research_baseline",
+  "clinical_claim": "non_clinical",
+  "input_contract": "coronal_vpi_image"
+}

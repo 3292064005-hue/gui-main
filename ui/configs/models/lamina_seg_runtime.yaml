@@ -1,0 +1,2 @@
+package_dir: ../../models/lamina_seg
+backend: baseline

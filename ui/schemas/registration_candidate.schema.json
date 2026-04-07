@@ -1,0 +1,20 @@
+{
+  "$id": "registration_candidate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "candidate_id", "source_type", "patient_frame", "scan_corridor", "quality_metrics", "candidate_hash"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "candidate_id": {"type": "string"},
+    "source_type": {"type": "string"},
+    "patient_frame": {"type": "object"},
+    "scan_corridor": {"type": "object"},
+    "landmarks": {"type": "array"},
+    "quality_metrics": {"type": "object"},
+    "confidence": {"type": "number"},
+    "registration_covariance": {"type": "object"},
+    "usable_segment_count": {"type": "integer"},
+    "algorithm_bundle_hash": {"type": "string"},
+    "candidate_hash": {"type": "string"}
+  }
+}

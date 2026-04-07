@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["train", "val", "test"],
+  "properties": {
+    "train": {"type": "array", "items": {"type": "string"}},
+    "val": {"type": "array", "items": {"type": "string"}},
+    "test": {"type": "array", "items": {"type": "string"}}
+  }
+}

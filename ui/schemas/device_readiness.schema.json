@@ -1,0 +1,41 @@
+{
+  "$id": "device_readiness.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "robot_ready",
+    "camera_ready",
+    "ultrasound_ready",
+    "force_provider_ready",
+    "storage_ready",
+    "config_valid",
+    "protocol_match",
+    "time_sync_ok",
+    "localization_inputs_available",
+    "calibration_bundle_available",
+    "guidance_pipeline_available"
+  ],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "robot_ready": {"type": "boolean"},
+    "camera_ready": {"type": "boolean"},
+    "ultrasound_ready": {"type": "boolean"},
+    "force_provider_ready": {"type": "boolean"},
+    "storage_ready": {"type": "boolean"},
+    "config_valid": {"type": "boolean"},
+    "protocol_match": {"type": "boolean"},
+    "software_version": {"type": "string"},
+    "build_id": {"type": "string"},
+    "time_sync_ok": {"type": "boolean"},
+    "ready_to_lock": {"type": "boolean"},
+    "network_link_ok": {"type": "boolean"},
+    "single_control_source_ok": {"type": "boolean"},
+    "rt_control_ready": {"type": "boolean"},
+    "localization_inputs_available": {"type": "boolean"},
+    "calibration_bundle_available": {"type": "boolean"},
+    "guidance_pipeline_available": {"type": "boolean"},
+    "control_authority": {"type": "object"},
+    "robot_profile": {"type": "object"},
+    "rt_contract": {"type": "object"}
+  }
+}

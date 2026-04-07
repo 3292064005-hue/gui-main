@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "case_id", "pairs"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "case_id": {"type": "string"},
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["vertebra_instance_id", "left_point_id", "right_point_id"],
+        "properties": {
+          "vertebra_instance_id": {"type": "string"},
+          "left_point_id": {"type": "string"},
+          "right_point_id": {"type": "string"},
+          "pair_confidence": {"type": "number"}
+        }
+      }
+    }
+  }
+}

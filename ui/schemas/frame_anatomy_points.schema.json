@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "frame_anatomy_points.schema.json",
+  "type": "object",
+  "required": ["generated_at", "session_id", "points", "stable_pairs", "summary"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "session_id": {"type": "string"},
+    "method_version": {"type": "string"},
+    "points": {"type": "array"},
+    "stable_pairs": {"type": "array"},
+    "summary": {"type": "object"},
+    "runtime_model": {"type": "object"}
+  }
+}

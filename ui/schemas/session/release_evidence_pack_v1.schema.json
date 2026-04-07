@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["session_id", "release_candidate", "evidence_index", "open_gaps"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "release_candidate": {"type": "boolean"},
+    "release_readiness": {"type": "object"},
+    "version_lock": {"type": "object"},
+    "diagnostics_summary": {"type": "object"},
+    "integrity_summary": {"type": "object"},
+    "contract_summary": {"type": "object"},
+    "evidence_index": {"type": "array", "items": {"type": "object"}},
+    "open_gaps": {"type": "array", "items": {"type": "string"}}
+  }
+}

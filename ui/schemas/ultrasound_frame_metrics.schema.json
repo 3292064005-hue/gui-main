@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UltrasoundFrameMetrics",
+  "type": "object",
+  "required": ["session_id", "frames", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts_ns", "frame_path", "mean_intensity", "std_intensity", "dark_ratio", "edge_energy", "coupled", "missing_frame"],
+        "properties": {
+          "ts_ns": {"type": "integer"},
+          "frame_path": {"type": "string"},
+          "mean_intensity": {"type": "number"},
+          "std_intensity": {"type": "number"},
+          "dark_ratio": {"type": "number"},
+          "edge_energy": {"type": "number"},
+          "coupled": {"type": "boolean"},
+          "missing_frame": {"type": "boolean"}
+        }
+      }
+    },
+    "summary": {"type": "object"}
+  }
+}

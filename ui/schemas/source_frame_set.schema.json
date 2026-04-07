@@ -1,0 +1,29 @@
+{
+  "$id": "source_frame_set.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "camera_device_id",
+    "frame_refs",
+    "frame_envelopes",
+    "frame_count",
+    "fresh",
+    "provider_mode",
+    "requested_mode",
+    "source_frame_set_hash"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "generated_at": {"type": "string"},
+    "camera_device_id": {"type": "string", "minLength": 1},
+    "frame_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "frame_envelopes": {"type": "array", "items": {"$ref": "camera_frame_envelope.schema.json"}, "minItems": 1},
+    "frame_count": {"type": "integer", "minimum": 1},
+    "fresh": {"type": "boolean"},
+    "provider_mode": {"type": "string", "enum": ["synthetic", "filesystem", "opencv_camera"]},
+    "requested_mode": {"type": "string", "enum": ["synthetic", "filesystem", "opencv_camera", "webcam", "live"]},
+    "source_frame_set_hash": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AssessmentSummary",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method_version",
+    "cobb_angle_deg",
+    "confidence",
+    "requires_manual_review",
+    "coordinate_frame",
+    "evidence_refs"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "method_version": {
+      "type": "string"
+    },
+    "cobb_angle_deg": {
+      "type": "number"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "requires_manual_review": {
+      "type": "boolean"
+    },
+    "coordinate_frame": {
+      "type": "string"
+    },
+    "point_count": {
+      "type": "integer"
+    },
+    "segment_count": {
+      "type": "integer"
+    },
+    "upper_end_vertebra_candidate": {
+      "type": "object"
+    },
+    "lower_end_vertebra_candidate": {
+      "type": "object"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "runtime_profile": {
+      "type": "string"
+    },
+    "profile_release_state": {
+      "type": "string"
+    },
+    "closure_mode": {
+      "type": "string"
+    },
+    "measurement_source": {
+      "type": "string"
+    },
+    "measurement_status": {
+      "type": "string"
+    },
+    "closure_verdict": {
+      "type": "string"
+    },
+    "provenance_purity": {
+      "type": "string"
+    },
+    "source_contamination_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "soft_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "manual_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reconstruction_status": {
+      "type": "string"
+    },
+    "uca_angle_deg": {
+      "type": "number"
+    },
+    "uca_confidence": {
+      "type": "number"
+    },
+    "agreement": {
+      "type": "object"
+    },
+    "overlay_ref": {
+      "type": "string"
+    },
+    "manual_review_reason": {
+      "type": "string"
+    },
+    "profile_config_path": {
+      "type": "string"
+    },
+    "profile_load_error": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

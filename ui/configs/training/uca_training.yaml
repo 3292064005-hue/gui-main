@@ -1,0 +1,14 @@
+dataset_root: datasets/uca
+split_file: datasets/uca/splits/split_v1.json
+output_dir: training_outputs/uca
+task_name: uca_auxiliary
+ranking_model: numpy_baseline_rank
+segmentation_backbone: numpy_baseline_seg
+batch_size: 8
+max_epochs: 10
+learning_rate: 0.001
+num_workers: 0
+export_onnx: false
+split_name: train
+trainer_backend: numpy_baseline
+backend_options: {}

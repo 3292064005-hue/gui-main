@@ -1,0 +1,36 @@
+{
+  "$id": "camera_frame_envelope.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "frame_id",
+    "device_id",
+    "timestamp_ns",
+    "frame_type",
+    "resolution",
+    "intrinsics_hash",
+    "storage_ref",
+    "fresh",
+    "provider_mode"
+  ],
+  "properties": {
+    "frame_id": {"type": "string", "minLength": 1},
+    "device_id": {"type": "string", "minLength": 1},
+    "timestamp_ns": {"type": "integer", "minimum": 1},
+    "frame_type": {"type": "string", "enum": ["rgb", "depth", "rgbd"]},
+    "resolution": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "intrinsics_hash": {"type": "string", "minLength": 1},
+    "storage_ref": {"type": "string", "minLength": 1},
+    "fresh": {"type": "boolean"},
+    "provider_mode": {"type": "string", "enum": ["synthetic", "filesystem", "opencv_camera"]}
+  },
+  "additionalProperties": false
+}

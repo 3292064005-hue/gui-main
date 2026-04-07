@@ -1,0 +1,21 @@
+# Spine Ultrasound Platform - Ubuntu 22.04 clinical extension
+
+-r requirements.txt
+
+# Core math and data
+scipy>=1.9.0
+h5py>=3.7.0
+
+# Communications and device integration
+websockets>=11.0.3
+pyzmq>=25.1.0
+opencv-python-headless>=4.8.0
+aiortc>=1.6.0
+
+# Reconstruction and acceleration
+open3d>=0.17.0
+tensorrt>=8.6.1
+pycuda>=2022.2.2
+
+# Clinical logging and PACS
+pydicom>=2.4.1

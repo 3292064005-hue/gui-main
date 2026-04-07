@@ -1,0 +1,18 @@
+{
+  "$id": "diagnostics_pack.schema.json",
+  "type": "object",
+  "required": ["session_id", "health_snapshot", "recovery_snapshot", "summary"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "health_snapshot": {"type": "object"},
+    "recovery_snapshot": {"type": "object"},
+    "telemetry_summary": {"type": "object"},
+    "command_digest": {"type": "object"},
+    "alarm_digest": {"type": "object"},
+    "quality_digest": {"type": "object"},
+    "artifact_digest": {"type": "object"},
+    "environment": {"type": "object"},
+    "versioning": {"type": "object"},
+    "summary": {"type": "object"}
+  }
+}

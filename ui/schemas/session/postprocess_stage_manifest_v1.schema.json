@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Postprocess stage manifest v1",
+  "type": "object",
+  "required": ["generated_at", "session_id", "schema", "stages"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "session_id": {"type": "string"},
+    "schema": {"type": "string"},
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage", "label", "input_artifacts", "output_artifacts", "retryable", "performance_budget_ms", "owner_domain"],
+        "properties": {
+          "stage": {"type": "string"},
+          "label": {"type": "string"},
+          "input_artifacts": {"type": "array", "items": {"type": "string"}},
+          "output_artifacts": {"type": "array", "items": {"type": "string"}},
+          "retryable": {"type": "boolean"},
+          "performance_budget_ms": {"type": "integer"},
+          "owner_domain": {"type": "string"},
+          "status": {"type": "string"},
+          "ready": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

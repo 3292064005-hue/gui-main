@@ -1,0 +1,28 @@
+{
+  "$id": "guidance_targets.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["entry_point_mm", "exit_point_mm", "centerline_mm", "approach_clearance_mm"],
+  "properties": {
+    "entry_point_mm": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}},
+      "additionalProperties": false
+    },
+    "exit_point_mm": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}},
+      "additionalProperties": false
+    },
+    "centerline_mm": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}},
+      "additionalProperties": false
+    },
+    "approach_clearance_mm": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": false
+}

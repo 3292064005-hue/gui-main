@@ -1,0 +1,51 @@
+{
+  "$id": "localization_freeze.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "freeze_id",
+    "patient_registration_hash",
+    "localization_readiness_hash",
+    "calibration_bundle_hash",
+    "algorithm_bundle_hash",
+    "source_frame_set_hash",
+    "manual_adjustment_hash",
+    "freeze_verdict"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "freeze_id": {
+      "type": "string"
+    },
+    "patient_registration_hash": {
+      "type": "string"
+    },
+    "localization_readiness_hash": {
+      "type": "string"
+    },
+    "calibration_bundle_hash": {
+      "type": "string"
+    },
+    "algorithm_bundle_hash": {
+      "type": "string"
+    },
+    "source_frame_set_hash": {
+      "type": "string"
+    },
+    "manual_adjustment_hash": {
+      "type": "string"
+    },
+    "freeze_verdict": {
+      "type": "string"
+    },
+    "freeze_hash": {
+      "type": "string"
+    }
+  }
+}

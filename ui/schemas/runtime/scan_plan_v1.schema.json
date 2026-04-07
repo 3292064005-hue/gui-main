@@ -1,0 +1,43 @@
+{
+  "$id": "runtime/scan_plan_v1.schema.json",
+  "type": "object",
+  "required": [
+    "session_id",
+    "plan_id",
+    "approach_pose",
+    "retreat_pose",
+    "segments"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "planner_version": {
+      "type": "string"
+    },
+    "registration_hash": {
+      "type": "string"
+    },
+    "plan_kind": {
+      "type": "string"
+    },
+    "created_ts_ns": {
+      "type": "integer"
+    },
+    "validation_summary": {
+      "type": "object"
+    },
+    "approach_pose": {
+      "type": "object"
+    },
+    "retreat_pose": {
+      "type": "object"
+    },
+    "segments": {
+      "type": "array"
+    }
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "generated_at": "2026-04-04 09:29:58",
+  "runtime_model": {
+    "generated_at": "2026-04-04 09:29:58",
+    "package_name": "frame_anatomy_keypoint_exported",
+    "package_version": "2.0.0",
+    "backend": "numpy_template_export",
+    "runtime_kind": "exported_weight_template",
+    "task": "frame_anatomy_points",
+    "release_state": "research_validated",
+    "clinical_claim": "non_clinical_research_only",
+    "input_contract": "raw_ultrasound_frame_sequence",
+    "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+    "trainer_backend": "numpy_baseline",
+    "task_name": "frame_anatomy_keypoint_export",
+    "training_metrics": {
+      "sample_count": 6,
+      "avg_pair_separation_px": 25.0,
+      "avg_confidence": 1.0
+    },
+    "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+    "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+  },
+  "details": [
+    {
+      "case_id": "case_001",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 18,
+          "y_px": 18,
+          "confidence": 0.99187
+        },
+        "right": {
+          "x_px": 46,
+          "y_px": 18,
+          "confidence": 0.99187
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 28,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    },
+    {
+      "case_id": "case_002",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 20,
+          "y_px": 19,
+          "confidence": 0.993013
+        },
+        "right": {
+          "x_px": 44,
+          "y_px": 19,
+          "confidence": 0.993013
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 24,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    },
+    {
+      "case_id": "case_003",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 22,
+          "y_px": 20,
+          "confidence": 0.993136
+        },
+        "right": {
+          "x_px": 42,
+          "y_px": 20,
+          "confidence": 0.993136
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 20,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    },
+    {
+      "case_id": "case_004",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 17,
+          "y_px": 17,
+          "confidence": 0.990657
+        },
+        "right": {
+          "x_px": 45,
+          "y_px": 17,
+          "confidence": 0.990657
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 28,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    },
+    {
+      "case_id": "case_005",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 21,
+          "y_px": 21,
+          "confidence": 0.994208
+        },
+        "right": {
+          "x_px": 43,
+          "y_px": 21,
+          "confidence": 0.994208
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 22,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    },
+    {
+      "case_id": "case_006",
+      "detected": true,
+      "stable": true,
+      "point_errors_px": [
+        0.0,
+        0.0
+      ],
+      "result": {
+        "left": {
+          "x_px": 19,
+          "y_px": 18,
+          "confidence": 0.99187
+        },
+        "right": {
+          "x_px": 47,
+          "y_px": 18,
+          "confidence": 0.99187
+        },
+        "stable": true,
+        "stability_score": 1.0,
+        "summary": {
+          "pair_separation_px": 28,
+          "score_floor": 0.15
+        },
+        "runtime_model": {
+          "generated_at": "2026-04-04 09:29:58",
+          "package_name": "frame_anatomy_keypoint_exported",
+          "package_version": "2.0.0",
+          "backend": "numpy_template_export",
+          "runtime_kind": "exported_weight_template",
+          "task": "frame_anatomy_points",
+          "release_state": "research_validated",
+          "clinical_claim": "non_clinical_research_only",
+          "input_contract": "raw_ultrasound_frame_sequence",
+          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "trainer_backend": "numpy_baseline",
+          "task_name": "frame_anatomy_keypoint_export",
+          "training_metrics": {
+            "sample_count": 6,
+            "avg_pair_separation_px": 25.0,
+            "avg_confidence": 1.0
+          },
+          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "case_count": 6,
+    "detected_case_count": 6,
+    "stable_case_count": 6,
+    "detection_rate": 1.0,
+    "stable_detection_rate": 1.0,
+    "mean_error_px": 0.0,
+    "max_error_px": 0.0
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$id": "manual_adjustment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "adjustment_count", "adjustments", "hash"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "generated_at": {"type": "string"},
+    "adjustment_count": {"type": "integer", "minimum": 0},
+    "adjustments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["adjustment_id", "operator_id", "reason", "target", "delta", "pre_hash", "post_hash"],
+        "properties": {
+          "adjustment_id": {"type": "string", "minLength": 1},
+          "operator_id": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "target": {"type": "string", "minLength": 1},
+          "delta": {"type": "object"},
+          "pre_hash": {"type": "string"},
+          "post_hash": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "hash": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

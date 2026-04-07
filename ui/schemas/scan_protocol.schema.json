@@ -1,0 +1,20 @@
+{
+  "$id": "scan_protocol.schema.json",
+  "type": "object",
+  "required": ["session_id", "robot_model", "clinical_control_modes", "contact_control", "path_policy"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "robot_model": {"type": "string"},
+    "sdk_robot_class": {"type": "string"},
+    "axis_count": {"type": "integer"},
+    "rt_loop_hz": {"type": "integer"},
+    "clinical_control_modes": {"type": "object"},
+    "contact_control": {"type": "object"},
+    "path_policy": {"type": "object"},
+    "registration_contract": {"type": "object"},
+    "rt_parameters": {"type": "object"},
+    "segments": {"type": "array"},
+    "patient_frame": {"type": "object"},
+    "safety_contract": {"type": "object"}
+  }
+}

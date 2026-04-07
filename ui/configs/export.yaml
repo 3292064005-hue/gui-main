@@ -1,0 +1,3 @@
+default_report_format: pdf
+export_preview_png: true
+export_summary_csv: true

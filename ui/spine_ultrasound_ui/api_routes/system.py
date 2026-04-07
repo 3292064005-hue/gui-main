@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from fastapi import APIRouter, Body, HTTPException
+
+from spine_ultrasound_ui.contracts import schema_catalog
+
+
+def build_system_router(adapter_getter: Callable[[], Any], deployment_profile_getter: Callable[[], Any]) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/api/v1/status")
+    async def get_system_status():
+        return adapter_getter().status()
+
+    @router.get("/api/v1/health")
+    async def get_health():
+        return adapter_getter().health()
+
+    @router.get("/api/v1/telemetry/snapshot")
+    async def get_telemetry_snapshot(topics: str | None = None):
+        topic_filter = {topic.strip() for topic in (topics or "").split(",") if topic.strip()} or None
+        return adapter_getter().snapshot(topic_filter)
+
+    @router.get("/api/v1/schema")
+    async def get_protocol_schema():
+        payload = adapter_getter().schema()
+        payload["contract_schemas"] = list(schema_catalog().keys())
+        return payload
+
+    @router.get("/api/v1/profile")
+    async def get_deployment_profile():
+        adapter = adapter_getter()
+        runtime_config = {}
+        if hasattr(adapter, "runtime_config"):
+            runtime_config = dict(getattr(adapter, "runtime_config")().get("runtime_config", {}))
+        return {
+            "deployment_profile": deployment_profile_getter().build_snapshot(None),
+            "runtime_config_present": bool(runtime_config),
+        }
+
+    @router.get("/api/v1/backend/link-state")
+    async def get_backend_link_state():
+        adapter = adapter_getter()
+        return {
+            "status": adapter.status(),
+            "health": adapter.health(),
+            "topics": adapter.topic_catalog() if hasattr(adapter, "topic_catalog") else {"topics": []},
+        }
+
+    @router.get("/api/v1/control-plane")
+    async def get_control_plane():
+        adapter = adapter_getter()
+        if hasattr(adapter, "control_plane_status"):
+            return adapter.control_plane_status()
+        return {
+            "status": adapter.status(),
+            "health": adapter.health(),
+            "schema": adapter.schema(),
+            "runtime_config": adapter.runtime_config() if hasattr(adapter, "runtime_config") else {"runtime_config": {}},
+            "topics": adapter.topic_catalog() if hasattr(adapter, "topic_catalog") else {"topics": []},
+            "recent_commands": {"recent_commands": []},
+            "control_authority": adapter.control_authority_status() if hasattr(adapter, "control_authority_status") else {},
+        }
+
+    @router.get("/api/v1/control-authority")
+    async def get_control_authority():
+        adapter = adapter_getter()
+        if hasattr(adapter, "control_authority_status"):
+            return adapter.control_authority_status()
+        return {
+            "summary_state": "ready",
+            "summary_label": "control authority unavailable",
+            "detail": "adapter does not expose control authority",
+        }
+
+    @router.post("/api/v1/control-lease/acquire")
+    async def post_control_lease_acquire(payload: Any = Body(default=None)):
+        if payload is not None and not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="payload must be a JSON object")
+        adapter = adapter_getter()
+        if hasattr(adapter, "acquire_control_lease"):
+            return adapter.acquire_control_lease(payload or {})
+        return {
+            "ok": False,
+            "summary_state": "blocked",
+            "summary_label": "control lease unsupported",
+            "detail": "adapter does not support control lease acquisition",
+        }
+
+    @router.post("/api/v1/control-lease/renew")
+    async def post_control_lease_renew(payload: Any = Body(default=None)):
+        if payload is not None and not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="payload must be a JSON object")
+        adapter = adapter_getter()
+        if hasattr(adapter, "renew_control_lease"):
+            return adapter.renew_control_lease(payload or {})
+        return {
+            "ok": False,
+            "summary_state": "blocked",
+            "summary_label": "control lease renew unsupported",
+            "detail": "adapter does not support control lease renew",
+        }
+
+    @router.post("/api/v1/control-lease/release")
+    async def post_control_lease_release(payload: Any = Body(default=None)):
+        if payload is not None and not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="payload must be a JSON object")
+        adapter = adapter_getter()
+        if hasattr(adapter, "release_control_lease"):
+            return adapter.release_control_lease(payload or {})
+        return {
+            "ok": False,
+            "summary_state": "blocked",
+            "summary_label": "control lease unsupported",
+            "detail": "adapter does not support control lease release",
+        }
+
+    @router.get("/api/v1/commands/recent")
+    async def get_recent_commands():
+        adapter = adapter_getter()
+        if hasattr(adapter, "recent_commands"):
+            return adapter.recent_commands()
+        return {"recent_commands": []}
+
+    @router.get("/api/v1/runtime-config")
+    async def get_runtime_config():
+        adapter = adapter_getter()
+        if hasattr(adapter, "runtime_config"):
+            return adapter.runtime_config()
+        return {"runtime_config": {}}
+
+    @router.post("/api/v1/runtime-config")
+    async def post_runtime_config(payload: Any = Body(default=None)):
+        if payload is not None and not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="payload must be a JSON object")
+        adapter = adapter_getter()
+        if hasattr(adapter, "set_runtime_config"):
+            return adapter.set_runtime_config(payload or {})
+        return {"runtime_config": payload or {}}
+
+    @router.get("/api/v1/topics")
+    async def get_topic_catalog():
+        adapter = adapter_getter()
+        if hasattr(adapter, "topic_catalog"):
+            return adapter.topic_catalog()
+        return {"topics": []}
+
+    @router.get("/api/v1/roles")
+    async def get_role_catalog():
+        adapter = adapter_getter()
+        if hasattr(adapter, "role_catalog"):
+            return adapter.role_catalog()
+        return {"roles": {}}
+
+    @router.get("/api/v1/command-policies")
+    async def get_command_policy_catalog():
+        adapter = adapter_getter()
+        if hasattr(adapter, "command_policy_catalog"):
+            return adapter.command_policy_catalog()
+        return {"policies": []}
+
+    @router.get("/api/v1/schema/artifacts")
+    async def get_artifact_schemas():
+        return schema_catalog()
+
+    return router

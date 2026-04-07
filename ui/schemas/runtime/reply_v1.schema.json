@@ -1,0 +1,28 @@
+{
+  "$id": "runtime/reply_v1.schema.json",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "ok",
+    "message",
+    "request_id",
+    "data_json"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "integer"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "message": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "data_json": {
+      "type": "string"
+    }
+  }
+}

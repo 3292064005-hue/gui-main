@@ -1,0 +1,14 @@
+{
+  "$id": "session/resume_decision.schema.json",
+  "type": "object",
+  "required": ["session_id", "resume_allowed", "mode", "blocking_reasons"],
+  "properties": {
+    "session_id": {"type": "string"},
+    "resume_allowed": {"type": "boolean"},
+    "mode": {"type": "string"},
+    "blocking_reasons": {"type": "array", "items": {"type": "string"}},
+    "resume_from": {"type": "object"},
+    "recommended_patch_segments": {"type": "array", "items": {"type": "integer"}}
+  },
+  "additionalProperties": true
+}

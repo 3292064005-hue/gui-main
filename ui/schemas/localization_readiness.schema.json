@@ -1,0 +1,56 @@
+{
+  "$id": "localization_readiness.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "status", "device_gate", "calibration_gate", "perception_gate", "guidance_gate", "freeze_gate", "blocking_reasons", "warnings", "summary_metrics", "review_required", "review_approval", "readiness_hash"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "generated_at": {"type": "string"},
+    "status": {"type": "string", "enum": ["READY_FOR_FREEZE", "READY_WITH_REVIEW", "BLOCKED"]},
+    "device_gate": {
+      "type": "object",
+      "required": ["camera_online", "robot_online", "ultrasound_online", "pressure_online", "frame_fresh", "frame_count"],
+      "properties": {
+        "camera_online": {"type": "boolean"},
+        "robot_online": {"type": "boolean"},
+        "ultrasound_online": {"type": "boolean"},
+        "pressure_online": {"type": "boolean"},
+        "frame_fresh": {"type": "boolean"},
+        "frame_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "calibration_gate": {"type": "object"},
+    "perception_gate": {"type": "object"},
+    "guidance_gate": {"type": "object"},
+    "freeze_gate": {
+      "type": "object",
+      "required": ["freeze_ready", "review_required", "review_approved", "stale_artifacts", "source_frame_set_hash", "algorithm_bundle_hash"],
+      "properties": {
+        "freeze_ready": {"type": "boolean"},
+        "review_required": {"type": "boolean"},
+        "review_approved": {"type": "boolean"},
+        "stale_artifacts": {"type": "boolean"},
+        "source_frame_set_hash": {"type": "string"},
+        "algorithm_bundle_hash": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "blocking_reasons": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "summary_metrics": {"type": "object"},
+    "review_required": {"type": "boolean"},
+    "review_approval": {
+      "type": "object",
+      "required": ["approved", "operator_id", "reason"],
+      "properties": {
+        "approved": {"type": "boolean"},
+        "operator_id": {"type": "string"},
+        "reason": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "readiness_hash": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

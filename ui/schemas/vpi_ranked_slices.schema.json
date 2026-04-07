@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "VPIRankedSlices",
+  "required": [
+    "session_id",
+    "method_version",
+    "ranked_slices"
+  ],
+  "properties": {
+    "session_id": {},
+    "method_version": {},
+    "ranked_slices": {}
+  }
+}

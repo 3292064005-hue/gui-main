@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package spine_core;
+
+message Command {
+  int32 protocol_version = 1;
+  string command = 2;
+  string payload_json = 3;
+  string request_id = 4;
+}
+
+message Reply {
+  int32 protocol_version = 1;
+  bool ok = 2;
+  string message = 3;
+  string request_id = 4;
+  string data_json = 5;
+}
+
+message TelemetryEnvelope {
+  int32 protocol_version = 1;
+  string topic = 2;
+  int64 ts_ns = 3;
+  string data_json = 4;
+}
+
+message RobotTelemetry {
+  int32 protocol_version = 1;
+  string topic = 2;
+  int64 ts_ns = 3;
+  repeated double tcp_pose_measured = 4;
+  repeated double joint_pos = 5;
+  repeated double joint_torque = 6;
+  double actual_force_z = 7;
+  int32 safety_status = 8;
+  double quality_score = 9;
+}
+
+message CommandPose {
+  repeated double tcp_pose_td = 1;
+  int64 timestamp_ns = 2;
+}

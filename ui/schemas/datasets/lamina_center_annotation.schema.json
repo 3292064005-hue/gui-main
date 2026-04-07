@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "case_id", "patient_id", "session_id", "coordinate_frame", "points"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "case_id": {"type": "string"},
+    "patient_id": {"type": "string"},
+    "session_id": {"type": "string"},
+    "coordinate_frame": {"type": "string"},
+    "annotator_id": {"type": "string"},
+    "review_status": {"type": "string"},
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["point_id", "vertebra_instance_id", "side", "x_mm", "y_mm", "z_mm"],
+        "properties": {
+          "point_id": {"type": "string"},
+          "vertebra_instance_id": {"type": "string"},
+          "side": {"type": "string", "enum": ["left", "right"]},
+          "x_mm": {"type": "number"},
+          "y_mm": {"type": "number"},
+          "z_mm": {"type": "number"},
+          "visibility": {"type": "string"}
+        }
+      }
+    }
+  }
+}

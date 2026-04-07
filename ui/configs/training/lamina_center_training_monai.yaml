@@ -1,0 +1,17 @@
+dataset_root: datasets/lamina_center
+split_file: datasets/lamina_center/splits/split_v1.json
+output_dir: training_outputs/lamina_center_monai
+task_name: lamina_center
+input_mode: vpi_2d
+segmentation_backbone: monai_unet
+keypoint_head: monai_heatmap
+batch_size: 4
+max_epochs: 100
+learning_rate: 0.0005
+num_workers: 4
+mixed_precision: true
+export_onnx: true
+split_name: train
+trainer_backend: monai
+backend_options:
+  monai_bundle: configs/training/monai/lamina_center_bundle.json

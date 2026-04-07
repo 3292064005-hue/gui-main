@@ -1,0 +1,325 @@
+{
+  "$id": "xmate_profile.schema.json",
+  "type": "object",
+  "required": [
+    "robot_model",
+    "sdk_robot_class",
+    "axis_count",
+    "preferred_link",
+    "rt_loop_hz"
+  ],
+  "properties": {
+    "robot_model": {
+      "type": "string",
+      "const": "xmate3"
+    },
+    "sdk_robot_class": {
+      "type": "string",
+      "const": "xMateRobot"
+    },
+    "controller_series": {
+      "type": "string"
+    },
+    "controller_version": {
+      "type": "string"
+    },
+    "axis_count": {
+      "type": "integer",
+      "const": 6
+    },
+    "preferred_link": {
+      "type": "string",
+      "const": "wired_direct"
+    },
+    "rt_loop_hz": {
+      "type": "integer"
+    },
+    "rt_mode": {
+      "type": "string",
+      "const": "cartesianImpedance"
+    },
+    "supported_rt_modes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "clinical_allowed_modes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rt_network_tolerance_percent": {
+      "type": "integer"
+    },
+    "cartesian_impedance": {
+      "type": "array"
+    },
+    "desired_wrench_n": {
+      "type": "array"
+    },
+    "contact_control": {
+      "type": "object",
+      "properties": {
+        "mode": {"type": "string"},
+        "virtual_mass": {"type": "number", "exclusiveMinimum": 0.0},
+        "virtual_damping": {"type": "number", "minimum": 0.0},
+        "virtual_stiffness": {"type": "number", "minimum": 0.0},
+        "force_deadband_n": {"type": "number", "minimum": 0.0},
+        "max_normal_step_mm": {"type": "number", "minimum": 0.01},
+        "max_normal_velocity_mm_s": {"type": "number", "minimum": 0.1},
+        "max_normal_acc_mm_s2": {"type": "number", "minimum": 1.0},
+        "max_normal_travel_mm": {"type": "number", "minimum": 0.01},
+        "anti_windup_limit_n": {"type": "number", "minimum": 0.1},
+        "integrator_leak": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+      }
+    },
+    "force_estimator": {
+      "type": "object",
+      "properties": {
+        "preferred_source": {"type": "string"},
+        "pressure_weight": {"type": "number", "minimum": 0.0},
+        "wrench_weight": {"type": "number", "minimum": 0.0},
+        "stale_timeout_ms": {"type": "integer", "minimum": 1},
+        "timeout_ms": {"type": "integer", "minimum": 1},
+        "auto_bias_zero": {"type": "boolean"},
+        "min_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+      }
+    },
+    "orientation_trim": {
+      "type": "object",
+      "properties": {
+        "gain": {"type": "number", "minimum": 0.0},
+        "max_trim_deg": {"type": "number", "minimum": 0.1},
+        "lowpass_hz": {"type": "number", "minimum": 0.1}
+      }
+    },
+    "seek_contact_max_travel_mm": {
+      "type": "number"
+    },
+    "retract_travel_mm": {
+      "type": "number"
+    },
+    "scan_follow_lateral_amplitude_mm": {
+      "type": "number"
+    },
+    "scan_follow_frequency_hz": {
+      "type": "number"
+    },
+    "dh_parameters": {
+      "type": "array"
+    },
+    "clinical_scan_contract": {
+      "type": "object"
+    },
+    "rt_control_contract": {
+      "type": "object"
+    },
+    "rt_stale_state_timeout_ms": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 200.0,
+      "default": 40.0
+    },
+    "rt_phase_transition_debounce_cycles": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 5
+    },
+    "rt_max_cart_step_mm": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 5.0,
+      "default": 0.25
+    },
+    "rt_max_cart_vel_mm_s": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 100.0,
+      "default": 25.0
+    },
+    "rt_max_cart_acc_mm_s2": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 2000.0,
+      "default": 200.0
+    },
+    "rt_max_pose_trim_deg": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 10.0,
+      "default": 1.5
+    },
+    "rt_max_force_error_n": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 50.0,
+      "default": 8.0
+    },
+    "rt_integrator_limit_n": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 100.0,
+      "default": 10.0
+    },
+    "contact_force_target_n": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 30.0,
+      "default": 8.0
+    },
+    "contact_force_tolerance_n": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 10.0,
+      "default": 1.0
+    },
+    "contact_establish_cycles": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "default": 12
+    },
+    "normal_admittance_gain": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 0.01,
+      "default": 0.00012
+    },
+    "normal_damping_gain": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 0.01,
+      "default": 4e-05
+    },
+    "seek_contact_max_step_mm": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 2.0,
+      "default": 0.08
+    },
+    "normal_velocity_quiet_threshold_mm_s": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "default": 0.3
+    },
+    "scan_force_target_n": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 30.0,
+      "default": 8.0
+    },
+    "scan_force_tolerance_n": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 10.0,
+      "default": 1.0
+    },
+    "scan_normal_pi_kp": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.012
+    },
+    "scan_normal_pi_ki": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.008
+    },
+    "scan_tangent_speed_min_mm_s": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "default": 2.0
+    },
+    "scan_tangent_speed_max_mm_s": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 100.0,
+      "default": 12.0
+    },
+    "scan_pose_trim_gain": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.08
+    },
+    "scan_follow_enable_lateral_modulation": {
+      "type": "boolean",
+      "default": true
+    },
+    "pause_hold_position_guard_mm": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 10.0,
+      "default": 0.4
+    },
+    "pause_hold_force_guard_n": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 20.0,
+      "default": 3.0
+    },
+    "pause_hold_drift_kp": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.01
+    },
+    "pause_hold_drift_ki": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.004
+    },
+    "pause_hold_integrator_leak": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.02
+    },
+    "retract_release_force_n": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 20.0,
+      "default": 1.5
+    },
+    "retract_release_cycles": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "default": 6
+    },
+    "retract_safe_gap_mm": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 20.0,
+      "default": 3.0
+    },
+    "retract_max_travel_mm": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "default": 15.0
+    },
+    "retract_jerk_limit_mm_s3": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 5000.0,
+      "default": 500.0
+    },
+    "retract_timeout_ms": {
+      "type": "number",
+      "minimum": 10.0,
+      "maximum": 10000.0,
+      "default": 1200.0
+    },
+    "rt_phase_contract": {
+      "type": "object"
+    }
+  }
+}

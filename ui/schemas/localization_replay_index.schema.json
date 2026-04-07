@@ -1,0 +1,18 @@
+{
+  "$id": "localization_replay_index.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "replay_id", "frame_refs", "candidate_hash", "registration_hash", "readiness_hash", "calibration_bundle_hash", "replay_hash"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "replay_id": {"type": "string"},
+    "frame_refs": {"type": "array", "items": {"type": "string"}},
+    "processing_step_refs": {"type": "array", "items": {"type": "string"}},
+    "candidate_hash": {"type": "string"},
+    "registration_hash": {"type": "string"},
+    "readiness_hash": {"type": "string"},
+    "calibration_bundle_hash": {"type": "string"},
+    "replay_hash": {"type": "string"}
+  }
+}
