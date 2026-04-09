@@ -98,6 +98,10 @@ set(CORE_RUNTIME_SOURCES
   src/rt_motion_service.cpp
   src/safety_service.cpp
   src/sdk_robot_facade.cpp
+  src/sdk_robot_facade_lifecycle.cpp
+  src/sdk_robot_facade_nrt.cpp
+  src/sdk_robot_facade_rt.cpp
+  src/sdk_robot_facade_cache.cpp
   src/sdk_robot_facade_ports.cpp
   src/sdk_robot_facade_state.cpp
   src/normal_force_estimator.cpp
@@ -106,7 +110,6 @@ set(CORE_RUNTIME_SOURCES
   src/orientation_trim_controller.cpp
   src/contact_control_contract.cpp
   src/telemetry_publisher.cpp
-  src/trajectory_compiler.cpp
   src/kinematics_validator.cpp
   src/pose_interpolator.cpp
 )
@@ -167,6 +170,7 @@ if(ROBOT_CORE_BUILD_EXAMPLES)
   target_link_libraries(impedance_scan_example PRIVATE spine_robot_core_runtime)
 endif()
 
+add_test(NAME cpp_seqlock COMMAND test_seqlock)
 add_test(NAME cpp_force_control COMMAND test_force_control)
 add_test(NAME cpp_normal_force_estimator COMMAND test_normal_force_estimator)
 add_test(NAME cpp_normal_axis_admittance_controller COMMAND test_normal_axis_admittance_controller)
@@ -179,5 +183,6 @@ add_test(NAME cpp_recovery_manager COMMAND test_recovery_manager)
 add_test(NAME cpp_recording_service COMMAND test_recording_service)
 
 install(TARGETS spine_robot_core DESTINATION /opt/spine_ultrasound/cpp_robot_core/bin)
+install(TARGETS spine_robot_core_runtime DESTINATION /opt/spine_ultrasound/cpp_robot_core/lib)
 
 add_test(NAME cpp_rt_motion_service_truth COMMAND test_rt_motion_service_truth)

@@ -6,6 +6,7 @@ from spine_ultrasound_ui.services.command_audit_service import CommandAuditServi
 from spine_ultrasound_ui.services.command_dispatch_service import CommandDispatchService
 from spine_ultrasound_ui.services.command_guard_service import CommandGuardService
 from spine_ultrasound_ui.services.ipc_protocol import COMMANDS, ReplyEnvelope, is_write_command, validate_command_payload
+from spine_ultrasound_ui.services.runtime_command_catalog import is_plan_compile_command
 
 
 class HeadlessCommandService:
@@ -88,8 +89,8 @@ class HeadlessCommandService:
             raise ValueError(f"unsupported command: {command}")
         requested_payload = dict(payload or {})
         validate_command_payload(command, requested_payload)
-        if is_write_command(command):
-            normalized_payload, blocked_reply = self._guard.guard_write_command(command, requested_payload)
+        if is_write_command(command) or is_plan_compile_command(command):
+            normalized_payload, blocked_reply = self._guard.guard_command(command, requested_payload)
             if blocked_reply is not None:
                 return self._remember_and_return(command, normalized_payload, blocked_reply)
         else:

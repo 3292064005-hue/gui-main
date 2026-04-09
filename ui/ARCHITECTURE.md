@@ -156,3 +156,20 @@ The repository separates clinical runtime code from annotation/training code:
 `tools/monai_label_app/` now contains both packaging manifests and server-side task handlers for `lamina_center` and `uca_auxiliary`.
 `spine_ultrasound_ui/training/exporters/nnunet_dataset_export_service.py` owns nnU-Net raw dataset conversion.
 Heavyweight dependencies remain outside the desktop runtime; runtime code only consumes exported model packages through adapters.
+
+## Control authority capability claims
+
+- 控制权不再只表示“谁持有租约”，还会显式记录当前 owner 已拿到的 capability claims。
+- 写命令按 `hardware_lifecycle_write / session_freeze_write / nrt_motion_write / rt_motion_write / recovery_write / fault_injection_write / plan_compile / runtime_validation` 收口。
+- `validate_scan_plan` 是 canonical 的 plan precheck/read-contract 命令；兼容别名 `compile_scan_plan` 仍会经过 capability guard，但不会升级为写命令，也不会隐式占用控制租约。
+
+## Scan-plan adapter pipeline
+
+- preview / execution / rescan plan 在 planner 输出后统一进入 adapter pipeline。
+- 当前 pipeline 固定执行：`resolve_frames -> surface_constraints -> safety_limits -> time_parameterization -> plan_digest`。
+- adapter evidence 会写入 `scan_plan.validation_summary.adapter_pipeline`，用于后续 session freeze / rationale / replay 审计。
+
+
+## Session intelligence read policy
+
+Session-intelligence artifacts (lineage, resume, release, governance, evidence seal, and related products) are now governed by a **materialized-only read policy**. `SessionFinalizeService` / `SessionService.refresh_session_intelligence()` is the sole supported materialization phase. Read surfaces may report `not_materialized` or `legacy_fallback_only`, but they must not regenerate session-intelligence artifacts as a side effect.

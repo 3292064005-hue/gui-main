@@ -64,6 +64,7 @@ class ReconstructionArtifactWriter:
         """
         if not session_dir.exists():
             raise FileNotFoundError(session_dir)
+        input_index = dict(input_index)
         model_ready_input_index = dict(input_index.get('model_ready_input_index', {}))
         canonical_spine_curve = self._canonical_spine_curve_payload(
             spine_curve=spine_curve,
@@ -106,6 +107,30 @@ class ReconstructionArtifactWriter:
             runtime_model=json.dumps(bone_mask.get('runtime_model', {}), ensure_ascii=False),
         )
         output['bone_mask'] = bone_mask_path
+        reconstruction_volume_bundle_path = session_dir / 'derived' / 'reconstruction' / 'reconstruction_volume_bundle.npz'
+        np.savez_compressed(
+            reconstruction_volume_bundle_path,
+            coronal_vpi_image=np.asarray(coronal_vpi.get('image')),
+            coronal_contribution_map=np.asarray(coronal_vpi.get('contribution_map', np.zeros((1, 1), dtype=np.float32))),
+            bone_mask=np.asarray(bone_mask.get('mask')),
+            bone_binary_mask=np.asarray(bone_mask.get('binary_mask')),
+            pose_series=json.dumps(pose_series, ensure_ascii=False),
+            frame_anatomy_points=json.dumps(frame_anatomy_points, ensure_ascii=False),
+            lamina_candidates=json.dumps(lamina_candidates, ensure_ascii=False),
+            reconstruction_evidence=json.dumps(reconstruction_evidence, ensure_ascii=False),
+            spine_curve=json.dumps(canonical_spine_curve, ensure_ascii=False),
+            landmark_track=json.dumps(landmark_track, ensure_ascii=False),
+            reconstruction_summary=json.dumps(summary, ensure_ascii=False),
+        )
+        output['reconstruction_volume_bundle'] = reconstruction_volume_bundle_path
+        model_ready_input_index['reconstruction_volume_bundle_ref'] = str(reconstruction_volume_bundle_path)
+        model_ready_input_index['volume_reconstruction_ref'] = str(reconstruction_volume_bundle_path)
+        input_index['reconstruction_volume_bundle_ref'] = str(reconstruction_volume_bundle_path)
+        input_index['volume_reconstruction_ref'] = str(reconstruction_volume_bundle_path)
+        input_index['model_ready_input_index'] = model_ready_input_index
+        output['reconstruction_input_index'] = self.exp_manager.save_json_artifact(session_dir, 'derived/reconstruction/reconstruction_input_index.json', input_index)
+        output['model_ready_input_index'] = self.exp_manager.save_json_artifact(session_dir, 'derived/reconstruction/model_ready_input_index.json', model_ready_input_index)
+        output['training_bridge_model_ready_input_index'] = self.exp_manager.save_json_artifact(session_dir, 'derived/training_bridge/model_ready_input_index.json', model_ready_input_index)
         if prior_assisted_curve is not None:
             output['prior_assisted_curve'] = self.exp_manager.save_json_artifact(session_dir, 'derived/reconstruction/prior_assisted_curve.json', prior_assisted_curve)
         return output

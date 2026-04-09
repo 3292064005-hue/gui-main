@@ -479,9 +479,14 @@ class MockRuntimeCommandAdapterMixin:
             self._append_controller_log("ERROR", "emergency stop")
             return ReplyEnvelope(ok=True, message="emergency_stop accepted")
 
-        def _cmd_compile_scan_plan(self, payload: dict) -> ReplyEnvelope:
+        def _cmd_validate_scan_plan(self, payload: dict) -> ReplyEnvelope:
             verdict = self.compile_scan_plan_verdict(payload.get('scan_plan'), payload.get('config_snapshot'))
-            return ReplyEnvelope(ok=bool(verdict.get('final_verdict', {}).get('accepted', False)), message=str(verdict.get('detail', 'compile_scan_plan evaluated')), data={'final_verdict': verdict})
+            return ReplyEnvelope(ok=bool(verdict.get('final_verdict', {}).get('accepted', False)), message=str(verdict.get('detail', 'validate_scan_plan evaluated')), data={'final_verdict': verdict, 'canonical_command': 'validate_scan_plan'})
+
+        def _cmd_compile_scan_plan(self, payload: dict) -> ReplyEnvelope:
+            reply = self._cmd_validate_scan_plan(payload)
+            reply.data.setdefault('deprecated_alias', True)
+            return reply
 
         def _cmd_query_final_verdict(self, payload: dict) -> ReplyEnvelope:
             del payload

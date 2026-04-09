@@ -1,0 +1,29 @@
+{
+  "schema_version": "cpp.build_evidence.v2",
+  "path_basis": "relative_to_report_dir_or_symbolic",
+  "profile": "mock",
+  "with_sdk": false,
+  "with_model": false,
+  "build_dir": "<ephemeral_tmpdir_removed>",
+  "build_dir_retained": false,
+  "build_dir_kind": "ephemeral_tmpdir",
+  "build_dir_parent": "/tmp",
+  "claim_boundary": "repository/sandbox only; never implies live-controller validation",
+  "target_timeout_sec": 1,
+  "configure_returncode": 0,
+  "generator": "Ninja",
+  "configure_ok": true,
+  "target_results": {
+    "spine_robot_core_runtime": "timed_out_after_1s"
+  },
+  "syntax_only_results": {
+    "cpp_robot_core/src/sdk_robot_facade.cpp": "ok",
+    "cpp_robot_core/src/rt_motion_service.cpp": "ok",
+    "cpp_robot_core/src/core_runtime_session_execution.cpp": "ok",
+    "cpp_robot_core/src/model_authority.cpp": "ok"
+  },
+  "target_build_complete": false,
+  "syntax_only_fallback_ok": true,
+  "evidence_mode": "syntax_only_fallback",
+  "result_ok": true
+}

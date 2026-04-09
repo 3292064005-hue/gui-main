@@ -41,6 +41,8 @@ class BackendAuthoritativeContractService:
         plan_digest: Mapping[str, Any] | None = None,
         protocol_version: int | None = None,
         detail: str = "",
+        authoritative_runtime_envelope_present: bool = False,
+        envelope_origin: str = "unknown",
     ) -> dict[str, Any]:
         """Build a normalized authoritative envelope.
 
@@ -54,6 +56,9 @@ class BackendAuthoritativeContractService:
             plan_digest: Optional plan identity/digest information.
             protocol_version: Protocol version for the envelope.
             detail: Human-readable explanatory detail.
+            authoritative_runtime_envelope_present: True only when the runtime
+                explicitly published an authoritative envelope.
+            envelope_origin: Source used to derive this envelope.
 
         Returns:
             A normalized authoritative envelope dictionary.
@@ -64,16 +69,22 @@ class BackendAuthoritativeContractService:
         freeze = self.normalize_session_freeze(session_freeze)
         verdict = self.normalize_final_verdict(final_verdict)
         digest = self.normalize_plan_digest(plan_digest, session_freeze=freeze, final_verdict=verdict)
-        summary_state = self._derive_summary_state(normalized_authority, verdict, freeze)
+        summary_state = self._derive_summary_state(
+            normalized_authority,
+            verdict,
+            freeze,
+            authoritative_runtime_envelope_present=authoritative_runtime_envelope_present,
+        )
         summary_label = {
             "ready": "运行时权威快照可用",
             "degraded": "运行时权威快照降级",
             "blocked": "运行时权威快照阻塞",
         }.get(summary_state, "运行时权威快照")
+        synthesized = not bool(authoritative_runtime_envelope_present)
         return {
             "summary_state": summary_state,
             "summary_label": summary_label,
-            "detail": detail or self._default_detail(authority_source, normalized_authority),
+            "detail": detail or self._default_detail(authority_source, normalized_authority, synthesized=synthesized, envelope_origin=envelope_origin),
             "authority_source": authority_source,
             "protocol_version": self._coerce_int(protocol_version, self.DEFAULT_PROTOCOL_VERSION),
             "control_authority": normalized_authority,
@@ -82,6 +93,9 @@ class BackendAuthoritativeContractService:
             "session_freeze": freeze,
             "plan_digest": digest,
             "final_verdict": verdict,
+            "authoritative_runtime_envelope_present": bool(authoritative_runtime_envelope_present),
+            "envelope_origin": envelope_origin,
+            "synthesized": synthesized,
         }
 
     def normalize_payload(
@@ -105,19 +119,35 @@ class BackendAuthoritativeContractService:
         """
         data = self._as_dict(payload)
         if data.get("authoritative_runtime_envelope"):
-            return self.normalize_payload(
-                self._as_dict(data.get("authoritative_runtime_envelope")),
-                authority_source=authority_source,
+            authoritative = self._as_dict(data.get("authoritative_runtime_envelope"))
+            return self.build(
+                authority_source=str(authoritative.get("authority_source") or authority_source),
+                control_authority=self._as_dict(authoritative.get("control_authority")),
+                runtime_config_applied=authoritative.get("runtime_config_applied") or authoritative.get("runtime_config"),
                 desired_runtime_config=desired_runtime_config,
-                fallback_control_authority=fallback_control_authority,
+                session_freeze=authoritative.get("session_freeze"),
+                final_verdict=authoritative.get("final_verdict") or authoritative,
+                plan_digest=authoritative.get("plan_digest"),
+                protocol_version=self._coerce_int(authoritative.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
+                detail=str(authoritative.get("detail") or ""),
+                authoritative_runtime_envelope_present=True,
+                envelope_origin="authoritative_runtime_envelope",
             )
         control_plane = self._extract_control_plane(data)
         if control_plane and control_plane.get("authoritative_runtime_envelope"):
-            return self.normalize_payload(
-                self._as_dict(control_plane.get("authoritative_runtime_envelope")),
-                authority_source=authority_source,
+            authoritative = self._as_dict(control_plane.get("authoritative_runtime_envelope"))
+            return self.build(
+                authority_source=str(authoritative.get("authority_source") or control_plane.get("authority_source") or authority_source),
+                control_authority=self._as_dict(authoritative.get("control_authority")),
+                runtime_config_applied=authoritative.get("runtime_config_applied") or authoritative.get("runtime_config"),
                 desired_runtime_config=desired_runtime_config,
-                fallback_control_authority=fallback_control_authority,
+                session_freeze=authoritative.get("session_freeze"),
+                final_verdict=authoritative.get("final_verdict") or authoritative,
+                plan_digest=authoritative.get("plan_digest"),
+                protocol_version=self._coerce_int(authoritative.get("protocol_version") or control_plane.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
+                detail=str(authoritative.get("detail") or control_plane.get("detail") or ""),
+                authoritative_runtime_envelope_present=True,
+                envelope_origin="control_plane.authoritative_runtime_envelope",
             )
         authority = (
             self._as_dict(data.get("control_authority"))
@@ -130,6 +160,7 @@ class BackendAuthoritativeContractService:
             or control_plane.get("runtime_config_applied")
             or control_plane.get("runtime_config")
         )
+        origin = "payload_control_plane_synthesized" if control_plane else "payload_synthesized"
         return self.build(
             authority_source=str(data.get("authority_source") or control_plane.get("authority_source") or authority_source),
             control_authority=authority,
@@ -140,6 +171,8 @@ class BackendAuthoritativeContractService:
             plan_digest=data.get("plan_digest") or control_plane.get("plan_digest"),
             protocol_version=self._coerce_int(data.get("protocol_version") or control_plane.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
             detail=str(data.get("detail") or control_plane.get("detail") or ""),
+            authoritative_runtime_envelope_present=False,
+            envelope_origin=origin,
         )
 
     def normalize_control_authority(
@@ -187,14 +220,15 @@ class BackendAuthoritativeContractService:
         """Normalize final-verdict payloads from replies or control-plane snapshots."""
         data = self._as_dict(payload)
         if isinstance(data.get("accepted"), bool):
+            policy_state = str(data.get("policy_state", "ready" if data.get("accepted") else "idle"))
             return {
                 "accepted": bool(data.get("accepted")),
                 "reason": str(data.get("reason", "")),
-                "policy_state": str(data.get("policy_state", "idle" if data.get("accepted") is None else "ready")),
+                "policy_state": policy_state,
                 "source": str(data.get("source", data.get("authority_source", ""))),
                 "evidence_id": str(data.get("evidence_id", "")),
                 "advisory_only": bool(data.get("advisory_only", False)),
-                "summary_state": str(data.get("summary_state", data.get("policy_state", "idle"))),
+                "summary_state": str(data.get("summary_state", policy_state)),
                 "summary_label": str(data.get("summary_label", "运行时前检")),
                 "detail": str(data.get("detail", data.get("reason", ""))),
                 "blockers": list(data.get("blockers", [])) if isinstance(data.get("blockers"), list) else [],
@@ -299,6 +333,8 @@ class BackendAuthoritativeContractService:
         control_authority: Mapping[str, Any],
         final_verdict: Mapping[str, Any],
         session_freeze: Mapping[str, Any],
+        *,
+        authoritative_runtime_envelope_present: bool,
     ) -> str:
         authority_state = str(control_authority.get("summary_state", "degraded"))
         verdict_state = str(final_verdict.get("summary_state", final_verdict.get("policy_state", "ready" if final_verdict.get("accepted") else "idle")))
@@ -308,11 +344,15 @@ class BackendAuthoritativeContractService:
             return "degraded"
         if authority_state in {"degraded", "warning", "unknown"} or verdict_state in {"degraded", "warning", "idle", "unknown"}:
             return "degraded"
+        if not authoritative_runtime_envelope_present:
+            return "degraded"
         return "ready"
 
     @staticmethod
-    def _default_detail(authority_source: str, control_authority: Mapping[str, Any]) -> str:
+    def _default_detail(authority_source: str, control_authority: Mapping[str, Any], *, synthesized: bool, envelope_origin: str) -> str:
         owner = dict(control_authority.get("owner", {}))
         actor = owner.get("actor_id", "runtime-authority")
         workspace = owner.get("workspace", "runtime")
-        return f"authority_source={authority_source} owner={actor}@{workspace}"
+        if synthesized:
+            return f"authority_source={authority_source} owner={actor}@{workspace} synthesized_from={envelope_origin}; authoritative_runtime_envelope missing"
+        return f"authority_source={authority_source} owner={actor}@{workspace} envelope_origin={envelope_origin}"

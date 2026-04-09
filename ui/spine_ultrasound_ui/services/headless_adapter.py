@@ -187,6 +187,7 @@ class HeadlessAdapter(HeadlessAdapterProductsSurface):
             source=str(data.get('source', 'api')),
             preempt=bool(data.get('preempt', False)),
             preempt_reason=str(data.get('preempt_reason', '')),
+            requested_claims=data.get('requested_claims') or data.get('claims'),
         )
 
     def renew_control_lease(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:

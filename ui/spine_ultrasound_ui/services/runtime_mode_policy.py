@@ -19,7 +19,7 @@ _HEADLESS_ALLOWED = {
     "lab": frozenset({"core"}),
     "research": frozenset({"core"}),
     "clinical": frozenset({"core"}),
-    "review": frozenset({"core"}),
+    "review": frozenset({"mock", "core"}),
 }
 _DEFAULT_BY_SURFACE = {
     "desktop": {
@@ -102,9 +102,11 @@ def resolve_runtime_mode(
     Boundary behaviour:
         - When no explicit mode is provided, the resolver chooses a documented
           default based on deployment profile and runtime surface.
-        - Research/clinical/review surfaces do not silently fall back to mock;
+        - Research and clinical surfaces do not silently fall back to mock;
           callers must run a live backend that matches the intended control
           plane.
+        - Review headless defaults to ``core``; explicit ``mock`` is only for
+          read-only evidence / replay / contract inspection flows.
     """
     source = dict(env if env is not None else os.environ)
     profile = DeploymentProfileService(source).resolve(config)

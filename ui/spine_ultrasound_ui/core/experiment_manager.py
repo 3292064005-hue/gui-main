@@ -12,6 +12,51 @@ from spine_ultrasound_ui.models import ArtifactDescriptor, ProcessingStepRecord,
 from spine_ultrasound_ui.utils import ensure_dir, now_text
 from spine_ultrasound_ui.core.artifact_path_policy import infer_dependencies, infer_source_stage
 from spine_ultrasound_ui.core.artifact_schema_registry import schema_for_artifact
+from spine_ultrasound_ui.contracts.schema_validator import validate_payload_against_schema
+
+
+ENFORCED_CANONICAL_JSON_ARTIFACTS = {
+    "device_readiness",
+    "xmate_profile",
+    "patient_registration",
+    "localization_readiness",
+    "calibration_bundle",
+    "localization_freeze",
+    "manual_adjustment",
+    "source_frame_set",
+    "localization_replay_index",
+    "registration_candidate",
+    "back_roi",
+    "midline_polyline",
+    "landmarks",
+    "body_surface",
+    "guidance_targets",
+    "scan_protocol",
+}
+
+MANIFEST_CANONICAL_PAYLOAD_TO_ARTIFACT = {
+    "device_readiness": "device_readiness",
+    "robot_profile": "xmate_profile",
+    "patient_registration": "patient_registration",
+    "localization_readiness": "localization_readiness",
+    "calibration_bundle": "calibration_bundle",
+    "localization_freeze": "localization_freeze",
+    "manual_adjustment": "manual_adjustment",
+    "source_frame_set": "source_frame_set",
+    "scan_protocol": "scan_protocol",
+}
+
+MANIFEST_CANONICAL_HASH_TO_PAYLOAD = {
+    "robot_profile_hash": ("robot_profile", ()),
+    "patient_registration_hash": ("patient_registration", ("registration_hash",)),
+    "localization_readiness_hash": ("localization_readiness", ("readiness_hash",)),
+    "calibration_bundle_hash": ("calibration_bundle", ("bundle_hash",)),
+    "localization_freeze_hash": ("localization_freeze", ("freeze_hash",)),
+    "manual_adjustment_hash": ("manual_adjustment", ("hash",)),
+    "source_frame_set_hash": ("source_frame_set", ("source_frame_set_hash",)),
+}
+
+PROTECTED_MANIFEST_CANONICAL_FIELDS = set(MANIFEST_CANONICAL_PAYLOAD_TO_ARTIFACT) | set(MANIFEST_CANONICAL_HASH_TO_PAYLOAD)
 
 
 class ExperimentManager:
@@ -189,16 +234,47 @@ class ExperimentManager:
         }
 
     def append_artifact(self, session_dir: Path, name: str, artifact_path: Path) -> dict:
+        """Register an on-disk artifact after enforcing its declared schema.
+
+        Args:
+            session_dir: Locked session directory.
+            name: Canonical artifact type.
+            artifact_path: Absolute path to the JSON artifact inside the session.
+
+        Returns:
+            Updated manifest payload.
+
+        Raises:
+            RuntimeError: Raised when the artifact payload violates its declared
+                schema contract.
+        """
+        self._validate_artifact_file(name=name, artifact_path=artifact_path)
         descriptor = self._build_artifact_descriptor(session_dir, name, artifact_path)
         return self.register_artifact(session_dir, name, descriptor)
 
     def register_artifact(self, session_dir: Path, name: str, descriptor: ArtifactDescriptor | Dict[str, Any]) -> dict:
+        """Register an artifact descriptor after enforcing canonical schema boundaries.
+
+        Args:
+            session_dir: Locked session directory owning the artifact.
+            name: Canonical artifact type.
+            descriptor: Artifact descriptor payload or model.
+
+        Returns:
+            Updated manifest payload.
+
+        Raises:
+            RuntimeError: Raised when the descriptor points at a canonical JSON
+                artifact that is missing on disk or violates its declared schema.
+            KeyError: Raised when the descriptor does not provide a ``path``.
+        """
         manifest = self.load_manifest(session_dir)
         artifacts = dict(manifest.get("artifacts", {}))
         artifact_registry = dict(manifest.get("artifact_registry", {}))
         payload = descriptor.to_dict() if isinstance(descriptor, ArtifactDescriptor) else dict(descriptor)
         payload.setdefault("artifact_id", name)
         payload.setdefault("schema", schema_for_artifact(name))
+        self._validate_artifact_registration(session_dir=session_dir, name=name, payload=payload)
         artifacts[name] = payload["path"]
         artifact_registry[name] = payload
         manifest["artifacts"] = artifacts
@@ -215,8 +291,104 @@ class ExperimentManager:
         return manifest
 
     def update_manifest(self, session_dir: Path, **updates: Any) -> dict:
+        """Update non-canonical manifest metadata.
+
+        This generic update path is intentionally restricted to ordinary manifest
+        metadata. Canonical artifact snapshots, their hash fields, and artifact
+        registry data must flow through dedicated helpers so the repository keeps
+        a single schema-enforced boundary for authoritative artifacts.
+
+        Args:
+            session_dir: Locked session directory owning the manifest.
+            **updates: Top-level manifest fields to update.
+
+        Returns:
+            Updated manifest payload.
+
+        Raises:
+            RuntimeError: Raised when callers attempt to mutate artifact registry
+                fields or embedded canonical snapshot/hash fields through the
+                generic manifest update path.
+        """
+        forbidden = {
+            key
+            for key in (set(("artifacts", "artifact_registry")) | PROTECTED_MANIFEST_CANONICAL_FIELDS)
+            if key in updates
+        }
+        if forbidden:
+            names = ', '.join(sorted(forbidden))
+            raise RuntimeError(
+                'update_manifest cannot modify '
+                f'{names}; use append_artifact/register_artifact for artifact registry changes '
+                'and sync_canonical_manifest_fields for canonical manifest snapshots'
+            )
         manifest = self.load_manifest(session_dir)
         manifest.update(updates)
+        self._write_manifest(session_dir, SessionManifest(**manifest))
+        return manifest
+
+    def sync_canonical_manifest_fields(self, session_dir: Path, **updates: Any) -> dict:
+        """Synchronize embedded canonical manifest snapshots with registered artifacts.
+
+        Args:
+            session_dir: Locked session directory owning the manifest.
+            **updates: Canonical manifest payload fields and their companion hash
+                fields. Hash-only updates are forbidden because the manifest hash
+                must always be derived from the synchronized payload.
+
+        Returns:
+            Updated manifest payload.
+
+        Raises:
+            RuntimeError: Raised when callers provide unsupported fields, when a
+                canonical artifact is missing, when payloads diverge from the
+                registered on-disk artifact, when supplied hash fields do not
+                match the payload, or when callers attempt to update a hash field
+                without the corresponding payload.
+        """
+        unsupported = set(updates) - PROTECTED_MANIFEST_CANONICAL_FIELDS
+        if unsupported:
+            names = ', '.join(sorted(unsupported))
+            raise RuntimeError(
+                f'sync_canonical_manifest_fields only accepts canonical manifest snapshot/hash fields, got: {names}'
+            )
+        hash_only_fields = [
+            hash_field
+            for hash_field, (payload_field, _) in MANIFEST_CANONICAL_HASH_TO_PAYLOAD.items()
+            if hash_field in updates and payload_field not in updates
+        ]
+        if hash_only_fields:
+            names = ', '.join(sorted(hash_only_fields))
+            raise RuntimeError(
+                'sync_canonical_manifest_fields requires the matching canonical payload when updating '
+                f'{names}'
+            )
+        manifest = self.load_manifest(session_dir)
+        normalized_updates = dict(updates)
+        for field_name, artifact_name in MANIFEST_CANONICAL_PAYLOAD_TO_ARTIFACT.items():
+            if field_name not in normalized_updates:
+                continue
+            payload = normalized_updates[field_name]
+            if not isinstance(payload, dict):
+                raise RuntimeError(f'{field_name} must be a JSON object for canonical manifest synchronization')
+            self._validate_manifest_canonical_payload(
+                session_dir=session_dir,
+                manifest=manifest,
+                field_name=field_name,
+                artifact_name=artifact_name,
+                payload=payload,
+            )
+            for hash_field, (payload_field, preferred_keys) in MANIFEST_CANONICAL_HASH_TO_PAYLOAD.items():
+                if payload_field != field_name:
+                    continue
+                expected_hash = self._canonical_payload_hash(payload, preferred_keys=preferred_keys)
+                provided_hash = normalized_updates.get(hash_field)
+                if provided_hash not in (None, "", expected_hash):
+                    raise RuntimeError(
+                        f'{hash_field} does not match the canonical payload for {field_name}'
+                    )
+                normalized_updates[hash_field] = expected_hash
+        manifest.update(normalized_updates)
         self._write_manifest(session_dir, SessionManifest(**manifest))
         return manifest
 
@@ -242,6 +414,126 @@ class ExperimentManager:
     def load_json_artifact(self, session_dir: Path, relative_path: str) -> Dict[str, Any]:
         target = session_dir / relative_path
         return json.loads(target.read_text(encoding="utf-8"))
+
+
+    def _validate_manifest_canonical_payload(
+        self,
+        *,
+        session_dir: Path,
+        manifest: Dict[str, Any],
+        field_name: str,
+        artifact_name: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """Validate embedded canonical manifest payloads against registered artifacts.
+
+        Args:
+            session_dir: Locked session directory owning the manifest.
+            manifest: Current normalized manifest payload.
+            field_name: Manifest field receiving the canonical payload.
+            artifact_name: Canonical artifact type backing the manifest field.
+            payload: Candidate manifest payload.
+
+        Raises:
+            RuntimeError: Raised when the canonical artifact is missing, when the
+                payload violates its schema, or when it diverges from the
+                registered artifact file on disk.
+        """
+        schema_name = schema_for_artifact(artifact_name)
+        if schema_name:
+            validate_payload_against_schema(schema_name=schema_name, payload=payload)
+        relative_path = str(manifest.get('artifacts', {}).get(artifact_name, '') or '').strip()
+        if not relative_path:
+            raise RuntimeError(
+                f'canonical manifest field {field_name} requires registered artifact {artifact_name}'
+            )
+        artifact_path = session_dir / relative_path
+        if not artifact_path.exists() or not artifact_path.is_file():
+            raise RuntimeError(
+                f'canonical manifest field {field_name} is missing artifact file {artifact_path}'
+            )
+        try:
+            artifact_payload = json.loads(artifact_path.read_text(encoding='utf-8'))
+        except Exception as exc:
+            raise RuntimeError(
+                f'canonical manifest field {field_name} cannot read artifact file {artifact_path}: {exc}'
+            ) from exc
+        if artifact_payload != payload:
+            raise RuntimeError(
+                f'canonical manifest field {field_name} diverges from registered artifact {artifact_name}'
+            )
+
+    @staticmethod
+    def _canonical_payload_hash(payload: Dict[str, Any], *, preferred_keys: tuple[str, ...]) -> str:
+        """Compute the canonical hash for manifest-embedded payloads.
+
+        Args:
+            payload: Canonical JSON payload.
+            preferred_keys: Optional payload keys whose non-empty value should be
+                used directly before falling back to normalized JSON hashing.
+
+        Returns:
+            Stable hash string or an empty string for empty payloads.
+        """
+        for key in preferred_keys:
+            value = str(payload.get(key, '') or '').strip()
+            if value:
+                return value
+        if not payload:
+            return ''
+        blob = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')
+        return hashlib.sha256(blob).hexdigest()
+
+    def _validate_artifact_registration(self, *, session_dir: Path, name: str, payload: Dict[str, Any]) -> None:
+        """Validate registration payloads that target canonical JSON artifacts.
+
+        Args:
+            session_dir: Locked session directory owning the artifact.
+            name: Canonical artifact type.
+            payload: Artifact descriptor payload destined for the manifest.
+
+        Raises:
+            KeyError: Raised when the descriptor omits ``path``.
+            RuntimeError: Raised when the referenced artifact file is missing or
+                violates the enforced canonical schema contract.
+        """
+        if name not in ENFORCED_CANONICAL_JSON_ARTIFACTS:
+            return
+        relative_path = str(payload.get("path", "") or "").strip()
+        if not relative_path:
+            raise KeyError(f"artifact descriptor for {name} is missing path")
+        artifact_path = Path(relative_path)
+        if not artifact_path.is_absolute():
+            artifact_path = session_dir / artifact_path
+        if not artifact_path.exists() or not artifact_path.is_file():
+            raise RuntimeError(f"artifact registration failed for {name}: missing artifact file {artifact_path}")
+        self._validate_artifact_file(name=name, artifact_path=artifact_path)
+
+    def _validate_artifact_file(self, *, name: str, artifact_path: Path) -> None:
+        """Validate a JSON artifact against its registered canonical schema.
+
+        Args:
+            name: Canonical artifact type.
+            artifact_path: On-disk JSON artifact path.
+
+        Raises:
+            RuntimeError: Raised when the artifact payload is not valid for the
+                registered schema.
+        """
+        if name not in ENFORCED_CANONICAL_JSON_ARTIFACTS:
+            return
+        schema_name = schema_for_artifact(name)
+        if not schema_name:
+            return
+        try:
+            payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+            validate_payload_against_schema(schema_name=schema_name, payload=payload)
+        except Exception as exc:
+            try:
+                artifact_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise RuntimeError(f'artifact schema validation failed for {name}: {exc}') from exc
 
     def _build_artifact_descriptor(self, session_dir: Path, name: str, artifact_path: Path) -> ArtifactDescriptor:
         mime_type = mimetypes.guess_type(str(artifact_path))[0] or "application/octet-stream"

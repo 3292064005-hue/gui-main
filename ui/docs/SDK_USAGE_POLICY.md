@@ -6,7 +6,7 @@
 - Direct torque control is reserved for advanced research mode only.
 - Always use a single control authority.
 
-- Compile/precheck verdicts must be consumed from the runtime contract kernel (`compile_scan_plan` / `query_final_verdict`) rather than recomputed as final truth in Desktop.
+- Compile/precheck verdicts must be consumed from the runtime contract kernel (`validate_scan_plan` / `query_final_verdict`). `compile_scan_plan` remains a compatibility alias and must not be treated as the canonical command name in Desktop or API code.
 - Development TLS material must be generated locally under `configs/tls/runtime/`; do not commit certificates or keys to the repository root.
 
 ## Controlled SDK Ports

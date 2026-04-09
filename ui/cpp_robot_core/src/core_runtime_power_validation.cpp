@@ -1,5 +1,8 @@
 #include "robot_core/core_runtime.h"
 
+#include <functional>
+#include <unordered_map>
+
 #include "json_utils.h"
 
 namespace robot_core {
@@ -7,71 +10,91 @@ namespace robot_core {
 std::string CoreRuntime::handlePowerModeCommand(const std::string& request_id, const std::string& line) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
   const auto command = json::extractString(line, "command");
-  if (command == "power_on") {
-    if (!controller_online_) {
-      return replyJson(request_id, false, "robot not connected");
-    }
-    if (!sdk_robot_.lifecyclePort().setPower(true)) {
-      return replyJson(request_id, false, "power_on failed");
-    }
-    powered_ = true;
-    execution_state_ = RobotCoreState::Powered;
-    return replyJson(request_id, true, "power_on accepted");
+  using PowerHandler = std::function<std::string(CoreRuntime*, const std::string&)>;
+  static const std::unordered_map<std::string, PowerHandler> handlers = {
+      {"power_on", [](CoreRuntime* self, const std::string& req) {
+         if (!self->controller_online_) {
+           return self->replyJson(req, false, "robot not connected");
+         }
+         if (!self->sdk_robot_.lifecyclePort().setPower(true)) {
+           return self->replyJson(req, false, "power_on failed");
+         }
+         self->powered_ = true;
+         self->execution_state_ = RobotCoreState::Powered;
+         return self->replyJson(req, true, "power_on accepted");
+       }},
+      {"power_off", [](CoreRuntime* self, const std::string& req) {
+         if (self->controller_online_ && !self->sdk_robot_.lifecyclePort().setPower(false)) {
+           return self->replyJson(req, false, "power_off failed");
+         }
+         self->powered_ = false;
+         self->automatic_mode_ = false;
+         self->execution_state_ = self->controller_online_ ? RobotCoreState::Connected : RobotCoreState::Disconnected;
+         return self->replyJson(req, true, "power_off accepted");
+       }},
+      {"set_auto_mode", [](CoreRuntime* self, const std::string& req) {
+         if (!self->powered_) {
+           return self->replyJson(req, false, "robot not powered");
+         }
+         if (!self->sdk_robot_.lifecyclePort().setAutoMode()) {
+           return self->replyJson(req, false, "set_auto_mode failed");
+         }
+         self->automatic_mode_ = true;
+         self->execution_state_ = RobotCoreState::AutoReady;
+         return self->replyJson(req, true, "set_auto_mode accepted");
+       }},
+      {"set_manual_mode", [](CoreRuntime* self, const std::string& req) {
+         if (self->controller_online_) {
+           self->sdk_robot_.lifecyclePort().setManualMode();
+         }
+         self->automatic_mode_ = false;
+         self->execution_state_ = self->powered_ ? RobotCoreState::Powered : RobotCoreState::Connected;
+         return self->replyJson(req, true, "set_manual_mode accepted");
+       }},
+  };
+  const auto it = handlers.find(command);
+  if (it == handlers.end()) {
+    return replyJson(request_id, false, "unsupported command: " + command);
   }
-  if (command == "power_off") {
-    if (controller_online_ && !sdk_robot_.lifecyclePort().setPower(false)) {
-      return replyJson(request_id, false, "power_off failed");
-    }
-    powered_ = false;
-    automatic_mode_ = false;
-    execution_state_ = controller_online_ ? RobotCoreState::Connected : RobotCoreState::Disconnected;
-    return replyJson(request_id, true, "power_off accepted");
-  }
-  if (command == "set_auto_mode") {
-    if (!powered_) {
-      return replyJson(request_id, false, "robot not powered");
-    }
-    if (!sdk_robot_.lifecyclePort().setAutoMode()) {
-      return replyJson(request_id, false, "set_auto_mode failed");
-    }
-    automatic_mode_ = true;
-    execution_state_ = RobotCoreState::AutoReady;
-    return replyJson(request_id, true, "set_auto_mode accepted");
-  }
-  if (command == "set_manual_mode") {
-    if (controller_online_) {
-      sdk_robot_.lifecyclePort().setManualMode();
-    }
-    automatic_mode_ = false;
-    execution_state_ = powered_ ? RobotCoreState::Powered : RobotCoreState::Connected;
-    return replyJson(request_id, true, "set_manual_mode accepted");
-  }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return it->second(this, request_id);
 }
 
 std::string CoreRuntime::handleValidationCommand(const std::string& request_id, const std::string& line) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
   const auto command = json::extractString(line, "command");
-  if (command == "validate_setup") {
-    const auto safety = evaluateSafetyLocked();
-    const auto data_json = json::object({
-        json::field("safe_to_arm", json::boolLiteral(safety.safe_to_arm)),
-        json::field("safe_to_scan", json::boolLiteral(safety.safe_to_scan)),
-        json::field("active_interlocks", json::stringArray(safety.active_interlocks)),
-    });
-    return replyJson(request_id, safety.safe_to_arm, safety.safe_to_arm ? "setup validated" : "setup invalid", data_json);
+  using ValidationHandler = std::function<std::string(CoreRuntime*, const std::string&, const std::string&)>;
+  static const std::unordered_map<std::string, ValidationHandler> handlers = {
+      {"validate_setup", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         const auto safety = self->evaluateSafetyLocked();
+         const auto data_json = json::object({
+             json::field("safe_to_arm", json::boolLiteral(safety.safe_to_arm)),
+             json::field("safe_to_scan", json::boolLiteral(safety.safe_to_scan)),
+             json::field("active_interlocks", json::stringArray(safety.active_interlocks)),
+         });
+         return self->replyJson(req, safety.safe_to_arm, safety.safe_to_arm ? "setup validated" : "setup invalid", data_json);
+       }},
+      {"validate_scan_plan", [](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         const auto verdict = self->compileScanPlanVerdictLocked(json_line);
+         self->last_final_verdict_ = verdict;
+         const auto verdict_json = self->finalVerdictJson(verdict);
+         return self->replyJson(req, verdict.accepted, verdict.accepted ? "validate_scan_plan accepted" : "validate_scan_plan rejected", json::object({json::field("final_verdict", verdict_json), json::field("canonical_command", json::quote("validate_scan_plan"))}));
+       }},
+      {"compile_scan_plan", [](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         const auto verdict = self->compileScanPlanVerdictLocked(json_line);
+         self->last_final_verdict_ = verdict;
+         const auto verdict_json = self->finalVerdictJson(verdict);
+         return self->replyJson(req, verdict.accepted, verdict.accepted ? "compile_scan_plan accepted" : "compile_scan_plan rejected", json::object({json::field("final_verdict", verdict_json), json::field("canonical_command", json::quote("validate_scan_plan")), json::field("deprecated_alias", json::boolLiteral(true))}));
+       }},
+      {"query_final_verdict", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         const auto verdict_json = self->finalVerdictJson(self->last_final_verdict_);
+         return self->replyJson(req, true, "final verdict snapshot", json::object({json::field("final_verdict", verdict_json)}));
+       }},
+  };
+  const auto it = handlers.find(command);
+  if (it == handlers.end()) {
+    return replyJson(request_id, false, "unsupported command: " + command);
   }
-  if (command == "compile_scan_plan") {
-    const auto verdict = compileScanPlanVerdictLocked(line);
-    last_final_verdict_ = verdict;
-    const auto verdict_json = finalVerdictJson(verdict);
-    return replyJson(request_id, verdict.accepted, verdict.accepted ? "compile_scan_plan accepted" : "compile_scan_plan rejected", json::object({json::field("final_verdict", verdict_json)}));
-  }
-  if (command == "query_final_verdict") {
-    const auto verdict_json = finalVerdictJson(last_final_verdict_);
-    return replyJson(request_id, true, "final verdict snapshot", json::object({json::field("final_verdict", verdict_json)}));
-  }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return it->second(this, request_id, line);
 }
 
 }  // namespace robot_core

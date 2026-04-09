@@ -292,6 +292,13 @@ struct RobotStateSnapshot {
   std::vector<double> cart_force;
   std::string last_event{"-"};
   std::string last_controller_log{"-"};
+  std::string runtime_source{"unknown"};
+  std::string pose_source{"unavailable"};
+  std::string force_source{"unavailable"};
+  bool pose_available{false};
+  bool force_available{false};
+  bool pose_authoritative{false};
+  bool force_authoritative{false};
 };
 
 struct ContactTelemetry {
@@ -299,6 +306,12 @@ struct ContactTelemetry {
   double confidence{0.0};
   double pressure_current{0.0};
   std::string recommended_action{"IDLE"};
+  std::string pressure_source{"unavailable"};
+  std::string quality_source{"unavailable"};
+  bool pressure_available{false};
+  bool quality_available{false};
+  bool authoritative{false};
+  bool contact_stable{false};
 };
 
 struct ScanProgress {
@@ -313,6 +326,9 @@ struct QualityFeedback {
   double feature_confidence{0.0};
   double quality_score{0.0};
   bool need_resample{false};
+  std::string source{"unavailable"};
+  bool available{false};
+  bool authoritative{false};
 };
 
 struct AlarmEvent {

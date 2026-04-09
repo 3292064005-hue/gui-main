@@ -63,11 +63,13 @@ def build_app_controller_composition(*, exp_root: Path, runtime_config_path: Pat
         Fully materialized dependency bundle consumed by ``AppController``.
     """
     config_service = ConfigService()
+    config_profile_service = ClinicalConfigService()
     persistence = RuntimePersistenceService(
         config_service=config_service,
         runtime_config_path=runtime_config_path,
         ui_prefs_path=runtime_dir / "ui_preferences.json",
         session_meta_path=runtime_dir / "session_meta.json",
+        profile_service=config_profile_service,
     )
     telemetry = TelemetryStore()
     experiment_manager = ExperimentManager(exp_root)
@@ -76,7 +78,6 @@ def build_app_controller_composition(*, exp_root: Path, runtime_config_path: Pat
     postprocess_service = PostprocessService(experiment_manager)
     guidance_review_service = GuidanceReviewService()
     sdk_service = SdkCapabilityService()
-    config_profile_service = ClinicalConfigService()
     sdk_runtime_service = SdkRuntimeAssetService()
     runtime_verdict_service = RuntimeVerdictKernelService()
     session_governance_service = SessionGovernanceService()

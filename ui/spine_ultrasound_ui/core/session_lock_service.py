@@ -213,7 +213,7 @@ class SessionLockService:
             payload = self._guidance_artifact_payload(artifact_name=artifact_name, registration_payload=registration_payload)
             path = self.exp_manager.save_json_artifact(session_dir, relative_path, payload)
             self.exp_manager.append_artifact(session_dir, artifact_name, path)
-        self.exp_manager.update_manifest(
+        self.exp_manager.sync_canonical_manifest_fields(
             session_dir,
             device_readiness=readiness,
             robot_profile=robot_profile,
@@ -224,14 +224,17 @@ class SessionLockService:
             manual_adjustment=manual_adjustment_payload,
             source_frame_set=source_frame_set_payload,
             scan_protocol=scan_protocol,
-            control_authority=control_authority or {},
-            guidance_algorithm_registry=guidance_registry_payload,
-            guidance_processing_steps=guidance_steps_payload,
             localization_readiness_hash=self._canonical_hash(readiness_payload, preferred_keys=("readiness_hash",)),
             calibration_bundle_hash=self._canonical_hash(calibration_payload, preferred_keys=("bundle_hash",)),
             localization_freeze_hash=self._canonical_hash(localization_freeze, preferred_keys=("freeze_hash",)),
             manual_adjustment_hash=self._canonical_hash(manual_adjustment_payload, preferred_keys=("hash",)),
             source_frame_set_hash=self._canonical_hash(source_frame_set_payload, preferred_keys=("source_frame_set_hash",)),
+        )
+        self.exp_manager.update_manifest(
+            session_dir,
+            control_authority=control_authority or {},
+            guidance_algorithm_registry=guidance_registry_payload,
+            guidance_processing_steps=guidance_steps_payload,
             guidance_version="camera_guidance_v1",
             guidance_mode="guidance_only",
             guidance_source_type=str(registration_payload.get("source_type", "")),
@@ -346,15 +349,24 @@ class SessionLockService:
         payload["freeze_hash"] = self._hash_payload(payload)
         return payload
 
-    @staticmethod
-    def _guidance_artifact_payload(*, artifact_name: str, registration_payload: dict[str, Any]) -> dict[str, Any]:
+    @classmethod
+    def _guidance_artifact_payload(cls, *, artifact_name: str, registration_payload: dict[str, Any]) -> dict[str, Any]:
         if artifact_name == "registration_candidate":
-            return {
+            payload = {
+                "schema_version": "1.0",
+                "candidate_id": f"candidate::{registration_payload.get('registration_id', 'registration')}::{registration_payload.get('source_type', 'camera_only')}",
+                "source_type": str(registration_payload.get("source_type", "camera_only")),
                 "patient_frame": dict(registration_payload.get("patient_frame", {})),
                 "scan_corridor": dict(registration_payload.get("scan_corridor", {})),
                 "landmarks": list(registration_payload.get("landmarks", [])),
                 "quality_metrics": dict(registration_payload.get("quality_metrics", {})),
+                "confidence": float(registration_payload.get("registration_quality", {}).get("overall_confidence", 0.0) or 0.0),
+                "registration_covariance": dict(registration_payload.get("registration_covariance", {})),
+                "usable_segment_count": len(list(registration_payload.get("usable_segments", []))),
+                "algorithm_bundle_hash": str(registration_payload.get("algorithm_bundle_hash", "")),
             }
+            payload["candidate_hash"] = cls._hash_payload(payload)
+            return payload
         if artifact_name == "back_roi":
             return dict(registration_payload.get("back_roi", {}))
         if artifact_name == "midline_polyline":

@@ -49,6 +49,13 @@ std::string robotStateJson(const RobotStateSnapshot& state) {
       field("cart_force", array(state.cart_force)),
       field("last_event", quote(state.last_event)),
       field("last_controller_log", quote(state.last_controller_log)),
+      field("runtime_source", quote(state.runtime_source)),
+      field("pose_source", quote(state.pose_source)),
+      field("force_source", quote(state.force_source)),
+      field("pose_available", boolLiteral(state.pose_available)),
+      field("force_available", boolLiteral(state.force_available)),
+      field("pose_authoritative", boolLiteral(state.pose_authoritative)),
+      field("force_authoritative", boolLiteral(state.force_authoritative)),
   });
 }
 
@@ -59,6 +66,12 @@ std::string contactJson(const ContactTelemetry& contact) {
       field("confidence", formatDouble(contact.confidence)),
       field("pressure_current", formatDouble(contact.pressure_current)),
       field("recommended_action", quote(contact.recommended_action)),
+      field("pressure_source", quote(contact.pressure_source)),
+      field("quality_source", quote(contact.quality_source)),
+      field("pressure_available", boolLiteral(contact.pressure_available)),
+      field("quality_available", boolLiteral(contact.quality_available)),
+      field("authoritative", boolLiteral(contact.authoritative)),
+      field("contact_stable", boolLiteral(contact.contact_stable)),
   });
 }
 
@@ -161,7 +174,10 @@ void RecordingService::recordAlarm(const AlarmEvent& alarm) {
   if (!active()) {
     return;
   }
-  append(session_dir_ / "raw" / "core" / "alarm_event.jsonl", alarmJson(alarm));
+  QueuedSample sample;
+  sample.kind = SampleKind::AlarmEvent;
+  sample.alarm_event = alarm;
+  enqueueSample(sample);
 }
 
 void RecordingService::append(const std::filesystem::path& path, const std::string& payload_json) {
@@ -188,6 +204,9 @@ void RecordingService::recordQueuedSample(const QueuedSample& sample) {
       break;
     case SampleKind::ScanProgress:
       append(session_dir_ / "raw" / "core" / "scan_progress.jsonl", progressJson(sample.core_state, sample.scan_progress));
+      break;
+    case SampleKind::AlarmEvent:
+      append(session_dir_ / "raw" / "core" / "alarm_event.jsonl", alarmJson(sample.alarm_event));
       break;
   }
 }

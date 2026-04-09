@@ -1,3 +1,51 @@
+## v21 - proof portability and readiness-state alignment
+
+- Reworked `write_verification_report.py` and `write_acceptance_summary.py` so packaged proof members are recorded with paths relative to the proof-file directory instead of leaking build-machine absolute paths or stale versioned work directories.
+- Adjusted `RuntimeReadinessManifestService` so the top-level manifest no longer reports `ready` while `doctor_snapshot` remains blocked; repository/sandbox readiness now degrades to `warning` until live environment blockers are cleared.
+- Normalized repository-owned paths emitted by `SdkEnvironmentDoctorService` to package-relative form while keeping host-only tool paths explicit.
+- Added regression coverage for portable proof paths and the readiness-state downgrade rule, then regenerated the machine-readable repository-proof bundle.
+
+## v20 - verification evidence closure and delivery hygiene
+
+- Removed duplicate `using namespace sdk_robot_facade_internal;` directives across the `sdk_robot_facade*` translation units so the lifecycle/runtime source set no longer carries avoidable namespace hygiene debt.
+- Hardened `scripts/verify_cpp_build_evidence.py` with bounded per-target timeouts and explicit `evidence_mode` / fallback fields, so sandbox repository proof now closes with a truthful `syntax_only_fallback` report instead of hanging or being summarized as a full C++ build.
+- Added `tests/test_cpp_build_evidence_report.py` to keep the bounded fallback evidence path executable and claim-safe.
+- Added machine-readable repository-proof artifacts under `artifacts/verification/sandbox_repository_proof/`, including the readiness manifest, verification execution report, build evidence report, acceptance summary, and the focused pytest log for this delivery.
+
+## v19 - canonical lifecycle binding closure
+
+- Moved `SdkRobotFacade` constructor plus authoritative `connect()/disconnect()` lifecycle ownership back into `cpp_robot_core/src/sdk_robot_facade.cpp`, so the canonical source file now carries the live-binding truth contract expected by the mainline gates.
+- Hardened the live-bind failure path to explicitly reassert `binding_detail_ = "live_binding_failed"` after exception capture, preventing any accidental regression toward contract-shell-success semantics after a failed vendor bind attempt.
+- Added function-level boundary documentation for the lifecycle entrypoints and revalidated the mock-profile C++ build / targeted runtime contract suites against the new source layout.
+
+## v18 - RT recorder purity, canonical verdict API, and review-mode lease hardening
+
+- Switched `RecordingService.recordAlarm()` to the same asynchronous queue/worker path used by robot-state/contact/progress samples, so `CoreRuntime::queueAlarmLocked()` no longer performs inline JSON/file I/O under the runtime state mutex.
+- Added canonical backend API `resolve_final_verdict(plan, config, read_only=...)` and moved `RuntimeVerdictKernelService` to that single authority surface instead of probing multiple legacy verdict methods.
+- Guarded `ApiBridgeBackend.send_command()` and startup lease acquisition with the deployment profile and `include_lease` intent so desktop `review` mode and read-only verdict queries no longer mutate API-side control authority.
+- Hardened `ApiBridgeVerdictService` so failed `query_final_verdict` / `validate_scan_plan` replies raise typed runtime errors instead of silently falling back to stale cached verdicts.
+- Split API-bridge lease handling and final-verdict resolution into dedicated services (`ApiBridgeLeaseService`, `ApiBridgeVerdictService`) while preserving the external backend façade.
+- Hardened architecture gates/tests so async alarm persistence and canonical verdict resolution cannot silently regress.
+
+## Audit closeout: verification-boundary hardening
+- Added `docs/VERIFICATION_BOUNDARY.md` to separate repository proof, profile proof, and live-controller/HIL validation claims.
+- Added `scripts/check_verification_boundary.py` and wired it into repository gates so README/docs cannot silently overstate validation scope.
+- Updated `scripts/verify_mainline.sh` to emit phase-scope notes, preventing `VERIFY_PHASE=python` or SDK-off runs from being misreported as HIL / prod / live-controller validation.
+
+## v16 - audit remediation and packaging closure
+
+- Restored the repository-owned `tools/monai_label_app/` package so offline MONAI Label skeleton imports, descriptors, and server-task tests are present in the delivery payload instead of being documented-but-missing.
+- Fixed `scripts/check_repo_hygiene.sh` execute permissions so `VERIFY_PHASE=python ./scripts/verify_mainline.sh` no longer fails before running repository gates.
+- Kept the MONAI Label tooling import-safe without introducing runtime MONAI dependencies into the desktop path.
+
+## v15 - governance projection decoupling
+
+- Split desktop governance refresh paths into explicit full / backend-link / bridge-observability / session-governance projections so high-frequency status emission no longer recompiles runtime verdicts or re-reads session artifacts.
+- Added read-only final-verdict snapshot APIs across backends and kept plan compilation as an explicit path instead of coupling it to every status-facing read.
+- Enabled `review` + `headless` + `mock` for read-only contract/evidence inspection while preserving profile-level write blocking.
+- Added filesystem-signature caching to `SessionGovernanceService` to bound repeated operator refresh cost for unchanged sessions.
+- Hardened controller semantics so `stop_scan` is explicitly treated as the UI alias of canonical `safe_retreat`.
+
 ## v14 - authority/runtime bridge convergence
 
 - Extracted `AppRuntimeBridge` to centralize telemetry handling, guarded command behavior, governance refresh, local alarm emission, and session product refresh away from `AppController`.
@@ -119,3 +167,8 @@
 - Split `api_server.py` into modular routers under `spine_ultrasound_ui/api_routes/`.
 - Removed legacy frontend `store/` and `stores/` shim directories; `src/state/` is now the canonical state entrypoint.
 - Clarified legacy Qt event bus naming with `core/qt_signal_bus.py`.
+
+## v22 - portable proof-chain closure
+- make C++ build evidence report path-safe for packaged delivery by replacing ephemeral tmp build dirs with symbolic metadata rather than host-specific absolute paths
+- enrich acceptance summary with verification boundary / reported tiers / build evidence mode so package consumers can inspect the claim boundary without chasing three JSON files
+- refresh sandbox proof README wording to stay version-neutral

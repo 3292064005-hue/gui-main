@@ -12,6 +12,7 @@ This document freezes the mainline real-time kernel contract used by `cpp_robot_
 - Outer execution lanes are split into `command`, `query`, and `rt_control` dispatch paths so query traffic does not share the same outer mutex with mutating commands or RT maintenance loops
 - Runtime commands `seek_contact`, `start_scan`, `pause_scan`, `resume_scan`, and `safe_retreat` are explicitly routed through the `rt_control` lane rather than the generic command lane
 - No blocking I/O, dynamic allocation, JSON formatting, or UI callbacks inside the measured RT loop
+- Alarm events are handed off to the asynchronous recorder queue under `state_mutex_`; JSON serialization and file append happen only on the recorder worker thread
 - All runtime phases and guards are evaluated inside the C++ kernel only
 
 ## Phases

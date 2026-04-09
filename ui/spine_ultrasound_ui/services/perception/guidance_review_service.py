@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -11,12 +12,7 @@ from spine_ultrasound_ui.services.planning.types import LocalizationResult
 
 
 class GuidanceReviewService:
-    """Approve or amend review-required guidance bundles before session freeze.
-
-    This service closes the operator review loop for guidance bundles that are
-    intentionally blocked from direct freeze until a human approves or adjusts
-    them.
-    """
+    """Approve or amend review-required guidance bundles before session freeze."""
 
     def __init__(
         self,
@@ -37,21 +33,6 @@ class GuidanceReviewService:
         adjustments: list[dict[str, Any]] | None = None,
         reason: str = 'manual_guidance_review',
     ) -> LocalizationResult:
-        """Approve a review-required localization bundle.
-
-        Args:
-            localization_result: Existing localization result requiring review.
-            operator_id: Operator identity recorded in the approval artifact.
-            adjustments: Optional additional manual deltas to record.
-            reason: Review reason stored in the manual adjustment log.
-
-        Returns:
-            Updated localization result with review approval applied.
-
-        Raises:
-            RuntimeError: If the localization bundle is blocked or incomplete.
-            ValueError: If the adjustment payload is malformed.
-        """
         readiness = dict(localization_result.localization_readiness)
         if not readiness:
             raise RuntimeError('localization readiness payload is required for review approval')
@@ -116,8 +97,24 @@ class GuidanceReviewService:
         device_gate = dict(readiness.get('device_gate', {}))
         frame_fresh = bool(device_gate.get('frame_fresh', True))
         return {
-            'camera': {'online': bool(device_gate.get('camera_online', True)), 'fresh': frame_fresh},
-            'robot': {'online': bool(device_gate.get('robot_online', True)), 'fresh': True},
-            'ultrasound': {'online': bool(device_gate.get('ultrasound_online', True)), 'fresh': True},
-            'pressure': {'online': bool(device_gate.get('pressure_online', True)), 'fresh': True},
+            'camera': {
+                'online': bool(device_gate.get('camera_online', True)),
+                'fresh': frame_fresh,
+                'fact_source': str(device_gate.get('camera_fact_source', 'runtime_snapshot')),
+            },
+            'robot': {
+                'online': bool(device_gate.get('robot_online', True)),
+                'fresh': bool(device_gate.get('robot_online', True)),
+                'fact_source': str(device_gate.get('robot_fact_source', 'runtime_snapshot')),
+            },
+            'ultrasound': {
+                'online': bool(device_gate.get('ultrasound_online', True)),
+                'fresh': bool(device_gate.get('ultrasound_online', True)),
+                'fact_source': str(device_gate.get('ultrasound_fact_source', 'runtime_snapshot')),
+            },
+            'pressure': {
+                'online': bool(device_gate.get('pressure_online', True)),
+                'fresh': bool(device_gate.get('pressure_online', True)),
+                'fact_source': str(device_gate.get('pressure_fact_source', 'runtime_snapshot')),
+            },
         }

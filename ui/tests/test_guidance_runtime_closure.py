@@ -23,6 +23,15 @@ def _app():
     return app
 
 
+def _device_roster() -> dict:
+    return {
+        "robot": {"online": True, "fresh": True, "fact_source": "test"},
+        "camera": {"online": True, "fresh": True, "fact_source": "test"},
+        "ultrasound": {"online": True, "fresh": True, "fact_source": "test"},
+        "pressure": {"online": True, "fresh": True, "fact_source": "test"},
+    }
+
+
 def _make_guidance_frame(path: Path, *, center_offset_px: int) -> None:
     height, width = 120, 160
     pixels = np.zeros((height, width), dtype=np.float32)
@@ -63,6 +72,31 @@ def test_guidance_runtime_reads_filesystem_frames(tmp_path: Path) -> None:
 
 
 
+
+def test_localization_pipeline_preserves_runtime_device_fact_surface() -> None:
+    config = RuntimeConfig()
+    pipeline = LocalizationPipeline()
+    class _Exp:
+        exp_id = 'EXP-FACTS'
+    result = pipeline.run(
+        _Exp(),
+        config,
+        device_roster={
+            'robot': {'online': True, 'fresh': True, 'fact_source': 'telemetry'},
+            'camera': {'online': True, 'fresh': True, 'fact_source': 'telemetry'},
+            'ultrasound': {'online': False, 'fresh': False, 'fact_source': 'telemetry'},
+            'pressure': {'online': False, 'fresh': False, 'fact_source': 'telemetry'},
+        },
+    )
+    device_gate = result.localization_readiness['device_gate']
+    assert device_gate['robot_online'] is True
+    assert device_gate['camera_online'] is True
+    assert device_gate['ultrasound_online'] is False
+    assert device_gate['pressure_online'] is False
+    assert device_gate['robot_fact_source'] == 'telemetry'
+    assert device_gate['pressure_fact_source'] == 'telemetry'
+
+
 def test_localization_pipeline_falls_back_when_camera_provider_fails(tmp_path: Path) -> None:
     config = RuntimeConfig(
         camera_guidance_input_mode='filesystem',
@@ -71,7 +105,7 @@ def test_localization_pipeline_falls_back_when_camera_provider_fails(tmp_path: P
     pipeline = LocalizationPipeline()
     class _Exp:
         exp_id = 'EXP-MISSING'
-    result = pipeline.run(_Exp(), config)
+    result = pipeline.run(_Exp(), config, device_roster=_device_roster())
     assert result.status.state == 'REVIEW_REQUIRED'
     assert result.localization_readiness['status'] == 'READY_WITH_REVIEW'
     assert '其余策略失败' in result.status.detail
@@ -86,7 +120,7 @@ def test_approve_localization_review_unblocks_path_generation(tmp_path: Path) ->
     controller.power_on()
     controller.set_auto_mode()
     controller.create_experiment()
-    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config)
+    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config, device_roster=_device_roster())
     controller.workflow_artifacts.localization = controller.localization_result.status
     controller.workflow_artifacts.localization_review_required = True
     controller.workflow_artifacts.localization_source_type = 'fallback_simulated'
@@ -152,7 +186,7 @@ def test_generate_path_blocks_until_review_approved(tmp_path: Path) -> None:
     controller.power_on()
     controller.set_auto_mode()
     controller.create_experiment()
-    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config)
+    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config, device_roster=_device_roster())
     controller.workflow_artifacts.localization = controller.localization_result.status
     controller.workflow_artifacts.localization_review_required = True
     controller.workflow_artifacts.localization_review_approved = False

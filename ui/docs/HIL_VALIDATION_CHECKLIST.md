@@ -79,3 +79,17 @@ python scripts/validate_hil_phase_metrics.py --runtime-config runtime_config.jso
 ```
 
 The gate fails if measured values exceed the active RT phase contract published by the runtime.
+
+
+## Bundle packaging
+After collecting `runtime_config.json` and `rt_phase_metrics.json`, package the archived controller evidence with:
+
+```bash
+python scripts/package_live_evidence_bundle.py \
+  --runtime-config runtime_config.json \
+  --phase-metrics rt_phase_metrics.json \
+  --readiness-manifest runtime_readiness_manifest.json \
+  --output live_evidence_bundle.zip
+```
+
+Only the archived `.zip` bundle may be passed to `scripts/write_verification_report.py --live-evidence-bundle ...`. The bundle itself must contain `runtime_config.json`, `rt_phase_metrics.json`, and `runtime_readiness_manifest.json`. A directory path, a missing bundle, or an external readiness manifest is not valid proof.

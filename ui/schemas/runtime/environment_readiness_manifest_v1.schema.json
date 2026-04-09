@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "runtime/environment_readiness_manifest_v1.schema.json",
+  "title": "Runtime Environment Readiness Manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "summary_state",
+    "summary_label",
+    "detail",
+    "surface",
+    "deployment_profile",
+    "runtime_mode_decision",
+    "verification",
+    "doctor_snapshot",
+    "blockers",
+    "warnings",
+    "host_requirements"
+  ],
+  "properties": {
+    "schema_version": {"const": "runtime.environment_readiness_manifest.v1"},
+    "summary_state": {"enum": ["ready", "warning", "blocked"]},
+    "summary_label": {"type": "string"},
+    "detail": {"type": "string"},
+    "surface": {"enum": ["desktop", "headless"]},
+    "deployment_profile": {"type": "object"},
+    "runtime_mode_decision": {"type": "object"},
+    "verification": {
+      "type": "object",
+      "required": [
+        "static_contract_ready",
+        "sandbox_validation_possible",
+        "live_runtime_verified",
+        "live_runtime_ready",
+        "verification_boundary",
+        "evidence_tier"
+      ],
+      "properties": {
+        "static_contract_ready": {"type": "boolean"},
+        "sandbox_validation_possible": {"type": "boolean"},
+        "live_runtime_verified": {"type": "boolean"},
+        "live_runtime_ready": {"type": "boolean"},
+        "verification_boundary": {"type": "string"},
+        "evidence_tier": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "doctor_snapshot": {"type": "object"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"},
+    "host_requirements": {"type": "object"}
+  },
+  "additionalProperties": true
+}

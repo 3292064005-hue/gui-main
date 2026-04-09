@@ -269,3 +269,52 @@ def test_authoritative_contract_service_tolerates_invalid_numeric_fields() -> No
     assert envelope["protocol_version"] == 1
     assert envelope["session_freeze"]["locked_at_ns"] == 0
     assert envelope["session_freeze"]["active_segment"] == 0
+
+
+def test_authoritative_contract_service_marks_synthesized_payload_as_degraded() -> None:
+    from spine_ultrasound_ui.services.backend_authoritative_contract_service import BackendAuthoritativeContractService
+
+    service = BackendAuthoritativeContractService()
+    envelope = service.normalize_payload(
+        {
+            'control_plane': {
+                'control_authority': {
+                    'summary_state': 'ready',
+                    'owner': {'actor_id': 'tester', 'workspace': 'desktop', 'role': 'operator', 'session_id': ''},
+                },
+                'runtime_config': {'runtime_config': {'pressure_target': 8.0}},
+            },
+            'accepted': True,
+            'reason': 'ok',
+        },
+        authority_source='unit-test',
+    )
+    assert envelope['authoritative_runtime_envelope_present'] is False
+    assert envelope['synthesized'] is True
+    assert envelope['summary_state'] == 'degraded'
+    assert envelope['envelope_origin'] == 'payload_control_plane_synthesized'
+
+
+def test_authoritative_contract_service_prefers_published_authoritative_envelope() -> None:
+    from spine_ultrasound_ui.services.backend_authoritative_contract_service import BackendAuthoritativeContractService
+
+    service = BackendAuthoritativeContractService()
+    envelope = service.normalize_payload(
+        {
+            'authoritative_runtime_envelope': {
+                'authority_source': 'cpp_robot_core',
+                'protocol_version': 2,
+                'control_authority': {
+                    'summary_state': 'ready',
+                    'owner': {'actor_id': 'runtime', 'workspace': 'runtime', 'role': 'runtime', 'session_id': ''},
+                },
+                'runtime_config_applied': {'pressure_target': 8.0},
+                'final_verdict': {'accepted': True, 'reason': 'ok'},
+            }
+        },
+        authority_source='unit-test',
+    )
+    assert envelope['authoritative_runtime_envelope_present'] is True
+    assert envelope['synthesized'] is False
+    assert envelope['summary_state'] == 'ready'
+    assert envelope['envelope_origin'] == 'authoritative_runtime_envelope'

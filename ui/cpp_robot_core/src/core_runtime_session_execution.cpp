@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <functional>
+#include <unordered_map>
 
 #include "json_utils.h"
 #include "robot_core/robot_identity_contract.h"
@@ -11,19 +13,26 @@ namespace robot_core {
 std::string CoreRuntime::handleFaultInjectionCommand(const std::string& request_id, const std::string& line) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
   const auto command = json::extractString(line, "command");
-  if (command == "inject_fault") {
-    const auto fault_name = json::extractString(line, "fault_name");
-    std::string error_message;
-    if (!applyFaultInjectionLocked(fault_name, &error_message)) {
-      return replyJson(request_id, false, error_message.empty() ? "fault injection failed" : error_message);
-    }
-    return replyJson(request_id, true, "inject_fault accepted", faultInjectionContractJsonLocked());
+  using FaultHandler = std::function<std::string(CoreRuntime*, const std::string&, const std::string&)>;
+  static const std::unordered_map<std::string, FaultHandler> handlers = {
+      {"inject_fault", [](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         const auto fault_name = json::extractString(json_line, "fault_name");
+         std::string error_message;
+         if (!self->applyFaultInjectionLocked(fault_name, &error_message)) {
+           return self->replyJson(req, false, error_message.empty() ? "fault injection failed" : error_message);
+         }
+         return self->replyJson(req, true, "inject_fault accepted", self->faultInjectionContractJsonLocked());
+       }},
+      {"clear_injected_faults", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         self->clearInjectedFaultsLocked();
+         return self->replyJson(req, true, "clear_injected_faults accepted", self->faultInjectionContractJsonLocked());
+       }},
+  };
+  const auto it = handlers.find(command);
+  if (it == handlers.end()) {
+    return replyJson(request_id, false, "unsupported command: " + command);
   }
-  if (command == "clear_injected_faults") {
-    clearInjectedFaultsLocked();
-    return replyJson(request_id, true, "clear_injected_faults accepted", faultInjectionContractJsonLocked());
-  }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return it->second(this, request_id, line);
 }
 
 std::string CoreRuntime::handleSessionCommand(const std::string& request_id, const std::string& line) {
@@ -181,246 +190,257 @@ std::string CoreRuntime::handleSessionCommand(const std::string& request_id, con
 std::string CoreRuntime::handleExecutionCommand(const std::string& request_id, const std::string& line) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
   const auto command = json::extractString(line, "command");
-  if (command == "approach_prescan") {
-    if (execution_state_ != RobotCoreState::PathValidated) {
-      return replyJson(request_id, false, "scan plan not ready");
-    }
-    if (!nrt_motion_service_.approachPrescan()) {
-      execution_state_ = RobotCoreState::Fault;
-      return replyJson(request_id, false, "approach_prescan failed");
-    }
-    execution_state_ = RobotCoreState::Approaching;
-    state_reason_ = "approach_prescan";
-    contact_state_.recommended_action = "SEEK_CONTACT";
-    return replyJson(request_id, true, "approach_prescan accepted");
-  }
-  if (command == "seek_contact") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
+  const auto allow_command = [this](const std::string& action, std::string* reason) -> bool {
+    return state_machine_guard_.allow(action, execution_state_, reason);
+  };
+  const auto validate_rt_phase = [this](const std::string& fallback_message, std::string* out_reason) -> bool {
     std::string phase_reason;
-    if (!model_authority_.validateRtPhaseTargetDelta(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseWorkspace(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseSingularityMargin(config_, sdk_robot_, &phase_reason)) {
-      return replyJson(request_id, false, phase_reason.empty() ? "seek_contact precheck failed" : phase_reason);
+    const bool ok = model_authority_.validateRtPhaseTargetDelta(config_, sdk_robot_, &phase_reason) &&
+                    model_authority_.validateRtPhaseWorkspace(config_, sdk_robot_, &phase_reason) &&
+                    model_authority_.validateRtPhaseSingularityMargin(config_, sdk_robot_, &phase_reason);
+    if (!ok && out_reason != nullptr) {
+      *out_reason = phase_reason.empty() ? fallback_message : phase_reason;
     }
-    if (!rt_motion_service_.seekContact()) {
-      return replyJson(request_id, false, "seek_contact failed");
-    }
-    execution_state_ = RobotCoreState::ContactSeeking;
-    state_reason_ = "waiting_for_contact_stability";
-    contact_state_.mode = "SEEKING_CONTACT";
-    contact_state_.recommended_action = "WAIT_CONTACT_STABLE";
-    return replyJson(request_id, true, "seek_contact accepted");
+    return ok;
+  };
+  using ExecutionHandler = std::function<std::string(CoreRuntime*, const std::string&, const std::string&)>;
+  const std::unordered_map<std::string, ExecutionHandler> handlers = {
+      {"approach_prescan", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         if (self->execution_state_ != RobotCoreState::PathValidated) {
+           return self->replyJson(req, false, "scan plan not ready");
+         }
+         if (!self->nrt_motion_service_.approachPrescan()) {
+           self->execution_state_ = RobotCoreState::Fault;
+           return self->replyJson(req, false, "approach_prescan failed");
+         }
+         self->execution_state_ = RobotCoreState::Approaching;
+         self->state_reason_ = "approach_prescan";
+         self->contact_state_.recommended_action = "SEEK_CONTACT";
+         return self->replyJson(req, true, "approach_prescan accepted");
+       }},
+      {"seek_contact", [allow_command, validate_rt_phase](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("seek_contact", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!validate_rt_phase("seek_contact precheck failed", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->rt_motion_service_.seekContact()) {
+           return self->replyJson(req, false, "seek_contact failed");
+         }
+         self->execution_state_ = RobotCoreState::ContactSeeking;
+         self->state_reason_ = "waiting_for_contact_stability";
+         self->contact_state_.mode = "SEEKING_CONTACT";
+         self->contact_state_.recommended_action = "WAIT_CONTACT_STABLE";
+         return self->replyJson(req, true, "seek_contact accepted");
+       }},
+      {"start_scan", [allow_command, validate_rt_phase](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("start_scan", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!validate_rt_phase("start_scan precheck failed", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->rt_motion_service_.startCartesianImpedance()) {
+           return self->replyJson(req, false, "start_scan failed");
+         }
+         self->execution_state_ = RobotCoreState::Scanning;
+         self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, true);
+         self->state_reason_ = "scan_active";
+         self->contact_state_.mode = "STABLE_CONTACT";
+         self->contact_state_.recommended_action = "SCAN";
+         return self->replyJson(req, true, "start_scan accepted");
+       }},
+      {"pause_scan", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         if (self->execution_state_ != RobotCoreState::Scanning) {
+           return self->replyJson(req, false, "scan not active");
+         }
+         self->rt_motion_service_.pauseAndHold();
+         self->recovery_manager_.pauseAndHold();
+         self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, false);
+         self->execution_state_ = RobotCoreState::PausedHold;
+         self->state_reason_ = "pause_hold";
+         self->contact_state_.mode = "HOLDING_CONTACT";
+         self->contact_state_.recommended_action = "RESUME_OR_RETREAT";
+         return self->replyJson(req, true, "pause_scan accepted");
+       }},
+      {"resume_scan", [validate_rt_phase](CoreRuntime* self, const std::string& req, const std::string&) {
+         if (self->execution_state_ != RobotCoreState::PausedHold) {
+           return self->replyJson(req, false, "scan not paused");
+         }
+         std::string reason;
+         if (!validate_rt_phase("resume_scan precheck failed", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->rt_motion_service_.startCartesianImpedance()) {
+           return self->replyJson(req, false, "resume_scan failed");
+         }
+         self->recovery_manager_.cancelRetry();
+         self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, true);
+         self->execution_state_ = RobotCoreState::Scanning;
+         self->state_reason_ = "scan_active";
+         self->contact_state_.mode = "STABLE_CONTACT";
+         self->contact_state_.recommended_action = "SCAN";
+         return self->replyJson(req, true, "resume_scan accepted");
+       }},
+      {"safe_retreat", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("safe_retreat", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         self->rt_motion_service_.controlledRetract();
+         if (!self->nrt_motion_service_.safeRetreat()) {
+           self->execution_state_ = RobotCoreState::Fault;
+           self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, false);
+           self->fault_code_ = "SAFE_RETREAT_FAILED";
+           self->queueAlarmLocked("RECOVERABLE_FAULT", "recovery", "安全退让失败", "safe_retreat", "", "controlled_retract_failed");
+           return self->replyJson(req, false, "safe_retreat failed");
+         }
+         self->recovery_manager_.controlledRetract();
+         self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, false);
+         self->execution_state_ = RobotCoreState::Retreating;
+         self->state_reason_ = "safe_retreat";
+         self->retreat_ticks_remaining_ = 30;
+         self->contact_state_.mode = "NO_CONTACT";
+         self->contact_state_.recommended_action = "WAIT_RETREAT_COMPLETE";
+         return self->replyJson(req, true, "safe_retreat accepted");
+       }},
+      {"go_home", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("go_home", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const bool ok = self->nrt_motion_service_.goHome();
+         return self->replyJson(req, ok, ok ? "go_home accepted" : "go_home failed");
+       }},
+      {"run_rl_project", [allow_command](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         std::string reason;
+         if (!allow_command("run_rl_project", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const auto project = json::extractString(json_line, "project", self->config_.rl_project_name);
+         const auto task = json::extractString(json_line, "task", self->config_.rl_task_name);
+         if (!self->sdk_robot_.collaborationPort().runRlProject(project, task, &reason)) {
+           return self->replyJson(req, false, reason.empty() ? "run_rl_project failed" : reason);
+         }
+         self->sdk_robot_.collaborationPort().setRlStatus(project, task, true);
+         return self->replyJson(req, true, "run_rl_project accepted");
+       }},
+      {"pause_rl_project", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("pause_rl_project", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->sdk_robot_.collaborationPort().pauseRlProject(&reason)) {
+           return self->replyJson(req, false, reason.empty() ? "pause_rl_project failed" : reason);
+         }
+         self->sdk_robot_.collaborationPort().setRlStatus(self->config_.rl_project_name, self->config_.rl_task_name, false);
+         return self->replyJson(req, true, "pause_rl_project accepted");
+       }},
+      {"enable_drag", [allow_command](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         std::string reason;
+         if (!allow_command("enable_drag", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const auto space = json::extractString(json_line, "space", "cartesian");
+         const auto type = json::extractString(json_line, "type", "admittance");
+         if (!self->sdk_robot_.collaborationPort().enableDrag(space, type, &reason)) {
+           return self->replyJson(req, false, reason.empty() ? "enable_drag failed" : reason);
+         }
+         self->sdk_robot_.collaborationPort().setDragState(true, space, type);
+         return self->replyJson(req, true, "enable_drag accepted");
+       }},
+      {"disable_drag", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("disable_drag", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->sdk_robot_.collaborationPort().disableDrag(&reason)) {
+           return self->replyJson(req, false, reason.empty() ? "disable_drag failed" : reason);
+         }
+         self->sdk_robot_.collaborationPort().setDragState(false, "cartesian", "admittance");
+         return self->replyJson(req, true, "disable_drag accepted");
+       }},
+      {"replay_path", [allow_command](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         std::string reason;
+         if (!allow_command("replay_path", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const auto name = json::extractString(json_line, "name", "spine_demo_path");
+         const auto rate = json::extractDouble(json_line, "rate", 0.5);
+         if (!self->sdk_robot_.collaborationPort().replayPath(name, rate, &reason)) {
+           return self->replyJson(req, false, reason.empty() ? "replay_path failed" : reason);
+         }
+         return self->replyJson(req, true, "replay_path accepted");
+       }},
+      {"start_record_path", [allow_command](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         std::string reason;
+         if (!allow_command("start_record_path", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const auto duration_s = json::extractInt(json_line, "duration_s", 60);
+         if (!self->sdk_robot_.collaborationPort().startRecordPath(duration_s, &reason)) {
+           return self->replyJson(req, false, reason.empty() ? "start_record_path failed" : reason);
+         }
+         return self->replyJson(req, true, "start_record_path accepted");
+       }},
+      {"stop_record_path", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("stop_record_path", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->sdk_robot_.collaborationPort().stopRecordPath(&reason)) {
+           return self->replyJson(req, false, reason.empty() ? "stop_record_path failed" : reason);
+         }
+         return self->replyJson(req, true, "stop_record_path accepted");
+       }},
+      {"cancel_record_path", [allow_command](CoreRuntime* self, const std::string& req, const std::string&) {
+         std::string reason;
+         if (!allow_command("cancel_record_path", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         if (!self->sdk_robot_.collaborationPort().cancelRecordPath(&reason)) {
+           return self->replyJson(req, false, reason.empty() ? "cancel_record_path failed" : reason);
+         }
+         return self->replyJson(req, true, "cancel_record_path accepted");
+       }},
+      {"save_record_path", [allow_command](CoreRuntime* self, const std::string& req, const std::string& json_line) {
+         std::string reason;
+         if (!allow_command("save_record_path", &reason)) {
+           return self->replyJson(req, false, reason);
+         }
+         const auto name = json::extractString(json_line, "name", "spine_demo_path");
+         const auto save_as = json::extractString(json_line, "save_as", name);
+         if (!self->sdk_robot_.collaborationPort().saveRecordPath(name, save_as, &reason)) {
+           return self->replyJson(req, false, reason.empty() ? "save_record_path failed" : reason);
+         }
+         return self->replyJson(req, true, "save_record_path accepted");
+       }},
+      {"clear_fault", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         if (self->execution_state_ != RobotCoreState::Fault) {
+           return self->replyJson(req, false, "no fault to clear");
+         }
+         self->fault_code_.clear();
+         self->execution_state_ = self->plan_loaded_ ? RobotCoreState::PathValidated : RobotCoreState::AutoReady;
+         return self->replyJson(req, true, "clear_fault accepted");
+       }},
+      {"emergency_stop", [](CoreRuntime* self, const std::string& req, const std::string&) {
+         self->rt_motion_service_.stop();
+         self->recovery_manager_.cancelRetry();
+         self->recovery_manager_.latchEstop();
+         self->execution_state_ = RobotCoreState::Estop;
+         self->fault_code_ = "ESTOP";
+         self->queueAlarmLocked("FATAL_FAULT", "safety", "急停触发");
+         return self->replyJson(req, true, "emergency_stop accepted");
+       }},
+  };
+  const auto it = handlers.find(command);
+  if (it == handlers.end()) {
+    return replyJson(request_id, false, "unsupported command: " + command);
   }
-  if (command == "start_scan") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    std::string phase_reason;
-    if (!model_authority_.validateRtPhaseTargetDelta(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseWorkspace(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseSingularityMargin(config_, sdk_robot_, &phase_reason)) {
-      return replyJson(request_id, false, phase_reason.empty() ? "start_scan precheck failed" : phase_reason);
-    }
-    if (!rt_motion_service_.startCartesianImpedance()) {
-      return replyJson(request_id, false, "start_scan failed");
-    }
-    execution_state_ = RobotCoreState::Scanning;
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, true);
-    state_reason_ = "scan_active";
-    contact_state_.mode = "STABLE_CONTACT";
-    contact_state_.recommended_action = "SCAN";
-    return replyJson(request_id, true, "start_scan accepted");
-  }
-  if (command == "pause_scan") {
-    if (execution_state_ != RobotCoreState::Scanning) {
-      return replyJson(request_id, false, "scan not active");
-    }
-    rt_motion_service_.pauseAndHold();
-    recovery_manager_.pauseAndHold();
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-    execution_state_ = RobotCoreState::PausedHold;
-    state_reason_ = "pause_hold";
-    contact_state_.mode = "HOLDING_CONTACT";
-    contact_state_.recommended_action = "RESUME_OR_RETREAT";
-    return replyJson(request_id, true, "pause_scan accepted");
-  }
-  if (command == "resume_scan") {
-    if (execution_state_ != RobotCoreState::PausedHold) {
-      return replyJson(request_id, false, "scan not paused");
-    }
-    std::string phase_reason;
-    if (!model_authority_.validateRtPhaseTargetDelta(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseWorkspace(config_, sdk_robot_, &phase_reason) ||
-        !model_authority_.validateRtPhaseSingularityMargin(config_, sdk_robot_, &phase_reason)) {
-      return replyJson(request_id, false, phase_reason.empty() ? "resume_scan precheck failed" : phase_reason);
-    }
-    if (!rt_motion_service_.startCartesianImpedance()) {
-      return replyJson(request_id, false, "resume_scan failed");
-    }
-    recovery_manager_.cancelRetry();
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, true);
-    execution_state_ = RobotCoreState::Scanning;
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, true);
-    state_reason_ = "scan_active";
-    contact_state_.mode = "STABLE_CONTACT";
-    contact_state_.recommended_action = "SCAN";
-    return replyJson(request_id, true, "resume_scan accepted");
-  }
-  if (command == "safe_retreat") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    rt_motion_service_.controlledRetract();
-    if (!nrt_motion_service_.safeRetreat()) {
-      execution_state_ = RobotCoreState::Fault;
-      sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-      fault_code_ = "SAFE_RETREAT_FAILED";
-      queueAlarmLocked("RECOVERABLE_FAULT", "recovery", "安全退让失败", "safe_retreat", "", "controlled_retract_failed");
-      return replyJson(request_id, false, "safe_retreat failed");
-    }
-    recovery_manager_.controlledRetract();
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-    execution_state_ = RobotCoreState::Retreating;
-    state_reason_ = "safe_retreat";
-    retreat_ticks_remaining_ = 30;
-    contact_state_.mode = "NO_CONTACT";
-    contact_state_.recommended_action = "WAIT_RETREAT_COMPLETE";
-    return replyJson(request_id, true, "safe_retreat accepted");
-  }
-  if (command == "go_home") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const bool ok = nrt_motion_service_.goHome();
-    return replyJson(request_id, ok, ok ? "go_home accepted" : "go_home failed");
-  }
-  if (command == "run_rl_project") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const auto project = json::extractString(line, "project", config_.rl_project_name);
-    const auto task = json::extractString(line, "task", config_.rl_task_name);
-    if (!sdk_robot_.collaborationPort().runRlProject(project, task, &reason)) {
-      return replyJson(request_id, false, reason.empty() ? "run_rl_project failed" : reason);
-    }
-    sdk_robot_.collaborationPort().setRlStatus(project, task, true);
-    return replyJson(request_id, true, "run_rl_project accepted");
-  }
-  if (command == "pause_rl_project") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    if (!sdk_robot_.collaborationPort().pauseRlProject(&reason)) {
-      return replyJson(request_id, false, reason.empty() ? "pause_rl_project failed" : reason);
-    }
-    sdk_robot_.collaborationPort().setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-    return replyJson(request_id, true, "pause_rl_project accepted");
-  }
-  if (command == "enable_drag") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const auto space = json::extractString(line, "space", "cartesian");
-    const auto type = json::extractString(line, "type", "admittance");
-    if (!sdk_robot_.collaborationPort().enableDrag(space, type, &reason)) {
-      return replyJson(request_id, false, reason.empty() ? "enable_drag failed" : reason);
-    }
-    sdk_robot_.collaborationPort().setDragState(true, space, type);
-    return replyJson(request_id, true, "enable_drag accepted");
-  }
-  if (command == "disable_drag") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    if (!sdk_robot_.collaborationPort().disableDrag(&reason)) {
-      return replyJson(request_id, false, reason.empty() ? "disable_drag failed" : reason);
-    }
-    sdk_robot_.collaborationPort().setDragState(false, "cartesian", "admittance");
-    return replyJson(request_id, true, "disable_drag accepted");
-  }
-  if (command == "replay_path") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const auto name = json::extractString(line, "name", "spine_demo_path");
-    const auto rate = json::extractDouble(line, "rate", 0.5);
-    if (!sdk_robot_.collaborationPort().replayPath(name, rate, &reason)) {
-      return replyJson(request_id, false, reason.empty() ? "replay_path failed" : reason);
-    }
-    return replyJson(request_id, true, "replay_path accepted");
-  }
-  if (command == "start_record_path") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const auto duration_s = json::extractInt(line, "duration_s", 60);
-    if (!sdk_robot_.collaborationPort().startRecordPath(duration_s, &reason)) {
-      return replyJson(request_id, false, reason.empty() ? "start_record_path failed" : reason);
-    }
-    return replyJson(request_id, true, "start_record_path accepted");
-  }
-  if (command == "stop_record_path") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    if (!sdk_robot_.collaborationPort().stopRecordPath(&reason)) {
-      return replyJson(request_id, false, reason.empty() ? "stop_record_path failed" : reason);
-    }
-    return replyJson(request_id, true, "stop_record_path accepted");
-  }
-  if (command == "cancel_record_path") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    if (!sdk_robot_.collaborationPort().cancelRecordPath(&reason)) {
-      return replyJson(request_id, false, reason.empty() ? "cancel_record_path failed" : reason);
-    }
-    return replyJson(request_id, true, "cancel_record_path accepted");
-  }
-  if (command == "save_record_path") {
-    std::string reason;
-    if (!state_machine_guard_.allow(command, execution_state_, &reason)) {
-      return replyJson(request_id, false, reason);
-    }
-    const auto name = json::extractString(line, "name", "spine_demo_path");
-    const auto save_as = json::extractString(line, "save_as", name);
-    if (!sdk_robot_.collaborationPort().saveRecordPath(name, save_as, &reason)) {
-      return replyJson(request_id, false, reason.empty() ? "save_record_path failed" : reason);
-    }
-    return replyJson(request_id, true, "save_record_path accepted");
-  }
-  if (command == "clear_fault") {
-    if (execution_state_ != RobotCoreState::Fault) {
-      return replyJson(request_id, false, "no fault to clear");
-    }
-    fault_code_.clear();
-    execution_state_ = plan_loaded_ ? RobotCoreState::PathValidated : RobotCoreState::AutoReady;
-    return replyJson(request_id, true, "clear_fault accepted");
-  }
-  if (command == "emergency_stop") {
-    rt_motion_service_.stop();
-    recovery_manager_.cancelRetry();
-    recovery_manager_.latchEstop();
-    execution_state_ = RobotCoreState::Estop;
-    fault_code_ = "ESTOP";
-    queueAlarmLocked("FATAL_FAULT", "safety", "急停触发");
-    return replyJson(request_id, true, "emergency_stop accepted");
-  }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return it->second(this, request_id, line);
 }
 
 }  // namespace robot_core

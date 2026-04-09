@@ -35,3 +35,10 @@ def test_finalize_and_postprocess_services_materialize_manifest_artifacts() -> N
     postprocess_source = Path('spine_ultrasound_ui/core/postprocess_service.py').read_text(encoding='utf-8')
     assert 'derived/session/session_intelligence_manifest.json' in finalize_source
     assert 'derived/postprocess/postprocess_stage_manifest.json' in postprocess_source
+
+
+def test_session_intelligence_registry_declares_materialization_and_read_policy() -> None:
+    specs = iter_product_specs()
+    assert all(spec.materialization_phase for spec in specs)
+    assert all(spec.read_policy == "materialized_only" for spec in specs)
+    assert all(spec.stale_policy for spec in specs)

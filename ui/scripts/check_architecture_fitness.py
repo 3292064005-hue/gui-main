@@ -1,21 +1,31 @@
+#!/usr/bin/env python3
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
-import sys
+from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 HEADLESS_ADAPTER = ROOT / 'spine_ultrasound_ui' / 'services' / 'headless_adapter.py'
 CORE_RUNTIME_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'core_runtime.h'
-SDK_FACADE_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'sdk_robot_facade.h'
 CORE_RUNTIME_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime.cpp'
+SDK_FACADE_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'sdk_robot_facade.h'
 NRT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'nrt_motion_service.cpp'
 RT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'rt_motion_service.cpp'
 SESSION_EXECUTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_session_execution.cpp'
+APP_CONTROLLER_RUNTIME_MIXIN = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_controller_runtime_mixin.py'
+APP_RUNTIME_BRIDGE = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_runtime_bridge.py'
 CONFIG_MANAGER = ROOT / 'spine_ultrasound_ui' / 'services' / 'config_manager.py'
+MAIN_WINDOW_LAYOUT = ROOT / 'spine_ultrasound_ui' / 'views' / 'main_window_layout.py'
+RUNTIME_READINESS_SERVICE = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_readiness_manifest_service.py'
 IGNORED_TOP_LEVEL_DIRS = frozenset({'.git', '.pytest_cache', 'archive', 'repo'})
 _MAX_MAINLINE_FILE_LINES = {
-    'cpp_robot_core/src/sdk_robot_facade.cpp': 1650,
+    'spine_ultrasound_ui/services/api_bridge_lease_service.py': 220,
+    'spine_ultrasound_ui/services/api_bridge_verdict_service.py': 220,
+    'cpp_robot_core/src/sdk_robot_facade.cpp': 300,
+    'cpp_robot_core/src/sdk_robot_facade_lifecycle.cpp': 420,
+    'cpp_robot_core/src/sdk_robot_facade_nrt.cpp': 420,
+    'cpp_robot_core/src/sdk_robot_facade_rt.cpp': 760,
+    'cpp_robot_core/src/sdk_robot_facade_cache.cpp': 220,
     'cpp_robot_core/src/core_runtime.cpp': 820,
     'cpp_robot_core/src/core_runtime_contracts.cpp': 840,
     'spine_ultrasound_ui/core/postprocess_service.py': 920,
@@ -136,13 +146,20 @@ def main() -> int:
         if required not in facade_text:
             failures.append(f'SdkRobotFacade controlled port contract missing: {required}')
 
+    for required in (
+        'cpp_robot_core/include/robot_core/sdk_robot_facade_internal.h',
+        'cpp_robot_core/src/sdk_robot_facade_lifecycle.cpp',
+        'cpp_robot_core/src/sdk_robot_facade_nrt.cpp',
+        'cpp_robot_core/src/sdk_robot_facade_rt.cpp',
+        'cpp_robot_core/src/sdk_robot_facade_cache.cpp',
+    ):
+        if not (ROOT / required).exists():
+            failures.append(f'SdkRobotFacade split-unit missing: {required}')
+
     runtime_source = CORE_RUNTIME_SOURCE.read_text(encoding='utf-8')
     for required in (
-        '{"seek_contact", RuntimeLane::RtControl}',
-        '{"start_scan", RuntimeLane::RtControl}',
-        '{"pause_scan", RuntimeLane::RtControl}',
-        '{"resume_scan", RuntimeLane::RtControl}',
-        '{"safe_retreat", RuntimeLane::RtControl}',
+        'commandCapabilityClaim',
+        'capability_claim == "rt_motion_write"',
         'std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_)',
         'queryPort().controllerLogs()',
         'lifecyclePort().connect',
@@ -161,6 +178,109 @@ def main() -> int:
     session_source = SESSION_EXECUTION_SOURCE.read_text(encoding='utf-8')
     if 'collaborationPort().' not in session_source:
         failures.append('Session execution must consume the restricted CollaborationPort surface')
+
+    controller_runtime_text = APP_CONTROLLER_RUNTIME_MIXIN.read_text(encoding='utf-8')
+    for required in (
+        'telemetry_received.connect(self._handle_telemetry, Qt.QueuedConnection)',
+        'log_generated.connect(self._forward_log, Qt.QueuedConnection)',
+        'camera_pixmap_ready.connect(self._on_camera_pixmap, Qt.QueuedConnection)',
+        'ultrasound_pixmap_ready.connect(self._on_ultrasound_pixmap, Qt.QueuedConnection)',
+    ):
+        if required not in APP_CONTROLLER_RUNTIME_MIXIN.read_text(encoding='utf-8'):
+            failures.append(f'AppControllerRuntimeMixin Qt queued connection contract missing: {required}')
+
+    if 'self.runtime_bridge.refresh_governance(force_sdk_assets=False)' in controller_runtime_text:
+        failures.append('_emit_status must not trigger a full governance refresh')
+    for required in (
+        'must stay side-effect-light',
+        'must not trigger governance recomputation',
+    ):
+        if required not in controller_runtime_text:
+            failures.append(f'AppControllerRuntimeMixin status emission contract missing: {required}')
+
+    session_service_text = (ROOT / 'spine_ultrasound_ui' / 'core' / 'session_service.py').read_text(encoding='utf-8')
+    if 'SESSION_SERVICE_PUBLIC_API' not in session_service_text:
+        failures.append('SessionService compatibility surface freeze missing: SESSION_SERVICE_PUBLIC_API')
+
+    runtime_bridge_text = APP_RUNTIME_BRIDGE.read_text(encoding='utf-8')
+    if 'refresh_bridge_projection' not in runtime_bridge_text:
+        failures.append('AppRuntimeBridge must route telemetry status updates through the lightweight bridge projection path')
+
+    api_bridge_backend_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'api_bridge_backend.py').read_text(encoding='utf-8')
+    for required in (
+        'ApiBridgeLeaseService',
+        'ApiBridgeVerdictService',
+        'def _lease_allowed(self) -> bool:',
+        'if self._lease_allowed():',
+        'effective_include_lease = include_lease and self._lease_allowed()',
+        'self._lease_service.ensure_control_lease(',
+        'self._verdict_service.resolve_final_verdict(',
+    ):
+        if required not in api_bridge_backend_text:
+            failures.append(f'ApiBridgeBackend service split missing: {required}')
+
+    runtime_verdict_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_verdict_kernel_service.py').read_text(encoding='utf-8')
+    api_bridge_verdict_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'api_bridge_verdict_service.py').read_text(encoding='utf-8')
+    for required in (
+        'resolve_final_verdict',
+        'read_only=not refresh_runtime_verdict',
+    ):
+        if required not in runtime_verdict_text:
+            failures.append(f'Runtime verdict kernel canonical API missing: {required}')
+    for forbidden in (
+        'query_final_verdict_snapshot',
+        'compile_final_verdict',
+        'get_final_verdict',
+    ):
+        if forbidden in runtime_verdict_text:
+            failures.append(f'Runtime verdict kernel must not use legacy backend verdict APIs directly: {forbidden}')
+
+    for required in (
+        '_raise_if_reply_failed',
+        'Failed read/compile attempts do not fall back to cached verdicts',
+    ):
+        if required not in api_bridge_verdict_text:
+            failures.append(f'ApiBridgeVerdictService reply-failure contract missing: {required}')
+
+    recording_header_text = (ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'recording_service.h').read_text(encoding='utf-8')
+    recording_source_text = (ROOT / 'cpp_robot_core' / 'src' / 'recording_service.cpp').read_text(encoding='utf-8')
+    runtime_state_store_text = (ROOT / 'cpp_robot_core' / 'src' / 'runtime_state_store.cpp').read_text(encoding='utf-8')
+    for required in (
+        'SampleKind::AlarmEvent',
+        'sample.alarm_event = alarm',
+        'alarmJson(sample.alarm_event)',
+    ):
+        if required not in recording_source_text and required not in recording_header_text:
+            failures.append(f'RecordingService async alarm persistence contract missing: {required}')
+    if 'recording_service_.recordAlarm(alarm);' not in runtime_state_store_text:
+        failures.append('CoreRuntime must enqueue alarms through RecordingService')
+
+    runtime_readiness_text = RUNTIME_READINESS_SERVICE.read_text(encoding='utf-8')
+    for required in (
+        'RuntimeReadinessManifestService',
+        'static_contract_ready',
+        'live_runtime_verified',
+        'environment_blocked',
+    ):
+        if required not in runtime_readiness_text:
+            failures.append(f'Runtime readiness manifest contract missing: {required}')
+
+    headless_surface_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'headless_adapter_surface.py').read_text(encoding='utf-8')
+    if '._session_product_update_envelopes(' in headless_surface_text:
+        failures.append('HeadlessAdapterSurface must not reach into private event-surface helpers; use the public session_product_update_envelopes surface')
+
+    for worker_name in (
+        'preprocess_worker.py',
+        'reconstruction_worker.py',
+        'assessment_worker.py',
+    ):
+        worker_text = (ROOT / 'spine_ultrasound_ui' / 'workers' / worker_name).read_text(encoding='utf-8')
+        if 'spine_ultrasound_ui.imaging.' in worker_text:
+            failures.append(f'Demo worker must not import imaging modules directly: spine_ultrasound_ui/workers/{worker_name}')
+
+    main_window_layout_text = MAIN_WINDOW_LAYOUT.read_text(encoding='utf-8')
+    if 'w.backend.' in main_window_layout_text:
+        failures.append('MainWindowLayout must not bind widgets directly to backend methods; route through MainWindowActionRouter')
 
     self_path = Path(__file__).resolve()
     scanned_python_files = 0

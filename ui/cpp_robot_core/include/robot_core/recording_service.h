@@ -87,11 +87,15 @@ public:
   void recordScanProgress(const CoreStateSnapshot& core_state, const ScanProgress& progress);
 
   /**
-   * @brief Persist alarm events immediately on the non-RT event path.
+   * @brief Queue an alarm event for asynchronous persistence.
    *
-   * @param alarm Alarm event to append.
+   * The caller may run on the RT/control maintenance lane while holding the
+   * runtime state mutex. This method therefore performs queue-only handoff and
+   * must not serialize JSON or touch the filesystem inline.
+   *
+   * @param alarm Alarm event to persist.
    * @return void
-   * @throws No exceptions are thrown explicitly.
+   * @throws No exceptions are thrown explicitly. Queue overflow is counted as dropped samples.
    */
   void recordAlarm(const AlarmEvent& alarm);
 
@@ -100,6 +104,7 @@ private:
     RobotState,
     ContactState,
     ScanProgress,
+    AlarmEvent,
   };
 
   struct QueuedSample {
@@ -108,6 +113,7 @@ private:
     ContactTelemetry contact_state{};
     CoreStateSnapshot core_state{};
     ScanProgress scan_progress{};
+    AlarmEvent alarm_event{};
   };
 
   static constexpr std::size_t kQueueCapacity = 1024;

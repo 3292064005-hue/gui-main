@@ -1,9 +1,19 @@
 
 from pathlib import Path
+import subprocess
+import sys
 
 
 def _read(path: str) -> str:
     return Path(path).read_text(encoding='utf-8')
+
+
+def _extract_shell_array(script: str, array_name: str) -> list[str]:
+    marker = f"{array_name}=("
+    start = script.index(marker) + len(marker)
+    end = script.index(')\n', start)
+    body = script[start:end]
+    return [line.strip().strip('"') for line in body.splitlines() if line.strip()]
 
 
 def test_verify_mainline_uses_ephemeral_build_dir_and_phase_dispatch() -> None:
@@ -13,7 +23,7 @@ def test_verify_mainline_uses_ephemeral_build_dir_and_phase_dispatch() -> None:
     assert 'VERIFY_PHASE="${VERIFY_PHASE:-all}"' in script
     assert 'case "${VERIFY_PHASE}" in' in script
     assert 'run_cpp_profile_gate mock' in script or 'run_cpp_profile_gate "mock"' in script
-    assert 'python scripts/build_cpp_targets.py' in script
+    assert 'scripts/build_cpp_targets.py' in script
     assert '--jobs "${CMAKE_BUILD_PARALLEL_LEVEL}"' in script
     assert 'ctest --test-dir' in script
 
@@ -77,7 +87,7 @@ def test_mainline_cpp_gate_scripts_retry_incremental_build_once() -> None:
 def test_verify_and_acceptance_run_protocol_sync_gate() -> None:
     verify_script = _read('scripts/verify_mainline.sh')
     acceptance_script = _read('scripts/final_acceptance_audit.sh')
-    assert 'python scripts/check_protocol_sync.py' in verify_script
+    assert 'scripts/check_protocol_sync.py' in verify_script
     assert 'scripts/check_protocol_sync.py' in acceptance_script
 
 
@@ -88,6 +98,12 @@ def test_convergence_audit_expands_budgets_to_hotspot_files() -> None:
     assert "'spine_ultrasound_ui/services/api_bridge_backend.py': 500" in script
     assert "'spine_ultrasound_ui/services/session_intelligence_service.py': 550" in script
 
+
+
+
+def test_strict_convergence_audit_current_repository_passes() -> None:
+    result = subprocess.run([sys.executable, 'scripts/strict_convergence_audit.py'], cwd=Path('.').resolve(), capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 def test_workflow_uses_converged_verify_script_and_no_longer_installs_system_protobuf() -> None:
     workflow = _read('.github/workflows/mainline.yml')
@@ -171,12 +187,19 @@ def test_cpp_prereq_script_uses_same_mock_mainline_defaults() -> None:
     assert 'ROBOT_CORE_WITH_XMATE_MODEL="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"' in script
 
 
+def test_acceptance_audit_batches_critical_regression_suite() -> None:
+    script = _read('scripts/final_acceptance_audit.sh')
+    assert 'run_pytest_batch()' in script
+    for label in ['control-plane', 'release-state', 'sdk-and-doctor', 'xmate-mainline']:
+        assert f'run_pytest_batch {label}' in script
+
+
 def test_acceptance_audit_runs_hygiene_and_cpp_preflight_before_build() -> None:
     script = _read('scripts/final_acceptance_audit.sh')
     assert 'section "Repository hygiene"' in script
-    assert './scripts/check_repo_hygiene.sh' in script
+    assert 'bash scripts/check_repo_hygiene.sh' in script
     assert 'section "C++ preflight"' in script
-    assert './scripts/check_cpp_prereqs.sh' in script
+    assert 'bash scripts/check_cpp_prereqs.sh' in script
 
 
 def test_mainline_pytest_entrypoint_cleans_artifacts_with_bottom_up_walk() -> None:
@@ -188,7 +211,7 @@ def test_mainline_pytest_entrypoint_cleans_artifacts_with_bottom_up_walk() -> No
 def test_verify_and_acceptance_preclean_generated_python_artifacts_before_hygiene() -> None:
     verify_script = _read('scripts/verify_mainline.sh')
     acceptance_script = _read('scripts/final_acceptance_audit.sh')
-    assert verify_script.index('cleanup_generated_artifacts') < verify_script.index('./scripts/check_repo_hygiene.sh')
+    assert verify_script.index('cleanup_generated_artifacts') < verify_script.index('bash scripts/check_repo_hygiene.sh')
     assert acceptance_script.index('cleanup_generated_artifacts') < acceptance_script.index('section "Repository hygiene"')
 
 
@@ -243,5 +266,152 @@ def test_verify_mainline_emits_phase_scoped_failure_context_and_rejects_unknown_
 def test_verify_mainline_batches_default_python_gate_for_constrained_envs() -> None:
     verify_script = _read('scripts/verify_mainline.sh')
     assert 'run_python_pytest_batch' in verify_script
-    for label in ['control-plane', 'release-state', 'repository-gates', 'archive-compat']:
+    for label in ['control-plane', 'release-state', 'repository-gates', 'preweight-closure']:
         assert f'run_python_pytest_batch {label}' in verify_script
+
+
+def test_verify_mainline_keeps_archive_compat_out_of_default_python_gate() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    assert 'INCLUDE_ARCHIVE_COMPAT' in verify_script
+    assert 'run_python_pytest_batch archive-compat' in verify_script
+
+
+def test_verify_mainline_prod_phase_builds_tests_and_installs() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    assert 'run_cpp_profile_install_check' in verify_script
+    assert 'run_prod_profile_release_smoke' in verify_script
+    assert 'scripts/deployment_smoke_test.py' in verify_script
+    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"' in verify_script
+
+
+
+def test_p2_acceptance_artifacts_are_generated_outside_repository_payload() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    generator_script = _read('scripts/generate_p2_acceptance_artifacts.py')
+    checker_script = _read('scripts/check_p2_acceptance.py')
+    hygiene_script = _read('scripts/check_repo_hygiene.sh')
+    assert 'P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance"' in verify_script
+    assert 'tempfile.gettempdir()' in generator_script
+    assert 'tempfile.gettempdir()' in checker_script
+    assert 'derived/postprocess/postprocess_stage_manifest.json' in hygiene_script
+    assert 'derived/session/session_intelligence_manifest.json' in hygiene_script
+
+
+def test_verify_mainline_uses_configured_python_interpreter_for_build_and_smoke_scripts() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    assert 'PYTHON_BIN="${PYTHON_BIN:-python3}"' in verify_script
+    assert '"$PYTHON_BIN" scripts/build_cpp_targets.py' in verify_script
+    assert 'SPINE_DEPLOYMENT_PROFILE=clinical "$PYTHON_BIN" scripts/deployment_smoke_test.py' in verify_script
+
+
+def test_verify_mainline_can_emit_claim_safe_verification_report() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    assert 'VERIFICATION_REPORT' in verify_script
+    assert 'scripts/write_verification_report.py' in verify_script
+
+
+def test_acceptance_audit_emits_claim_safe_verification_report_and_does_not_overclaim() -> None:
+    script = _read('scripts/final_acceptance_audit.sh')
+    assert 'verification_execution_report.json' in script
+    assert 'Live-controller/HIL validation is not implied' in script
+
+
+def test_acceptance_audit_forces_mock_profile_bindings_off_even_when_live_flags_are_enabled() -> None:
+    script = _read('scripts/final_acceptance_audit.sh')
+    assert 'if [[ "$PROFILE" == "mock" ]]; then' in script
+    assert 'PROFILE_WITH_SDK=OFF' in script
+    assert 'PROFILE_WITH_MODEL=OFF' in script
+
+
+def test_verification_report_script_disables_bytecode_writes() -> None:
+    script = _read('scripts/write_verification_report.py')
+    assert 'sys.dont_write_bytecode = True' in script
+    assert '--write-readiness-manifest' in script
+
+
+def test_verify_and_acceptance_run_robot_identity_registry_gate() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    acceptance_script = _read('scripts/final_acceptance_audit.sh')
+    assert 'scripts/check_robot_identity_registry.py' in verify_script
+    assert 'scripts/check_robot_identity_registry.py' in acceptance_script
+    assert 'scripts/check_python_compile.py' in verify_script
+    assert 'scripts/check_python_compile.py' in acceptance_script
+
+
+def test_acceptance_audit_runs_the_same_repository_gates_as_verify_python_phase() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    acceptance_script = _read('scripts/final_acceptance_audit.sh')
+    for gate in [
+        'bash scripts/check_repo_hygiene.sh',
+        'scripts/strict_convergence_audit.py',
+        'scripts/check_protocol_sync.py',
+        'scripts/check_robot_identity_registry.py',
+        'scripts/check_python_compile.py',
+        'scripts/check_canonical_imports.py',
+        'scripts/check_repository_gates.py',
+        'scripts/check_architecture_fitness.py',
+        'scripts/check_verification_boundary.py',
+        'scripts/generate_p2_acceptance_artifacts.py',
+        'scripts/check_p2_acceptance.py',
+    ]:
+        assert gate in verify_script
+        assert gate in acceptance_script
+    assert 'P2_ACCEPTANCE_OUTPUT_ROOT="$BUILD_DIR/p2_acceptance"' in acceptance_script
+    assert 'Repository/profile acceptance gates passed for the checks executed by final_acceptance_audit.sh' in acceptance_script
+
+
+def test_live_evidence_bundle_mode_does_not_mix_external_readiness_manifest_flags() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    acceptance_script = _read('scripts/final_acceptance_audit.sh')
+    assert 'elif [[ -n "${READINESS_MANIFEST_REPORT}" ]]; then' in verify_script
+    assert 'if [[ -n "$LIVE_EVIDENCE_BUNDLE" ]]; then' in acceptance_script
+    assert 'WRITE_ARGS+=(--live-evidence-bundle "$LIVE_EVIDENCE_BUNDLE")' in acceptance_script
+    assert 'WRITE_ARGS+=(--write-readiness-manifest "$READINESS_MANIFEST_REPORT")' in acceptance_script
+
+
+
+
+
+def test_acceptance_audit_builds_and_registers_the_same_cpp_test_set_as_mainline() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    acceptance_script = _read('scripts/final_acceptance_audit.sh')
+    verify_targets = _extract_shell_array(verify_script, 'CPP_TEST_TARGETS')
+    acceptance_targets = _extract_shell_array(acceptance_script, 'CPP_TEST_TARGETS')
+    assert acceptance_targets == verify_targets
+    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"' in acceptance_script
+    assert 'count_registered_cpp_tests' in acceptance_script
+    assert 'ctest registered $REGISTERED_CPP_TESTS' in acceptance_script
+def test_acceptance_audit_emits_build_evidence_and_summary_reports() -> None:
+    script = _read('scripts/final_acceptance_audit.sh')
+    assert 'BUILD_EVIDENCE_REPORT="$BUILD_DIR/build_evidence_report.json"' in script
+    assert 'ACCEPTANCE_SUMMARY_REPORT="$BUILD_DIR/acceptance_summary.json"' in script
+    assert 'scripts/verify_cpp_build_evidence.py' in script
+    assert 'scripts/write_acceptance_summary.py' in script
+
+
+def test_robot_identity_service_uses_structured_default_model_contract() -> None:
+    source = _read('spine_ultrasound_ui/services/robot_identity_service.py')
+    assert 'self.default_model = normalized or XMATE3_IDENTITY.robot_model' in source
+    assert 'model = (robot_model or self.default_model or XMATE3_IDENTITY.robot_model).strip().lower()' in source
+
+
+def test_start_headless_script_delegates_default_backend_resolution_to_runtime_policy() -> None:
+    script = _read('scripts/start_headless.sh')
+    assert 'scripts/resolve_headless_backend.py' in script
+    assert 'SPINE_HEADLESS_BACKEND' in script
+
+
+
+
+def test_readme_and_profile_matrix_align_review_headless_policy() -> None:
+    readme = _read('README.md')
+    profile_matrix = _read('docs/PROFILE_MATRIX.md')
+    runtime_policy = _read('spine_ultrasound_ui/services/runtime_mode_policy.py')
+    assert 'headless 默认 `core`，显式 `mock` 仅允许只读 evidence / replay / contract inspection' in readme
+    assert 'headless review may use `mock` **only** for read-only evidence / replay / contract inspection flows' in profile_matrix
+    assert '"review": frozenset({"mock", "core"})' in runtime_policy
+    assert '"review": "core"' in runtime_policy
+def test_readme_documents_runtime_policy_backed_headless_resolution() -> None:
+    readme = _read('README.md')
+    assert 'runtime_mode_policy' in readme
+    assert 'start_headless.sh' in readme

@@ -22,7 +22,7 @@ from .backend_projection_cache import BackendProjectionCache
 from .core_transport import parse_telemetry_payload, send_tls_command
 from .ipc_protocol import ReplyEnvelope
 from .protobuf_transport import DEFAULT_TLS_SERVER_NAME, create_client_ssl_context, recv_length_prefixed_message
-from .runtime_command_catalog import is_write_command
+from .runtime_command_catalog import is_plan_compile_command, is_write_command
 from .scan_plan_contract import runtime_scan_plan_payload
 
 
@@ -118,7 +118,7 @@ class RobotCoreClientBackend(QObject, BackendBase):
             reply = send_tls_command(self.command_host, self.command_port, self._ssl_context, command, request_payload)
             self._remember_recent_command(command, reply)
             self._capture_reply_contracts(reply)
-            if command != "get_authoritative_runtime_envelope" and (is_write_command(command) or command in {"compile_scan_plan", "query_final_verdict"}):
+            if command != "get_authoritative_runtime_envelope" and (is_write_command(command) or is_plan_compile_command(command)):
                 self._refresh_authoritative_runtime_snapshot(reason=command)
             self._log("INFO", f"{command}: {reply.message or ('OK' if reply.ok else 'FAILED')}")
             return reply
@@ -129,30 +129,39 @@ class RobotCoreClientBackend(QObject, BackendBase):
             self._log("ERROR", f"{command}: {normalized.error_type}: {normalized.message}")
             return failed
 
-    def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
-        """Resolve the authoritative final verdict with cached fallback.
+    def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict[str, Any]:
+        """Resolve the authoritative final verdict through the canonical backend API."""
+        if read_only:
+            reply = self.send_command("query_final_verdict", {})
+            verdict = self._authoritative_service.extract_final_verdict(reply.data)
+            if verdict:
+                return verdict
+            with self._lock:
+                cached = dict(self._last_final_verdict)
+                envelope = dict(self._authoritative_envelope)
+                control_plane = dict(self._control_plane_cache)
+            return cached or self._authoritative_service.extract_final_verdict(envelope) or self._authoritative_service.extract_final_verdict(control_plane)
 
-        Args:
-            plan: Optional scan plan for a compile-time query.
-            config: Optional config override used for the compile query.
-
-        Returns:
-            Normalized final verdict payload.
-        """
         compile_payload = {
             "scan_plan": runtime_scan_plan_payload(plan),
             "config_snapshot": config.to_dict() if config is not None else self.config.to_dict(),
         }
-        for command_name, payload in (("compile_scan_plan", compile_payload), ("query_final_verdict", {})):
-            reply = self.send_command(command_name, payload)
-            verdict = self._authoritative_service.extract_final_verdict(reply.data)
-            if verdict:
-                return verdict
-        with self._lock:
-            cached = dict(self._last_final_verdict)
-            envelope = dict(self._authoritative_envelope)
-            control_plane = dict(self._control_plane_cache)
-        return cached or self._authoritative_service.extract_final_verdict(envelope) or self._authoritative_service.extract_final_verdict(control_plane)
+        reply = self.send_command("validate_scan_plan", compile_payload)
+        verdict = self._authoritative_service.extract_final_verdict(reply.data)
+        if verdict:
+            return verdict
+        return self.resolve_final_verdict(read_only=True)
+
+    def query_final_verdict_snapshot(self) -> dict[str, Any]:
+        """Compatibility wrapper for the read-only final-verdict snapshot API."""
+        return self.resolve_final_verdict(read_only=True)
+
+    def compile_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
+        """Compatibility wrapper for compile-time final-verdict resolution."""
+        return self.resolve_final_verdict(plan, config, read_only=False)
+
+    def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
+        return self.compile_final_verdict(plan, config)
 
     def close(self) -> None:
         """Stop the telemetry loop and join the background thread."""

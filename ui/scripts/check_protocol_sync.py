@@ -112,7 +112,10 @@ def _cleanup_generated_python_artifacts() -> None:
             continue
         for filename in files:
             if filename.endswith(('.pyc', '.pyo')):
-                (root_path / filename).unlink(missing_ok=True)
+                try:
+                    (root_path / filename).unlink(missing_ok=True)
+                except PermissionError:
+                    pass
         for dirname in dirs:
             if dirname in {'.pytest_cache', '__pycache__'}:
                 shutil.rmtree(root_path / dirname, ignore_errors=True)
@@ -145,12 +148,13 @@ def parse_python_command_catalog(source: str) -> dict[str, dict[str, object]]:
 
 
 def parse_cpp_command_registry(source: str) -> dict[str, dict[str, object]]:
-    pattern = re.compile(r'\{"([a-z_]+)",\s*(true|false),\s*"([^"]*)"\}')
+    pattern = re.compile(r'\{"([a-z_]+)",\s*(true|false),\s*"([^"]*)",\s*"([^"]*)"\}')
     registry: dict[str, dict[str, object]] = {}
-    for command, write_flag, state_signature in pattern.findall(source):
+    for command, write_flag, state_signature, capability_claim in pattern.findall(source):
         registry[command] = {
             "write_command": write_flag == "true",
             "state_preconditions": [item for item in state_signature.split('|') if item],
+            "capability_claim": capability_claim,
         }
     return registry
 
@@ -212,6 +216,10 @@ def main() -> int:
             cpp_states = list(cpp_spec.get("state_preconditions", []))
             if py_states != cpp_states:
                 issues.append(f'command state preconditions mismatch for {command}: python={py_states} cpp={cpp_states}')
+            py_claim = str(py_spec.get("capability_claim", ""))
+            cpp_claim = str(cpp_spec.get("capability_claim", ""))
+            if py_claim != cpp_claim:
+                issues.append(f'command capability claim mismatch for {command}: python={py_claim} cpp={cpp_claim}')
 
         if issues:
             for issue in issues:

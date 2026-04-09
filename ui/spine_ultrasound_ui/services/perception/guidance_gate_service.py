@@ -41,8 +41,11 @@ class GuidanceGateService:
             The readiness verdict used by session freeze.
         """
 
+        def _item(name: str) -> dict[str, Any]:
+            return dict(device_roster.get(name, {}))
+
         def _online(name: str) -> bool:
-            item = dict(device_roster.get(name, {}))
+            item = _item(name)
             return bool(item.get("online", item.get("connected", False))) and bool(item.get("fresh", True))
 
         review_context = dict(review_context or {})
@@ -52,6 +55,10 @@ class GuidanceGateService:
             "robot_online": _online("robot"),
             "ultrasound_online": _online("ultrasound"),
             "pressure_online": _online("pressure"),
+            "camera_fact_source": str(_item("camera").get("fact_source", "runtime_snapshot")),
+            "robot_fact_source": str(_item("robot").get("fact_source", "runtime_snapshot")),
+            "ultrasound_fact_source": str(_item("ultrasound").get("fact_source", "runtime_snapshot")),
+            "pressure_fact_source": str(_item("pressure").get("fact_source", "runtime_snapshot")),
             "frame_fresh": bool(source_frame_set.get("fresh", False)),
             "frame_count": int(source_frame_set.get("frame_count", 0) or 0),
         }

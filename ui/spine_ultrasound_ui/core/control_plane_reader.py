@@ -46,7 +46,8 @@ class ControlPlaneReader:
         current_session_dir,
         force_sdk_assets: bool = False,
     ) -> dict[str, dict[str, Any]]:
-        refreshed = self.governance.refresh(
+        """Compatibility wrapper for the authoritative full refresh path."""
+        return self.refresh_full(
             backend=backend,
             config=config,
             telemetry=telemetry,
@@ -55,8 +56,59 @@ class ControlPlaneReader:
             current_session_dir=current_session_dir,
             force_sdk_assets=force_sdk_assets,
         )
-        self._snapshots.update({key: dict(value) for key, value in refreshed.items()})
+
+    def refresh_full(
+        self,
+        *,
+        backend,
+        config: RuntimeConfig,
+        telemetry,
+        workflow_artifacts: WorkflowArtifacts,
+        execution_scan_plan: ScanPlan | None,
+        current_session_dir,
+        force_sdk_assets: bool = False,
+    ) -> dict[str, dict[str, Any]]:
+        refreshed = self.governance.refresh_full(
+            backend=backend,
+            config=config,
+            telemetry=telemetry,
+            workflow_artifacts=workflow_artifacts,
+            execution_scan_plan=execution_scan_plan,
+            current_session_dir=current_session_dir,
+            force_sdk_assets=force_sdk_assets,
+        )
+        self._update_snapshots(refreshed)
         return self.snapshots
+
+    def refresh_bridge_projection(self, *, telemetry, workflow_artifacts: WorkflowArtifacts) -> dict[str, dict[str, Any]]:
+        refreshed = self.governance.refresh_bridge_projection(
+            telemetry=telemetry,
+            workflow_artifacts=workflow_artifacts,
+            snapshots=self._snapshots,
+        )
+        self._update_snapshots(refreshed)
+        return self.snapshots
+
+    def refresh_backend_projection(self, *, backend, telemetry, workflow_artifacts: WorkflowArtifacts) -> dict[str, dict[str, Any]]:
+        refreshed = self.governance.refresh_backend_projection(
+            backend=backend,
+            telemetry=telemetry,
+            workflow_artifacts=workflow_artifacts,
+            snapshots=self._snapshots,
+        )
+        self._update_snapshots(refreshed)
+        return self.snapshots
+
+    def refresh_session_governance(self, *, current_session_dir) -> dict[str, dict[str, Any]]:
+        refreshed = self.governance.refresh_session_governance_projection(
+            current_session_dir=current_session_dir,
+            snapshots=self._snapshots,
+        )
+        self._update_snapshots(refreshed)
+        return self.snapshots
+
+    def _update_snapshots(self, refreshed: dict[str, Any]) -> None:
+        self._snapshots.update({key: dict(value) for key, value in refreshed.items()})
 
     def collect_startup_blockers(self) -> list[dict[str, str]]:
         return self.governance.collect_startup_blockers(

@@ -47,6 +47,23 @@ def test_sdk_robot_facade_connect_does_not_report_contract_shell_success_after_l
     assert 'return false;' in connect_region
 
 
+def test_sdk_robot_facade_connect_missing_ip_branch_clears_live_binding_state() -> None:
+    source = _read('cpp_robot_core/src/sdk_robot_facade.cpp')
+    connect_start = source.find('bool SdkRobotFacade::connect')
+    assert connect_start >= 0
+    missing_branch_start = source.find('if (remote_ip.empty() || local_ip.empty())', connect_start)
+    assert missing_branch_start >= 0
+    missing_branch_end = source.find('#ifdef ROBOT_CORE_WITH_XCORE_SDK', missing_branch_start)
+    missing_branch = source[missing_branch_start:missing_branch_end]
+    assert 'robot_.reset();' in missing_branch
+    assert 'rt_controller_.reset();' in missing_branch
+    assert 'live_binding_established_ = false;' in missing_branch
+    assert 'state_channel_ready_ = false;' in missing_branch
+    assert 'aux_channel_ready_ = false;' in missing_branch
+    assert 'motion_channel_ready_ = false;' in missing_branch
+    assert 'network_healthy_ = false;' in missing_branch
+
+
 def test_vendor_boundary_detail_does_not_overstate_non_live_readiness() -> None:
     source = _read('cpp_robot_core/src/core_runtime_contracts.cpp')
     assert 'real live binding/lifecycle readiness/exclusive-control evidence is not yet established' in source

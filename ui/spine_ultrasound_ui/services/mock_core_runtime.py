@@ -99,6 +99,7 @@ class MockCoreRuntime(
         self.force_sensor_status = "ok"
         self.force_sensor_source = self.force_sensor_provider_name
         self.force_sensor_stale_ticks = 0
+        self.last_force_wrench_n = [0.0, 0.0, 0.0]
         self.force_sensor_timeout_alarm = False
         self.force_sensor_estop_alarm = False
         self.devices = {

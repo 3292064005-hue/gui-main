@@ -17,7 +17,7 @@ from spine_ultrasound_ui.services.runtime_version_policy import (
     check_pyside6_version,
     check_ubuntu_2204,
 )
-from spine_ultrasound_ui.services.sdk_vendor_locator import SdkVendorLocator
+from spine_ultrasound_ui.services.sdk_vendor_locator import SdkVendorLayout, SdkVendorLocator
 
 
 @dataclass
@@ -67,6 +67,34 @@ class SdkEnvironmentDoctorService:
         self.root_dir = Path(root_dir or Path(__file__).resolve().parents[2])
         self.snapshot = SdkEnvironmentDoctorSnapshot()
         self.locator = SdkVendorLocator(self.root_dir)
+
+    def _display_path(self, path: Path | str | None) -> str:
+        """Render repository-local paths portably while keeping host paths explicit."""
+        if path is None:
+            return ''
+        candidate = Path(path)
+        try:
+            resolved = candidate.resolve(strict=False)
+            root_resolved = self.root_dir.resolve(strict=False)
+        except Exception:
+            resolved = candidate
+            root_resolved = self.root_dir
+        try:
+            relative = resolved.relative_to(root_resolved)
+        except ValueError:
+            return str(candidate)
+        return relative.as_posix()
+
+    def _display_layout_dict(self, layout: SdkVendorLayout) -> dict[str, Any]:
+        payload = layout.to_dict()
+        for key in (
+            'sdk_root', 'include_dir', 'external_dir', 'lib_dir',
+            'static_lib', 'shared_lib', 'nomodel_shared_lib', 'xmate_model_lib',
+        ):
+            value = payload.get(key)
+            if value:
+                payload[key] = self._display_path(value)
+        return payload
 
     def inspect(self, config: RuntimeConfig) -> dict[str, Any]:
         checks: list[DoctorCheck] = []
@@ -126,8 +154,8 @@ class SdkEnvironmentDoctorService:
                 "protobuf_impl": os.getenv("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", ""),
             },
             sdk_paths={
-                **layout.to_dict(),
-                "tls_runtime_dir": str(self.root_dir / "configs" / "tls" / "runtime"),
+                **self._display_layout_dict(layout),
+                "tls_runtime_dir": self._display_path(self.root_dir / "configs" / "tls" / "runtime"),
             },
         )
         return self.snapshot.to_dict()
@@ -137,7 +165,7 @@ class SdkEnvironmentDoctorService:
         eigen_header = Path("/usr/include/eigen3/Eigen/Core")
         vendored_eigen_header = self.root_dir / "third_party" / "rokae_xcore_sdk" / "robot" / "external" / "Eigen" / "Core"
         eigen_ok = eigen_header.exists() or vendored_eigen_header.exists()
-        eigen_detail = str(eigen_header if eigen_header.exists() else vendored_eigen_header if vendored_eigen_header.exists() else "/usr/include/eigen3/Eigen/Core")
+        eigen_detail = self._display_path(eigen_header if eigen_header.exists() else vendored_eigen_header if vendored_eigen_header.exists() else Path("/usr/include/eigen3/Eigen/Core"))
         cmake_path = shutil.which("cmake")
         cmake_raw_version = self._tool_version(cmake_path, "--version")
         cmake_check = check_cmake_version(cmake_raw_version)
@@ -185,29 +213,29 @@ class SdkEnvironmentDoctorService:
         cpp_source = self.root_dir / "cpp_robot_core" / "src" / "ipc_messages.pb.cpp"
         sync_script = self.root_dir / "scripts" / "check_protocol_sync.py"
         return [
-            self._check("Protocol proto source", proto.exists(), "blocker", str(proto)),
-            self._check("Python pb2 asset", python_pb2.exists(), "blocker", str(python_pb2)),
-            self._check("C++ wire codec header", cpp_header.exists(), "blocker", str(cpp_header)),
-            self._check("C++ wire codec source", cpp_source.exists(), "blocker", str(cpp_source)),
-            self._check("Protocol sync gate script", sync_script.exists(), "warning", str(sync_script)),
+            self._check("Protocol proto source", proto.exists(), "blocker", self._display_path(proto)),
+            self._check("Python pb2 asset", python_pb2.exists(), "blocker", self._display_path(python_pb2)),
+            self._check("C++ wire codec header", cpp_header.exists(), "blocker", self._display_path(cpp_header)),
+            self._check("C++ wire codec source", cpp_source.exists(), "blocker", self._display_path(cpp_source)),
+            self._check("Protocol sync gate script", sync_script.exists(), "warning", self._display_path(sync_script)),
         ]
 
     def _sdk_mount_checks(self) -> list[DoctorCheck]:
         layout = self.locator.locate()
         return [
-            self._check("xCore SDK 根目录", layout.sdk_root is not None, "blocker", str(layout.sdk_root) if layout.sdk_root else "未找到 vendored SDK"),
-            self._check("xCore SDK include", layout.include_dir is not None, "blocker", str(layout.include_dir) if layout.include_dir else "include 缺失"),
-            self._check("xCore SDK external", layout.external_dir is not None, "blocker", str(layout.external_dir) if layout.external_dir else "external 缺失"),
-            self._check("xCore SDK 静态库", layout.static_lib is not None, "blocker", str(layout.static_lib) if layout.static_lib else "libxCoreSDK.a 缺失"),
-            self._check("xMateModel 静态库", layout.xmate_model_available, "warning", str(layout.xmate_model_lib) if layout.xmate_model_lib else "libxMateModel.a 缺失"),
+            self._check("xCore SDK 根目录", layout.sdk_root is not None, "blocker", self._display_path(layout.sdk_root) if layout.sdk_root else "未找到 vendored SDK"),
+            self._check("xCore SDK include", layout.include_dir is not None, "blocker", self._display_path(layout.include_dir) if layout.include_dir else "include 缺失"),
+            self._check("xCore SDK external", layout.external_dir is not None, "blocker", self._display_path(layout.external_dir) if layout.external_dir else "external 缺失"),
+            self._check("xCore SDK 静态库", layout.static_lib is not None, "blocker", self._display_path(layout.static_lib) if layout.static_lib else "libxCoreSDK.a 缺失"),
+            self._check("xMateModel 静态库", layout.xmate_model_available, "warning", self._display_path(layout.xmate_model_lib) if layout.xmate_model_lib else "libxMateModel.a 缺失"),
         ]
 
     def _tls_checks(self) -> list[DoctorCheck]:
         runtime_dir = self.root_dir / "configs" / "tls" / "runtime"
         material = list(runtime_dir.glob("*.pem")) + list(runtime_dir.glob("*.crt")) + list(runtime_dir.glob("*.key"))
         return [
-            self._check("TLS runtime 目录", runtime_dir.exists(), "blocker", str(runtime_dir)),
-            self._check("TLS 证书材料", bool(material), "warning", f"{runtime_dir} / {len(material)} files"),
+            self._check("TLS runtime 目录", runtime_dir.exists(), "blocker", self._display_path(runtime_dir)),
+            self._check("TLS 证书材料", bool(material), "warning", f"{self._display_path(runtime_dir)} / {len(material)} files"),
         ]
 
     def _network_checks(self, config: RuntimeConfig) -> list[DoctorCheck]:

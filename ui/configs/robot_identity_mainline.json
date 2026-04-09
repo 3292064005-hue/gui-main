@@ -1,0 +1,11 @@
+{
+  "family_key": "xmate3_cobot_6",
+  "robot_model": "xmate3",
+  "display_name": "xMate3",
+  "sdk_robot_class": "xMateRobot",
+  "axis_count": 6,
+  "controller_family": "xCore",
+  "controller_version": "v2.1+",
+  "preferred_link": "wired_direct",
+  "clinical_mainline_mode": "cartesianImpedance"
+}

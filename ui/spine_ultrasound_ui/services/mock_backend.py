@@ -127,13 +127,31 @@ class MockBackend(QObject, BackendBase):
             "projection_partitions": projection_snapshot["partitions"],
         }
 
-    def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict:
+    def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict:
+        """Resolve the authoritative final verdict through the canonical backend API."""
+        if read_only:
+            verdict = self._authoritative_service.extract_final_verdict(self._authoritative_envelope)
+            if verdict:
+                return verdict
+            return dict(self.runtime.last_final_verdict or {})
+
         plan_payload = runtime_scan_plan_payload(plan) or {}
         config_payload = config.to_dict() if config is not None else self.config.to_dict()
         verdict = self.runtime.compile_scan_plan_verdict(plan_payload, config_payload)
         self._authoritative_envelope = self._build_authoritative_envelope(final_verdict=verdict)
         self._projection_cache.update_partition("authoritative_runtime_envelope", self._authoritative_envelope)
         return verdict
+
+    def query_final_verdict_snapshot(self) -> dict:
+        """Compatibility wrapper for the read-only final-verdict snapshot API."""
+        return self.resolve_final_verdict(read_only=True)
+
+    def compile_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict:
+        """Compatibility wrapper for compile-time final-verdict resolution."""
+        return self.resolve_final_verdict(plan, config, read_only=False)
+
+    def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict:
+        return self.compile_final_verdict(plan, config)
 
     def close(self) -> None:
         """Stop the mock backend and release timer-backed Qt resources."""

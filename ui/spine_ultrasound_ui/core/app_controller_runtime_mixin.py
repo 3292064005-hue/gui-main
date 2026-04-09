@@ -105,7 +105,7 @@ class AppControllerRuntimeMixin:
         self._run_guarded_command("resume_scan", success_message="扫查已恢复。")
 
     def stop_scan(self) -> None:
-        self._log("INFO", "停止扫查请求已转换为安全退让。")
+        self._log("INFO", "结束本轮扫查请求已映射到 canonical action=safe_retreat。")
         self.safe_retreat()
 
     def safe_retreat(self) -> None:
@@ -249,7 +249,15 @@ class AppControllerRuntimeMixin:
         self.runtime_bridge.refresh_bridge_observability()
 
     def _emit_status(self) -> None:
-        self.runtime_bridge.refresh_governance(force_sdk_assets=False)
+        """Emit the already-materialized status projection.
+
+        Boundary behaviour:
+            - This method must stay side-effect-light.
+            - It must not trigger governance recomputation, session artifact IO,
+              or runtime verdict compilation.
+            - Callers needing fresh governance data must refresh the relevant
+              projection explicitly before invoking ``_emit_status``.
+        """
         payload = self.control_plane_reader.build_status_payload(
             telemetry=self.telemetry,
             config=self.config,

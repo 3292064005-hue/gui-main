@@ -1,6 +1,7 @@
+
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
 from spine_ultrasound_ui.models import CapabilityStatus, ExperimentRecord, ImplementationState, RuntimeConfig, ScanPlan
 from spine_ultrasound_ui.services.localization_strategies import (
@@ -17,15 +18,28 @@ class SimulatedLocalizationStrategy(HybridRegistrationStrategy):
 
 
 class LocalizationPipeline:
-    def __init__(self, strategies: Iterable[object] | None = None) -> None:
-        self.strategies = list(strategies or [HybridRegistrationStrategy(), CameraRegistrationStrategy(), UltrasoundRegistrationStrategy(), FallbackRegistrationStrategy()])
+    """Run localization strategies against a shared authoritative device snapshot."""
 
-    def run(self, experiment: ExperimentRecord, config: RuntimeConfig) -> LocalizationResult:
+    def __init__(self, strategies: Iterable[object] | None = None) -> None:
+        self.strategies = list(strategies or [
+            HybridRegistrationStrategy(),
+            CameraRegistrationStrategy(),
+            UltrasoundRegistrationStrategy(),
+            FallbackRegistrationStrategy(),
+        ])
+
+    def run(
+        self,
+        experiment: ExperimentRecord,
+        config: RuntimeConfig,
+        *,
+        device_roster: dict[str, Any] | None = None,
+    ) -> LocalizationResult:
         last_result: LocalizationResult | None = None
         failures: list[str] = []
         for strategy in self.strategies:
             try:
-                result = strategy.run(experiment, config)
+                result = strategy.run(experiment, config, device_roster=device_roster)
             except (RuntimeError, ValueError) as exc:
                 failures.append(f"{type(strategy).__name__}: {exc}")
                 continue
@@ -93,8 +107,14 @@ class PlanService:
         self.plan_strategy = plan_strategy or DeterministicPlanStrategy()
         self._last_localization: LocalizationResult | None = None
 
-    def run_localization(self, experiment: ExperimentRecord, config: RuntimeConfig) -> LocalizationResult:
-        result = self.localization_pipeline.run(experiment, config)
+    def run_localization(
+        self,
+        experiment: ExperimentRecord,
+        config: RuntimeConfig,
+        *,
+        device_roster: dict[str, Any] | None = None,
+    ) -> LocalizationResult:
+        result = self.localization_pipeline.run(experiment, config, device_roster=device_roster)
         self._last_localization = result
         return result
 
@@ -110,21 +130,34 @@ class PlanService:
             plan,
             CapabilityStatus(
                 ready=True,
-                state="READY",
+                state='READY',
                 implementation=ImplementationState.IMPLEMENTED.value,
-                detail="当前扫查路径由患者配准、表面建模、接触预探、执行候选评估与长轴条带扫查策略联合生成。",
+                detail='当前扫查路径由患者配准、表面建模、接触预探、执行候选评估与长轴条带扫查策略联合生成。',
             ),
         )
 
     def build_execution_plan(self, preview_plan: ScanPlan, *, config: RuntimeConfig) -> ScanPlan:
-        localization = self._last_localization or LocalizationResult(
-            status=CapabilityStatus(ready=True, state="READY", implementation=ImplementationState.IMPLEMENTED.value, detail="execution fallback"),
-            roi_center_y=0.0,
-            segment_count=len(preview_plan.segments),
-            patient_registration={"scan_corridor": {}},
-            confidence=0.75,
-        )
-        return self.plan_strategy.build_execution_plan(preview_plan, config=config, localization=localization)
+        """Build the execution plan from a preview plan and canonical localization.
+
+        Args:
+            preview_plan: Preview plan selected for execution.
+            config: Active runtime configuration.
+
+        Returns:
+            Session-bound execution plan.
+
+        Raises:
+            RuntimeError: Raised when no canonical localization result has been
+                captured for the preview plan.
+
+        Boundary behavior:
+            This method no longer synthesizes fallback localization facts.
+            Callers must first run localization and preview generation using the
+            same canonical localization bundle.
+        """
+        if self._last_localization is None:
+            raise RuntimeError('execution plan requires canonical localization before binding preview plan')
+        return self.plan_strategy.build_execution_plan(preview_plan, config=config, localization=self._last_localization)
 
     def build_rescan_patch_plan(
         self,

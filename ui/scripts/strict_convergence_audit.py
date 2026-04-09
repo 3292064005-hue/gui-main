@@ -56,11 +56,45 @@ def main() -> int:
 
     tls_cert = ROOT / 'configs/tls/robot_core_server.crt'
     record('tls-repo-clean', not tls_cert.exists(), f'committed_cert_present={tls_cert.exists()}')
-    record('protocol-compile-command', file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"compile_scan_plan"\s*:\s*\{') and file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"query_final_verdict"\s*:\s*\{'), 'compile/query contract commands registered in canonical command catalog')
-    runtime_final_verdict_files = ['cpp_robot_core/src/core_runtime.cpp', 'cpp_robot_core/src/core_runtime_power_validation.cpp']
-    compile_present = any(file_contains(rel, r'command == "compile_scan_plan"') for rel in runtime_final_verdict_files)
-    query_present = any(file_contains(rel, r'command == "query_final_verdict"') for rel in runtime_final_verdict_files)
-    record('core-runtime-final-verdict', compile_present and query_present, 'cpp core runtime handles compile/query final verdict across split handler files')
+    record('protocol-plan-compile-command', file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"validate_scan_plan"\s*:\s*\{') and file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"compile_scan_plan"\s*:\s*\{') and file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"query_final_verdict"\s*:\s*\{'), 'validate/query contract commands registered; compile alias retained for compatibility')
+    runtime_final_verdict_patterns = {
+        'validate_scan_plan': [
+            r'command == "validate_scan_plan"',
+            r'"validate_scan_plan"\s*,\s*&CoreRuntime::handleValidationCommand',
+            r'"validate_scan_plan"\s*,\s*\[\]\(CoreRuntime\* self',
+        ],
+        'compile_scan_plan_alias': [
+            r'command == "compile_scan_plan"',
+            r'"compile_scan_plan"\s*,\s*&CoreRuntime::handleValidationCommand',
+            r'"compile_scan_plan"\s*,\s*\[\]\(CoreRuntime\* self',
+        ],
+        'query_final_verdict': [
+            r'command == "query_final_verdict"',
+            r'"query_final_verdict"\s*,\s*&CoreRuntime::handleValidationCommand',
+            r'"query_final_verdict"\s*,\s*\[\]\(CoreRuntime\* self',
+        ],
+    }
+    runtime_final_verdict_files = [
+        'cpp_robot_core/src/core_runtime.cpp',
+        'cpp_robot_core/src/core_runtime_power_validation.cpp',
+        'cpp_robot_core/src/command_registry.cpp',
+    ]
+    validate_present = any(
+        file_contains(rel, pattern)
+        for rel in runtime_final_verdict_files
+        for pattern in runtime_final_verdict_patterns['validate_scan_plan']
+    )
+    compile_alias_present = any(
+        file_contains(rel, pattern)
+        for rel in runtime_final_verdict_files
+        for pattern in runtime_final_verdict_patterns['compile_scan_plan_alias']
+    )
+    query_present = any(
+        file_contains(rel, pattern)
+        for rel in runtime_final_verdict_files
+        for pattern in runtime_final_verdict_patterns['query_final_verdict']
+    )
+    record('core-runtime-final-verdict', validate_present and compile_alias_present and query_present, 'cpp core runtime handles validate/query final verdict with compile compatibility alias across split handler files')
     record('protocol-sync-script', (ROOT / 'scripts/check_protocol_sync.py').exists(), 'protocol sync script present')
     record('protocol-proto-source', (ROOT / 'cpp_robot_core/proto/ipc_messages.proto').exists(), 'canonical proto source present')
     record('protocol-python-pb2', (ROOT / 'spine_ultrasound_ui/services/ipc_messages_pb2.py').exists(), 'python pb2 asset present')

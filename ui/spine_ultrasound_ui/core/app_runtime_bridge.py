@@ -250,7 +250,13 @@ class AppRuntimeBridge:
         )
 
     def refresh_governance(self, *, force_sdk_assets: bool = False) -> None:
-        snapshots = self.host.control_plane_reader.refresh(
+        """Perform the authoritative full governance refresh.
+
+        This path is intended for command/config/workflow transitions. It may
+        refresh SDK assets, query the runtime verdict, and rebuild the full
+        control-plane snapshot.
+        """
+        snapshots = self.host.control_plane_reader.refresh_full(
             backend=self.host.backend,
             config=self.host.config,
             telemetry=self.host.telemetry,
@@ -265,13 +271,28 @@ class AppRuntimeBridge:
         self.refresh_governance(force_sdk_assets=force)
 
     def refresh_session_governance(self) -> None:
-        self.refresh_governance(force_sdk_assets=False)
+        """Refresh only session-governance-derived snapshots."""
+        snapshots = self.host.control_plane_reader.refresh_session_governance(
+            current_session_dir=self.host.session_service.current_session_dir,
+        )
+        self.host._sync_control_plane_snapshots(snapshots)
 
     def refresh_backend_link(self) -> None:
-        self.refresh_governance(force_sdk_assets=False)
+        """Refresh backend-link and bridge projections without recompiling governance-heavy products."""
+        snapshots = self.host.control_plane_reader.refresh_backend_projection(
+            backend=self.host.backend,
+            telemetry=self.host.telemetry,
+            workflow_artifacts=self.host.workflow_artifacts,
+        )
+        self.host._sync_control_plane_snapshots(snapshots)
 
     def refresh_bridge_observability(self) -> None:
-        self.refresh_governance(force_sdk_assets=False)
+        """Refresh telemetry-facing bridge observability from cached control-plane inputs only."""
+        snapshots = self.host.control_plane_reader.refresh_bridge_projection(
+            telemetry=self.host.telemetry,
+            workflow_artifacts=self.host.workflow_artifacts,
+        )
+        self.host._sync_control_plane_snapshots(snapshots)
 
     def raise_local_alarm(
         self,

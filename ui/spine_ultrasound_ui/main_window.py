@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QMessageBox, QP
 from spine_ultrasound_ui.models import ExperimentRecord
 from spine_ultrasound_ui.styles import MAIN_STYLESHEET
 from spine_ultrasound_ui.widgets import ConfigForm, ExperimentTableModel
+from spine_ultrasound_ui.views.main_window_action_router import MainWindowActionRouter, invoke_backend_action, report_action_failure
 from spine_ultrasound_ui.views.main_window_layout import MainWindowLayoutBuilder
 from spine_ultrasound_ui.views.main_window_runtime_bridge import MainWindowRuntimeBridge
 from spine_ultrasound_ui.views.main_window_status_presenter import MainWindowStatusPresenter
@@ -20,6 +21,7 @@ class MainWindow(QMainWindow):
         self.exp_model = ExperimentTableModel([])
         self.status_presenter = MainWindowStatusPresenter()
         self.runtime_bridge = MainWindowRuntimeBridge(self)
+        self.action_router = MainWindowActionRouter(self)
         self.config_form = ConfigForm(self.backend.config)
         if hasattr(self.backend, "update_config"):
             self.config_form.config_applied.connect(self.backend.update_config)
@@ -56,9 +58,9 @@ class MainWindow(QMainWindow):
         self.settings_page.restore_defaults_requested.connect(self._restore_default_config)
         self.settings_page.save_layout_requested.connect(self._save_ui_preferences)
         for signal_name, handler in [
-            ("apply_baseline_requested", self.backend.apply_clinical_baseline),
-            ("export_governance_requested", self.backend.export_governance_snapshot),
-            ("refresh_governance_requested", self.backend.refresh_session_governance),
+            ("apply_baseline_requested", self._action_apply_clinical_baseline),
+            ("export_governance_requested", self._action_export_governance_snapshot),
+            ("refresh_governance_requested", self._action_refresh_session_governance),
         ]:
             if hasattr(self.settings_page, signal_name):
                 getattr(self.settings_page, signal_name).connect(handler)
@@ -177,6 +179,108 @@ class MainWindow(QMainWindow):
 
     def _confirm_estop(self) -> None:
         self.runtime_bridge.confirm_estop()
+
+    def _report_unsupported_window_action(self, action_name: str) -> None:
+        report_action_failure(self, action_name, RuntimeError(f'unsupported window action: {action_name}'))
+
+    def _report_action_failure(self, action_name: str, exc: Exception) -> None:
+        report_action_failure(self, action_name, exc)
+
+    def _invoke_backend_action(self, action_name: str) -> bool:
+        return invoke_backend_action(self, action_name)
+
+    def _action_connect_robot(self) -> None:
+        self._invoke_backend_action("connect_robot")
+
+    def _action_disconnect_robot(self) -> None:
+        self._invoke_backend_action("disconnect_robot")
+
+    def _action_power_on(self) -> None:
+        self._invoke_backend_action("power_on")
+
+    def _action_power_off(self) -> None:
+        self._invoke_backend_action("power_off")
+
+    def _action_set_auto_mode(self) -> None:
+        self._invoke_backend_action("set_auto_mode")
+
+    def _action_set_manual_mode(self) -> None:
+        self._invoke_backend_action("set_manual_mode")
+
+    def _action_create_experiment(self) -> None:
+        self._invoke_backend_action("create_experiment")
+
+    def _action_run_localization(self) -> None:
+        self._invoke_backend_action("run_localization")
+
+    def _action_generate_path(self) -> None:
+        self._invoke_backend_action("generate_path")
+
+    def _action_start_scan(self) -> None:
+        self._invoke_backend_action("start_scan")
+
+    def _action_pause_scan(self) -> None:
+        self._invoke_backend_action("pause_scan")
+
+    def _action_resume_scan(self) -> None:
+        self._invoke_backend_action("resume_scan")
+
+    def _action_stop_scan(self) -> None:
+        self._invoke_backend_action("stop_scan")
+
+    def _action_go_home(self) -> None:
+        self._invoke_backend_action("go_home")
+
+    def _action_safe_retreat(self) -> None:
+        self._invoke_backend_action("safe_retreat")
+
+    def _action_run_preprocess(self) -> None:
+        self._invoke_backend_action("run_preprocess")
+
+    def _action_run_reconstruction(self) -> None:
+        self._invoke_backend_action("run_reconstruction")
+
+    def _action_run_assessment(self) -> None:
+        self._invoke_backend_action("run_assessment")
+
+    def _action_export_summary(self) -> None:
+        self._invoke_backend_action("export_summary")
+
+    def _action_refresh_sdk_assets(self) -> None:
+        self._invoke_backend_action("refresh_sdk_assets")
+
+    def _action_query_controller_log(self) -> None:
+        self._invoke_backend_action("query_controller_log")
+
+    def _action_run_rl_project(self) -> None:
+        self._invoke_backend_action("run_rl_project")
+
+    def _action_pause_rl_project(self) -> None:
+        self._invoke_backend_action("pause_rl_project")
+
+    def _action_enable_drag(self) -> None:
+        self._invoke_backend_action("enable_drag")
+
+    def _action_disable_drag(self) -> None:
+        self._invoke_backend_action("disable_drag")
+
+    def _action_replay_path(self) -> None:
+        self._invoke_backend_action("replay_path")
+
+    def _action_save_results(self) -> None:
+        self._invoke_backend_action("save_results")
+
+    def _action_apply_clinical_baseline(self) -> None:
+        self._invoke_backend_action("apply_clinical_baseline")
+
+    def _action_export_governance_snapshot(self) -> None:
+        self._invoke_backend_action("export_governance_snapshot")
+
+    def _action_refresh_session_governance(self) -> None:
+        self._invoke_backend_action("refresh_session_governance")
+
+    def _action_browse_evidence_offline(self) -> None:
+        self._invoke_backend_action("browse_evidence_offline")
 
     def closeEvent(self, event) -> None:
         try:

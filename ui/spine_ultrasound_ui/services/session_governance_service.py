@@ -13,10 +13,46 @@ class SessionGovernanceService:
     The desktop does not need the full raw contents of every generated artifact on each
     refresh. It needs an operator-facing governance digest: is the current session
     internally consistent, resumable, and eventually releasable.
+
+    This service caches the last digest by session path plus relevant artifact file
+    signatures so explicit refreshes remain cheap when nothing on disk changed.
     """
+
+    _RELATIVE_ARTIFACTS = (
+        ("manifest", Path("meta/manifest.json")),
+        ("release_gate", Path("export/release_gate_decision.json")),
+        ("integrity", Path("export/session_integrity.json")),
+        ("diagnostics", Path("export/diagnostics_pack.json")),
+        ("resume", Path("meta/resume_decision.json")),
+        ("incidents", Path("derived/incidents/session_incidents.json")),
+        ("selected_execution", Path("derived/planning/selected_execution_rationale.json")),
+        ("contract", Path("derived/session/contract_consistency.json")),
+        ("control_plane_snapshot", Path("derived/session/control_plane_snapshot.json")),
+        ("evidence_seal", Path("meta/session_evidence_seal.json")),
+        ("event_delivery", Path("derived/events/event_delivery_summary.json")),
+    )
+
+    def __init__(self) -> None:
+        self._cached_session_dir: str | None = None
+        self._cached_signature: tuple[tuple[str, Any], ...] | None = None
+        self._cached_payload: dict[str, Any] | None = None
+
+    def invalidate(self, session_dir: Path | None = None) -> None:
+        """Invalidate the cached digest.
+
+        Args:
+            session_dir: Optional session directory. When provided, only matching
+                cached entries are discarded.
+        """
+        if session_dir is not None and self._cached_session_dir not in {None, str(session_dir)}:
+            return
+        self._cached_session_dir = None
+        self._cached_signature = None
+        self._cached_payload = None
 
     def build(self, session_dir: Path | None) -> dict[str, Any]:
         if session_dir is None:
+            self.invalidate()
             return {
                 "summary_state": "idle",
                 "summary_label": "未锁定会话",
@@ -32,18 +68,30 @@ class SessionGovernanceService:
                 "incidents": {},
             }
 
+        signature = self._build_signature(session_dir)
+        if (
+            self._cached_payload is not None
+            and self._cached_session_dir == str(session_dir)
+            and self._cached_signature == signature
+        ):
+            return dict(self._cached_payload)
+
         read_errors: list[dict[str, Any]] = []
-        manifest = self._read_json(session_dir / "meta" / "manifest.json", read_errors)
-        gate = self._read_json(session_dir / "export" / "release_gate_decision.json", read_errors)
-        integrity = self._read_json(session_dir / "export" / "session_integrity.json", read_errors)
-        diagnostics = self._read_json(session_dir / "export" / "diagnostics_pack.json", read_errors)
-        resume = self._read_json(session_dir / "meta" / "resume_decision.json", read_errors)
-        incidents = self._read_json(session_dir / "derived" / "incidents" / "session_incidents.json", read_errors)
-        selected_execution = self._read_json(session_dir / "derived" / "planning" / "selected_execution_rationale.json", read_errors)
-        contract = self._read_json(session_dir / "derived" / "session" / "contract_consistency.json", read_errors)
-        control_plane_snapshot = self._read_json(session_dir / "derived" / "session" / "control_plane_snapshot.json", read_errors)
-        evidence_seal = self._read_json(session_dir / "meta" / "session_evidence_seal.json", read_errors)
-        event_delivery = self._read_json(session_dir / "derived" / "events" / "event_delivery_summary.json", read_errors)
+        documents = {
+            name: self._read_json(session_dir / relative_path, read_errors)
+            for name, relative_path in self._RELATIVE_ARTIFACTS
+        }
+        manifest = documents["manifest"]
+        gate = documents["release_gate"]
+        integrity = documents["integrity"]
+        diagnostics = documents["diagnostics"]
+        resume = documents["resume"]
+        incidents = documents["incidents"]
+        selected_execution = documents["selected_execution"]
+        contract = documents["contract"]
+        control_plane_snapshot = documents["control_plane_snapshot"]
+        evidence_seal = documents["evidence_seal"]
+        event_delivery = documents["event_delivery"]
 
         blockers: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
@@ -78,7 +126,7 @@ class SessionGovernanceService:
             if item.get("incident_type")
         ]
         detail = self._detail(summary_state, gate, blockers, warnings)
-        return {
+        payload = {
             "summary_state": summary_state,
             "summary_label": {
                 "ready": "会话治理通过",
@@ -113,8 +161,14 @@ class SessionGovernanceService:
             },
             "integrity": dict(integrity.get("summary", {})),
             "contract": dict(contract.get("summary", {})),
-            "control_plane": {"summary_state": control_plane_snapshot.get("summary_state", ""), "summary_label": control_plane_snapshot.get("summary_label", "")},
-            "evidence_seal": {"seal_digest": evidence_seal.get("seal_digest", ""), "artifact_count": int(evidence_seal.get("artifact_count", 0) or 0)},
+            "control_plane": {
+                "summary_state": control_plane_snapshot.get("summary_state", ""),
+                "summary_label": control_plane_snapshot.get("summary_label", ""),
+            },
+            "evidence_seal": {
+                "seal_digest": evidence_seal.get("seal_digest", ""),
+                "artifact_count": int(evidence_seal.get("artifact_count", 0) or 0),
+            },
             "selected_execution": {
                 "selected_candidate_id": selected_execution.get("selected_candidate_id", ""),
                 "selected_profile": selected_execution.get("selected_profile", ""),
@@ -125,6 +179,21 @@ class SessionGovernanceService:
             },
             "artifact_errors": read_errors,
         }
+        self._cached_session_dir = str(session_dir)
+        self._cached_signature = signature
+        self._cached_payload = dict(payload)
+        return dict(payload)
+
+    def _build_signature(self, session_dir: Path) -> tuple[tuple[str, Any], ...]:
+        signature: list[tuple[str, Any]] = [("session_dir", str(session_dir))]
+        for name, relative_path in self._RELATIVE_ARTIFACTS:
+            target = session_dir / relative_path
+            if not target.exists():
+                signature.append((name, None))
+                continue
+            stat = target.stat()
+            signature.append((name, (int(stat.st_mtime_ns), int(stat.st_size))))
+        return tuple(signature)
 
     @staticmethod
     def _detail(summary_state: str, gate: dict[str, Any], blockers: list[dict[str, Any]], warnings: list[dict[str, Any]]) -> str:
@@ -143,12 +212,14 @@ class SessionGovernanceService:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
-            normalized = normalize_backend_exception(exc, command='read_session_artifact', context='session-governance')
-            errors.append({
-                'name': 'artifact_read_error',
-                'path': str(path),
-                'error_type': normalized.error_type,
-                'detail': f'{path.name}: {normalized.message}',
-                'retryable': normalized.retryable,
-            })
+            normalized = normalize_backend_exception(exc, command="read_session_artifact", context="session-governance")
+            errors.append(
+                {
+                    "name": "artifact_read_error",
+                    "path": str(path),
+                    "error_type": normalized.error_type,
+                    "detail": f"{path.name}: {normalized.message}",
+                    "retryable": normalized.retryable,
+                }
+            )
             return {}

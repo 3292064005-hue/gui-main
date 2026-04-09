@@ -1,0 +1,16 @@
+pytest -q tests/test_p0_cpp_runtime_truth.py
+6 passed in 0.15s
+
+pytest -q tests/test_cpp_build_evidence_report.py
+1 passed in 7.84s
+
+pytest -q tests/test_verification_execution_report.py
+18 passed in 17.98s
+
+pytest -q tests/test_sdk_doctor_and_runtime_assets.py
+5 passed in 0.51s
+
+pytest -q tests/test_mainline_script_contracts.py tests/test_p2_repository_gates.py
+54 passed in 2.14s
+
+Total targeted repository-proof regressions: 84 passed

@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+
+def _output_root() -> Path:
+    configured = os.environ.get('P2_ACCEPTANCE_OUTPUT_ROOT', '').strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return Path(tempfile.gettempdir()) / 'spine_p2_acceptance_static'
 
 from spine_ultrasound_ui.core.postprocess.stage_registry import iter_stage_specs
 from spine_ultrasound_ui.services.session_intelligence.registry import iter_product_specs
@@ -19,8 +28,9 @@ def _write_json(path: Path, payload: dict) -> None:
 
 
 def main() -> None:
+    output_root = _output_root()
     _write_json(
-        REPO_ROOT / 'derived/postprocess/postprocess_stage_manifest.json',
+        output_root / 'derived/postprocess/postprocess_stage_manifest.json',
         {
             'generated_at': now_text(),
             'session_id': 'P2_ACCEPTANCE_STATIC',
@@ -32,7 +42,7 @@ def main() -> None:
         },
     )
     _write_json(
-        REPO_ROOT / 'derived/session/session_intelligence_manifest.json',
+        output_root / 'derived/session/session_intelligence_manifest.json',
         {
             'generated_at': now_text(),
             'session_id': 'P2_ACCEPTANCE_STATIC',

@@ -18,7 +18,7 @@ for path in   requirements-win-dev.txt   legacy   tools/rt_experiments   gui_pro
   fi
 done
 
-for path in .pytest_cache __pycache__ data/runtime/session_meta.json data/runtime/ui_preferences.json configs/tls/runtime cpp_robot_core/build cpp_robot_core/build_check cpp_robot_core/build_check_recheck final_acceptance.log full_suite.log pytest_full.log pytest_mainline.log; do
+for path in .pytest_cache __pycache__ data/runtime/session_meta.json data/runtime/ui_preferences.json configs/tls/runtime cpp_robot_core/build cpp_robot_core/build_check cpp_robot_core/build_check_recheck final_acceptance.log full_suite.log pytest_full.log pytest_mainline.log derived/postprocess/postprocess_stage_manifest.json derived/session/session_intelligence_manifest.json; do
   if [ -e "${path}" ]; then
     fail "remove generated/runtime artifact from repository payload: ${path}"
   fi

@@ -16,6 +16,8 @@ from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.utils import ensure_dir, now_ns, now_text
 
 from .api_bridge_backend_helpers import build_command_headers, decode_pixmap_payload, remember_backend_error
+from .api_bridge_lease_service import ApiBridgeLeaseService
+from .api_bridge_verdict_service import ApiBridgeVerdictService
 from .backend_authoritative_contract_service import BackendAuthoritativeContractService
 from .backend_base import BackendBase
 from .backend_control_plane_service import BackendControlPlaneService
@@ -24,7 +26,6 @@ from .backend_errors import BackendOperationError, normalize_backend_exception
 from .backend_link_service import BackendLinkMetrics, BackendLinkService
 from .backend_projection_cache import BackendProjectionCache
 from .ipc_protocol import ReplyEnvelope, TelemetryEnvelope
-from .scan_plan_contract import runtime_scan_plan_payload
 
 try:  # pragma: no cover
     from websockets.sync.client import connect as ws_connect
@@ -52,7 +53,6 @@ class ApiBridgeBackend(QObject, BackendBase):
     camera_pixmap_ready = Signal(QPixmap)
     ultrasound_pixmap_ready = Signal(QPixmap)
     reconstruction_pixmap_ready = Signal(QPixmap)
-
     def __init__(
         self,
         root_dir: Path,
@@ -61,6 +61,7 @@ class ApiBridgeBackend(QObject, BackendBase):
         request_timeout_s: float = 4.0,
         health_poll_interval_s: float = 1.0,
         snapshot_poll_interval_s: float = 0.5,
+        deployment_profile: str = "dev",
     ) -> None:
         """Create the API bridge backend.
 
@@ -70,6 +71,8 @@ class ApiBridgeBackend(QObject, BackendBase):
             request_timeout_s: Per-request timeout in seconds.
             health_poll_interval_s: Poll period for status/health/control-plane.
             snapshot_poll_interval_s: Poll period for REST telemetry fallback.
+            deployment_profile: Deployment profile name used to suppress lease
+                mutations for read-only review desktops.
         """
         super().__init__()
         self.root_dir = ensure_dir(root_dir)
@@ -99,10 +102,21 @@ class ApiBridgeBackend(QObject, BackendBase):
         self._authoritative_service = BackendAuthoritativeContractService()
         self._projection_cache = BackendProjectionCache()
         self._metrics = BackendLinkMetrics(using_websocket_telemetry=ws_connect is not None, using_websocket_media=ws_connect is not None)
+        self._deployment_profile = str(deployment_profile or "dev").strip().lower()
         self._actor_id = os.getenv("SPINE_ACTOR_ID", f"desktop-{socket.gethostname()}")
         self._workspace = os.getenv("SPINE_WORKSPACE", "desktop")
         self._role = os.getenv("SPINE_ROLE", "operator")
         self._lease_id = ""
+        self._lease_service = ApiBridgeLeaseService(self)
+        self._verdict_service = ApiBridgeVerdictService(self)
+
+    def _lease_allowed(self) -> bool:
+        """Return whether the backend may mutate control-lease state.
+
+        Review desktops are read-only surfaces and must not acquire/refresh a
+        control lease as a side effect of startup or verdict queries.
+        """
+        return self._deployment_profile != "review"
 
     def start(self) -> None:
         """Start polling/streaming loops and synchronize local runtime config."""
@@ -117,16 +131,17 @@ class ApiBridgeBackend(QObject, BackendBase):
         else:
             self._spawn(self._snapshot_poll_loop, "api-snapshot-poll")
             self._log("WARN", "websockets 依赖不可用，已退回 REST 快照轮询模式。")
-        self._ensure_control_lease()
+        if self._lease_allowed():
+            self._lease_service.ensure_control_lease()
+        else:
+            self._log("INFO", "review profile active: skip API-side control lease acquisition.")
         self._push_runtime_config()
         self._log("INFO", f"ApiBridgeBackend 已启动，HTTP {self.base_url} / WS {self.ws_base}")
-
     def update_runtime_config(self, config: RuntimeConfig) -> None:
         """Update desired runtime config and push it to the API surface."""
         self.config = config
         self._projection_cache.update_partition("desired_runtime_config", config.to_dict())
         self._push_runtime_config()
-
     def send_command(self, command: str, payload: Optional[dict] = None, *, context: Optional[dict] = None) -> ReplyEnvelope:
         """Send a command to the HTTP command surface.
 
@@ -141,11 +156,14 @@ class ApiBridgeBackend(QObject, BackendBase):
         """
         request_payload = dict(payload or {})
         command_context = dict(context or {})
+        include_lease = bool(command_context.get("include_lease", True))
+        effective_include_lease = include_lease and self._lease_allowed()
         started_ns = now_ns()
         with self._lock:
             self._metrics.commands_sent += 1
             self._metrics.last_command = command
-        self._ensure_control_lease(force=bool(command_context.get("force_lease_refresh")))
+        if effective_include_lease:
+            self._lease_service.ensure_control_lease(force=bool(command_context.get("force_lease_refresh")))
         try:
             response = self._client.post(
                 f"/api/v1/commands/{command}",
@@ -156,7 +174,7 @@ class ApiBridgeBackend(QObject, BackendBase):
                     workspace=str(command_context.get("workspace") or self._workspace),
                     role=str(command_context.get("role") or self._role),
                     session_id=str(command_context.get("session_id") or ""),
-                    include_lease=bool(command_context.get("include_lease", True)),
+                    include_lease=effective_include_lease,
                 ),
             )
             latency_ms = int((now_ns() - started_ns) / 1_000_000)
@@ -184,8 +202,8 @@ class ApiBridgeBackend(QObject, BackendBase):
                 with self._lock:
                     self._metrics.commands_failed += 1
                     self._metrics.last_error = reply.message
-                if "控制权" in reply.message or "lease" in reply.message.lower():
-                    self._ensure_control_lease(force=True)
+                if effective_include_lease and ("控制权" in reply.message or "lease" in reply.message.lower()):
+                    self._lease_service.ensure_control_lease(force=True)
                 remember_backend_error(self._last_errors, f"{command}: {reply.message}")
             self._log("INFO" if reply.ok else "WARN", f"API {command}: {reply.message or ('OK' if reply.ok else 'FAILED')}")
             return reply
@@ -197,15 +215,12 @@ class ApiBridgeBackend(QObject, BackendBase):
             remember_backend_error(self._last_errors, f"{command}: {normalized.error_type}: {normalized.message}")
             self._log("ERROR", f"API {command} 失败：{normalized.error_type}: {normalized.message}")
             return BackendErrorMapper.reply_from_exception(normalized, data={"command": command}, command=command, context="api-command")
-
     def status(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._status_cache)
-
     def health(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._health_cache)
-
     def link_snapshot(self) -> dict[str, Any]:
         """Build the canonical backend-link snapshot consumed by the desktop UI."""
         with self._lock:
@@ -238,29 +253,17 @@ class ApiBridgeBackend(QObject, BackendBase):
             control_plane=control_plane,
             local_runtime_config=self.config.to_dict(),
         )
-
+    def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict[str, Any]:
+        """Resolve the authoritative runtime final verdict through the canonical backend API."""
+        return self._verdict_service.resolve_final_verdict(plan, config, read_only=read_only)
+    def query_final_verdict_snapshot(self) -> dict[str, Any]:
+        """Compatibility wrapper for the read-only final-verdict snapshot API."""
+        return self.resolve_final_verdict(read_only=True)
+    def compile_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
+        """Compatibility wrapper for compile-time final-verdict resolution."""
+        return self.resolve_final_verdict(plan, config, read_only=False)
     def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
-        """Return the authoritative final verdict for the active or supplied plan."""
-        query_payloads = []
-        if plan is not None:
-            query_payloads.append((
-                "compile_scan_plan",
-                {
-                    "scan_plan": runtime_scan_plan_payload(plan),
-                    "config_snapshot": config.to_dict() if config is not None else self.config.to_dict(),
-                },
-            ))
-        query_payloads.append(("query_final_verdict", {}))
-        for command_name, payload in query_payloads:
-            reply = self.send_command(command_name, payload, context={"include_lease": False, "intent_reason": command_name})
-            verdict = self._authoritative_service.extract_final_verdict(reply.data)
-            if verdict:
-                return verdict
-        with self._lock:
-            cached = dict(self._last_final_verdict)
-            control_plane = dict(self._control_plane_cache)
-        return cached or self._authoritative_service.extract_final_verdict(control_plane)
-
+        return self.compile_final_verdict(plan, config)
     def close(self) -> None:
         """Stop background loops and close the HTTP client."""
         self._stop.set()
@@ -269,12 +272,10 @@ class ApiBridgeBackend(QObject, BackendBase):
                 thread.join(timeout=1.0)
         self._threads.clear()
         self._client.close()
-
     def _spawn(self, target, name: str) -> None:
         thread = threading.Thread(target=target, name=name, daemon=True)
         self._threads.append(thread)
         thread.start()
-
     def _push_runtime_config(self) -> None:
         """Push desired runtime config to the adapter and refresh local cache."""
         try:
@@ -293,7 +294,6 @@ class ApiBridgeBackend(QObject, BackendBase):
             normalized = normalize_backend_exception(exc, context="runtime-config")
             remember_backend_error(self._last_errors, f"runtime-config: {normalized.error_type}: {normalized.message}")
             self._log("WARN", f"运行配置同步失败：{normalized.error_type}: {normalized.message}")
-
     def _health_loop(self) -> None:
         """Continuously refresh status, health, and control-plane snapshots."""
         while not self._stop.is_set():
@@ -344,12 +344,10 @@ class ApiBridgeBackend(QObject, BackendBase):
                 remember_backend_error(self._last_errors, f"health: {normalized.error_type}: {normalized.message}")
                 self._log("WARN", f"API 健康检查失败：{normalized.error_type}: {normalized.message}")
             self._stop.wait(self.health_poll_interval_s)
-
     def _snapshot_poll_loop(self) -> None:
         while not self._stop.is_set():
             self._pull_snapshot_once()
             self._stop.wait(self.snapshot_poll_interval_s)
-
     def _pull_snapshot_once(self) -> None:
         """Pull telemetry snapshots through REST when WebSocket streaming is absent."""
         try:
@@ -370,7 +368,6 @@ class ApiBridgeBackend(QObject, BackendBase):
                 self._metrics.telemetry_connected = False
             remember_backend_error(self._last_errors, f"snapshot: {normalized.error_type}: {normalized.message}")
             self._log("WARN", f"遥测快照拉取失败：{normalized.error_type}: {normalized.message}")
-
     def _telemetry_ws_loop(self) -> None:
         assert ws_connect is not None
         url = f"{self.ws_base}/ws/telemetry"
@@ -395,7 +392,6 @@ class ApiBridgeBackend(QObject, BackendBase):
                 self._log("WARN", f"telemetry WebSocket 断开：{normalized.error_type}: {normalized.message}")
                 self._stop.wait(reconnect_delay_s)
                 reconnect_delay_s = min(MAX_WS_RECONNECT_DELAY_S, reconnect_delay_s * 2.0)
-
     def _media_ws_loop(self, channel: str, signal) -> None:
         assert ws_connect is not None
         url = f"{self.ws_base}/ws/{channel}"
@@ -423,7 +419,6 @@ class ApiBridgeBackend(QObject, BackendBase):
                 self._log("WARN", f"{channel} WebSocket 断开：{normalized.error_type}: {normalized.message}")
                 self._stop.wait(reconnect_delay_s)
                 reconnect_delay_s = min(MAX_WS_RECONNECT_DELAY_S, reconnect_delay_s * 2.0)
-
     def _emit_snapshot_item(self, item: dict[str, Any]) -> None:
         topic = str(item.get("topic", ""))
         if not topic:
@@ -431,7 +426,6 @@ class ApiBridgeBackend(QObject, BackendBase):
         env = TelemetryEnvelope(topic=topic, data=dict(item.get("data", {})), ts_ns=int(item.get("ts_ns", now_ns()) or now_ns()))
         self._projection_cache.update_partition(f"topic:{topic}", {"topic": topic, "data": env.data, "ts_ns": env.ts_ns})
         self.telemetry_received.emit(env)
-
     def _capture_reply_contracts(self, reply: ReplyEnvelope) -> None:
         authoritative_envelope = self._authoritative_service.normalize_payload(
             reply.data,
@@ -449,45 +443,6 @@ class ApiBridgeBackend(QObject, BackendBase):
                 self._control_authority_cache = dict(authoritative_envelope.get("control_authority", {}))
             self._projection_cache.update_partition("authoritative_runtime_envelope", authoritative_envelope)
             self._projection_cache.update_partition("control_authority", authoritative_envelope.get("control_authority", {}))
-
-    def _ensure_control_lease(self, *, force: bool = False) -> None:
-        """Acquire or refresh the API-side control lease."""
-        if self._lease_id and not force:
-            return
-        try:
-            response = self._client.post(
-                "/api/v1/control-lease/acquire",
-                json={
-                    "actor_id": self._actor_id,
-                    "role": self._role,
-                    "workspace": self._workspace,
-                    "intent_reason": "desktop_control_plane",
-                    "source": "api_bridge_backend",
-                },
-                headers=build_command_headers(intent="acquire-control-lease", actor_id=self._actor_id, workspace=self._workspace, role=self._role, include_lease=False),
-            )
-            response.raise_for_status()
-            body = response.json() if response.content else {}
-            lease = dict(body.get("lease", {}))
-            authoritative = self._authoritative_service.build(
-                authority_source="api_bridge",
-                control_authority=body,
-                runtime_config_applied=self._runtime_config_cache,
-                desired_runtime_config=self.config,
-                final_verdict=self._last_final_verdict,
-                detail="headless API control lease snapshot",
-            )
-            with self._lock:
-                self._control_authority_cache = dict(authoritative.get("control_authority", {}))
-                self._authoritative_envelope = authoritative
-                self._lease_id = str(lease.get("lease_id", "") or self._lease_id)
-            self._projection_cache.update_partition("control_authority", authoritative.get("control_authority", {}))
-            self._projection_cache.update_partition("authoritative_runtime_envelope", authoritative)
-        except (httpx.HTTPError, json.JSONDecodeError, OSError, RuntimeError, ValueError, TypeError) as exc:
-            normalized = normalize_backend_exception(exc, context="control-lease")
-            remember_backend_error(self._last_errors, f"control-lease: {normalized.error_type}: {normalized.message}")
-            self._log("WARN", f"控制权租约获取失败：{normalized.error_type}: {normalized.message}")
-
     def _log(self, level: str, message: str) -> None:
         try:
             self.log_generated.emit(level, f"[{now_text()}] {message}")

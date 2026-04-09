@@ -108,6 +108,13 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
               })),
           field("last_event", quote(snapshot.robot_state.last_event)),
           field("last_controller_log", quote(snapshot.robot_state.last_controller_log)),
+          field("runtime_source", quote(snapshot.robot_state.runtime_source)),
+          field("pose_source", quote(snapshot.robot_state.pose_source)),
+          field("force_source", quote(snapshot.robot_state.force_source)),
+          field("pose_available", boolLiteral(snapshot.robot_state.pose_available)),
+          field("force_available", boolLiteral(snapshot.robot_state.force_available)),
+          field("pose_authoritative", boolLiteral(snapshot.robot_state.pose_authoritative)),
+          field("force_authoritative", boolLiteral(snapshot.robot_state.force_authoritative)),
       })));
   lines.push_back(envelope(
       "contact_state",
@@ -116,6 +123,12 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
           field("confidence", formatDouble(snapshot.contact_state.confidence)),
           field("pressure_current", formatDouble(snapshot.contact_state.pressure_current)),
           field("recommended_action", quote(snapshot.contact_state.recommended_action)),
+          field("pressure_source", quote(snapshot.contact_state.pressure_source)),
+          field("quality_source", quote(snapshot.contact_state.quality_source)),
+          field("pressure_available", boolLiteral(snapshot.contact_state.pressure_available)),
+          field("quality_available", boolLiteral(snapshot.contact_state.quality_available)),
+          field("authoritative", boolLiteral(snapshot.contact_state.authoritative)),
+          field("contact_stable", boolLiteral(snapshot.contact_state.contact_stable)),
       })));
   lines.push_back(envelope(
       "scan_progress",
@@ -148,6 +161,9 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
           field("feature_confidence", formatDouble(snapshot.quality_feedback.feature_confidence)),
           field("quality_score", formatDouble(snapshot.quality_feedback.quality_score)),
           field("need_resample", boolLiteral(snapshot.quality_feedback.need_resample)),
+          field("source", quote(snapshot.quality_feedback.source)),
+          field("available", boolLiteral(snapshot.quality_feedback.available)),
+          field("authoritative", boolLiteral(snapshot.quality_feedback.authoritative)),
       })));
   for (const auto& alarm : snapshot.alarms) {
     lines.push_back(envelope(
@@ -209,6 +225,13 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
               })),
           field("last_event", quote(snapshot.robot_state.last_event)),
           field("last_controller_log", quote(snapshot.robot_state.last_controller_log)),
+          field("runtime_source", quote(snapshot.robot_state.runtime_source)),
+          field("pose_source", quote(snapshot.robot_state.pose_source)),
+          field("force_source", quote(snapshot.robot_state.force_source)),
+          field("pose_available", boolLiteral(snapshot.robot_state.pose_available)),
+          field("force_available", boolLiteral(snapshot.robot_state.force_available)),
+          field("pose_authoritative", boolLiteral(snapshot.robot_state.pose_authoritative)),
+          field("force_authoritative", boolLiteral(snapshot.robot_state.force_authoritative)),
       })));
 
   messages.push_back(makeTelemetryEnvelope(
@@ -219,6 +242,12 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
           field("confidence", formatDouble(snapshot.contact_state.confidence)),
           field("pressure_current", formatDouble(snapshot.contact_state.pressure_current)),
           field("recommended_action", quote(snapshot.contact_state.recommended_action)),
+          field("pressure_source", quote(snapshot.contact_state.pressure_source)),
+          field("quality_source", quote(snapshot.contact_state.quality_source)),
+          field("pressure_available", boolLiteral(snapshot.contact_state.pressure_available)),
+          field("quality_available", boolLiteral(snapshot.contact_state.quality_available)),
+          field("authoritative", boolLiteral(snapshot.contact_state.authoritative)),
+          field("contact_stable", boolLiteral(snapshot.contact_state.contact_stable)),
       })));
 
   messages.push_back(makeTelemetryEnvelope(
@@ -260,6 +289,9 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
           field("feature_confidence", formatDouble(snapshot.quality_feedback.feature_confidence)),
           field("quality_score", formatDouble(snapshot.quality_feedback.quality_score)),
           field("need_resample", boolLiteral(snapshot.quality_feedback.need_resample)),
+          field("source", quote(snapshot.quality_feedback.source)),
+          field("available", boolLiteral(snapshot.quality_feedback.available)),
+          field("authoritative", boolLiteral(snapshot.quality_feedback.authoritative)),
       })));
 
   for (const auto& alarm : snapshot.alarms) {

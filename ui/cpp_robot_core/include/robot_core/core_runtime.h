@@ -102,10 +102,24 @@ private:
   std::string handleSessionCommand(const std::string& request_id, const std::string& line);
   std::string handleExecutionCommand(const std::string& request_id, const std::string& line);
   void updateKinematicsLocked();
-  void updateQualityLocked();
-  void updateContactAndProgressLocked();
-  void refreshDeviceHealthLocked(int64_t ts_ns);
+  void updateQualityLocked(const RtObservedState& observed, const RtPhaseTelemetry& phase_telemetry);
+  void updateContactAndProgressLocked(const RtObservedState& observed);
+  void refreshDeviceHealthLocked(int64_t ts_ns, const RtObservedState& observed);
+  bool simulatedTelemetryAllowedLocked() const;
   SafetyStatus evaluateSafetyLocked() const;
+  /**
+   * @brief Queue an alarm for telemetry publication and asynchronous recorder persistence.
+   * @param severity Canonical severity label.
+   * @param source Subsystem that raised the alarm.
+   * @param message Human-readable alarm detail.
+   * @param workflow_step Optional workflow step associated with the alarm.
+   * @param request_id Optional originating command request id.
+   * @param auto_action Optional automatic recovery action taken by the runtime.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Runs under ``state_mutex_`` and must only copy alarm payload into in-memory queues.
+   *     JSON serialization and filesystem writes are delegated to ``RecordingService``'s worker thread.
+   */
   void queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step = "", const std::string& request_id = "", const std::string& auto_action = "");
   CoreStateSnapshot buildCoreSnapshotLocked() const;
   ScanProgress buildScanProgressLocked() const;
@@ -174,9 +188,12 @@ private:
   int64_t contact_stable_since_ns_{0};
   std::string last_transition_;
   std::string state_reason_;
-  double image_quality_{0.82};
-  double feature_confidence_{0.76};
-  double quality_score_{0.79};
+  double image_quality_{0.0};
+  double feature_confidence_{0.0};
+  double quality_score_{0.0};
+  std::string quality_source_{"unavailable"};
+  bool quality_available_{false};
+  bool quality_authoritative_{false};
   ContactTelemetry contact_state_{};
   FinalVerdict last_final_verdict_{};
   std::vector<DeviceHealth> devices_{};

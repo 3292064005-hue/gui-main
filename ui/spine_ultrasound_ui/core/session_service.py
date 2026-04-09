@@ -12,6 +12,7 @@ from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.core.session_artifact_service import SessionArtifactService
 from spine_ultrasound_ui.core.session_context_service import SessionContextService
 from spine_ultrasound_ui.core.session_finalize_service import SessionFinalizeService
+from spine_ultrasound_ui.core.session_guidance_bundle_service import SessionGuidanceBundleService
 from spine_ultrasound_ui.core.session_lock_service import SessionLockService
 from spine_ultrasound_ui.core.session_recorder_service import SessionRecorderService
 from spine_ultrasound_ui.core.session_recorders import FrameRecorder, JsonlRecorder
@@ -20,6 +21,26 @@ from spine_ultrasound_ui.services.planning.types import LocalizationResult
 from spine_ultrasound_ui.services.session_evidence_seal_service import SessionEvidenceSealService
 from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
 from spine_ultrasound_ui.services.xmate_profile import load_xmate_profile
+
+
+SESSION_SERVICE_PUBLIC_API = (
+    "create_experiment",
+    "apply_assessment_result",
+    "save_preview_plan",
+    "ensure_locked",
+    "save_summary",
+    "export_summary",
+    "rollback_pending_lock",
+    "record_quality_feedback",
+    "record_camera_pixmap",
+    "record_ultrasound_pixmap",
+    "record_pressure_sample",
+    "refresh_session_intelligence",
+    "reset_for_new_experiment",
+    "reset",
+    "record_annotation",
+    "record_command_journal",
+)
 
 
 @dataclass
@@ -44,7 +65,9 @@ class SessionService:
 
     The public API remains stable while internal responsibilities are delegated
     to dedicated services for context state, recorders/artifacts, and freeze
-    lifecycle.
+    lifecycle. ``SESSION_SERVICE_PUBLIC_API`` freezes the compatibility surface
+    so new feature work must land in delegated collaborators instead of growing
+    this façade.
     """
 
     def __init__(self, exp_manager: ExperimentManager):
@@ -220,9 +243,10 @@ class SessionService:
             localization_replay_index_payload,
             guidance_algorithm_registry_payload,
             guidance_processing_steps_payload,
-        ) = self._coalesce_guidance_bundle(
+        ) = SessionGuidanceBundleService.coalesce(
             registration_payload=registration_payload,
             localization_result=localization_result,
+            hash_payload=self._hash_payload,
         )
         locked = self.lock_service.lock(
             exp_id=self.current_experiment.exp_id,
@@ -259,136 +283,21 @@ class SessionService:
             manifest=locked.manifest,
         )
 
-    @staticmethod
-    def _coalesce_guidance_bundle(
-        *,
-        registration_payload: dict[str, Any],
-        localization_result: LocalizationResult | None,
-    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
-        """Normalize guidance freeze artifacts for direct and compatibility call paths.
+    def _require_locked_session_dir(self, action: str) -> Path:
+        """Return the locked session directory required by artifact operations.
 
         Args:
-            registration_payload: Registration snapshot already selected for session freeze.
-            localization_result: Structured localization result produced by the canonical
-                localization pipeline.
+            action: Human-readable operation label used in error messages.
 
         Returns:
-            Tuple of ``(localization_readiness, calibration_bundle, manual_adjustment,
-            source_frame_set, localization_replay_index, guidance_algorithm_registry,
-            guidance_processing_steps)`` ready to pass into ``SessionLockService``.
+            Locked session directory.
 
         Raises:
-            ValueError: Propagated if any synthesized artifact cannot be serialized by
-                the canonical hashing helpers.
-
-        Boundary behavior:
-            - Canonical localization results pass through unchanged.
-            - Non-guidance registrations return empty artifacts.
-            - ``guidance_only`` registrations synthesize the minimum freeze bundle needed
-              by legacy callers that do not yet pass ``localization_result``.
+            RuntimeError: If the session is not locked.
         """
-        if localization_result is not None:
-            return (
-                dict(localization_result.localization_readiness),
-                dict(localization_result.calibration_bundle),
-                dict(localization_result.manual_adjustment),
-                dict(localization_result.source_frame_set),
-                dict(localization_result.localization_replay_index),
-                dict(localization_result.guidance_algorithm_registry),
-                list(localization_result.guidance_processing_steps),
-            )
-
-        if registration_payload.get('role') != 'guidance_only':
-            return {}, {}, {}, {}, {}, {}, []
-
-        generated_at = str(registration_payload.get('generated_at', ''))
-        review_approval = dict(registration_payload.get('review_approval', {}))
-        freeze_ready = bool(registration_payload.get('freeze_ready', False))
-        frame_refs = list(registration_payload.get('camera_frame_refs', []))
-        frame_ref_payload = {
-            'camera_device_id': registration_payload.get('camera_device_id', ''),
-            'frame_refs': frame_refs,
-            'provider_mode': registration_payload.get('camera_observations', {}).get('provider_mode', 'synthetic'),
-        }
-        source_frame_set_hash = str(registration_payload.get('source_frame_set_hash', '')) or SessionService._hash_payload(frame_ref_payload)
-        source_frame_set = {
-            'schema_version': '1.0',
-            'generated_at': generated_at,
-            'camera_device_id': registration_payload.get('camera_device_id', ''),
-            'frame_refs': frame_refs,
-            'frame_count': len(frame_refs),
-            'fresh': True,
-            'provider_mode': registration_payload.get('camera_observations', {}).get('provider_mode', 'synthetic'),
-            'requested_mode': registration_payload.get('camera_observations', {}).get('provider_mode', 'synthetic'),
-            'source_frame_set_hash': source_frame_set_hash,
-        }
-        bundle_payload = {
-            'camera_intrinsics_hash': registration_payload.get('camera_intrinsics_hash', ''),
-            'camera_to_base_hash': registration_payload.get('camera_to_base_hash', ''),
-            'probe_tcp_hash': registration_payload.get('probe_tcp_hash', ''),
-            'temporal_sync_hash': registration_payload.get('temporal_sync_hash', ''),
-            'algorithm_bundle_hash': registration_payload.get('algorithm_bundle_hash', ''),
-        }
-        bundle_hash = str(registration_payload.get('calibration_bundle_hash', '')) or SessionService._hash_payload(bundle_payload)
-        calibration_bundle = {
-            'schema_version': '1.0',
-            'generated_at': generated_at,
-            'bundle_id': f"guidance_bundle::{registration_payload.get('camera_device_id', 'camera')}",
-            'release_state': 'approved' if freeze_ready else 'pending_review',
-            'bundle_role': 'guidance_only',
-            'camera_device_id': registration_payload.get('camera_device_id', ''),
-            **bundle_payload,
-            'bundle_hash': bundle_hash,
-        }
-        readiness = {
-            'schema_version': '1.0',
-            'generated_at': generated_at,
-            'status': 'READY_FOR_FREEZE' if freeze_ready else 'BLOCKED',
-            'device_gate': {
-                'camera_online': True,
-                'frame_count': len(frame_refs),
-                'frame_fresh': True,
-            },
-            'calibration_gate': {
-                'bundle_release_state': calibration_bundle['release_state'],
-                'camera_intrinsics_valid': bool(registration_payload.get('camera_intrinsics_hash')),
-                'camera_to_base_valid': bool(registration_payload.get('camera_to_base_hash')),
-                'probe_tcp_valid': bool(registration_payload.get('probe_tcp_hash')),
-                'temporal_sync_valid': bool(registration_payload.get('temporal_sync_hash')),
-            },
-            'guidance_gate': {
-                'guidance_mode': registration_payload.get('guidance_mode', 'guidance_only'),
-                'source_type': registration_payload.get('source_type', ''),
-                'registration_candidate_hash': registration_payload.get('registration_hash', ''),
-                'manual_adjustment_count': len(registration_payload.get('manual_adjustments', [])),
-                'review_approved': bool(review_approval.get('approved', False)),
-            },
-            'freeze_gate': {
-                'freeze_ready': freeze_ready,
-                'review_required': False,
-                'review_approved': bool(review_approval.get('approved', False)),
-                'stale_artifacts': False,
-                'source_frame_set_hash': source_frame_set_hash,
-                'algorithm_bundle_hash': registration_payload.get('algorithm_bundle_hash', ''),
-            },
-            'blocking_reasons': list(registration_payload.get('blocking_reasons', [])),
-            'warnings': list(registration_payload.get('warnings', [])),
-            'review_required': False,
-            'review_approval': review_approval,
-        }
-        readiness['readiness_hash'] = SessionService._hash_payload(readiness)
-        replay = {
-            'schema_version': '1.0',
-            'replay_id': f"guidance-replay::{registration_payload.get('registration_id', 'registration')}",
-            'generated_at': generated_at,
-            'frame_refs': frame_refs,
-            'processing_step_refs': list(registration_payload.get('processing_step_refs', [])),
-            'registration_hash': registration_payload.get('registration_hash', ''),
-            'readiness_hash': readiness['readiness_hash'],
-            'calibration_bundle_hash': bundle_hash,
-        }
-        replay['replay_hash'] = SessionService._hash_payload(replay)
-        return readiness, calibration_bundle, {}, source_frame_set, replay, {}, []
+        if self.current_session_dir is None:
+            raise RuntimeError(f"session is not locked; cannot {action}")
+        return self.current_session_dir
 
     def save_summary(self, payload: dict[str, Any]) -> Path:
         """Save the structured session summary JSON artifact.
@@ -396,9 +305,8 @@ class SessionService:
         Raises:
             RuntimeError: If the session is not locked.
         """
-        if self.current_session_dir is None:
-            raise RuntimeError("session is not locked")
-        path = self.artifact_service.save_summary(self.current_session_dir, payload)
+        session_dir = self._require_locked_session_dir("save summary")
+        path = self.artifact_service.save_summary(session_dir, payload)
         self.refresh_session_intelligence()
         return path
 
@@ -408,9 +316,8 @@ class SessionService:
         Raises:
             RuntimeError: If the session is not locked.
         """
-        if self.current_session_dir is None:
-            raise RuntimeError("session is not locked")
-        target = self.artifact_service.export_summary(self.current_session_dir, title, lines)
+        session_dir = self._require_locked_session_dir("export summary")
+        target = self.artifact_service.export_summary(session_dir, title, lines)
         self.refresh_session_intelligence()
         return target
 
@@ -505,7 +412,8 @@ class SessionService:
         """Refresh derived session intelligence/evidence artifacts if locked."""
         if self.current_session_dir is None:
             return
-        self.artifact_service.refresh_intelligence(self.current_session_dir)
+        session_dir = self._require_locked_session_dir("refresh session intelligence")
+        self.artifact_service.refresh_intelligence(session_dir)
 
     def reset_for_new_experiment(self) -> None:
         """Clear session-only state and recorder handles for a new experiment."""

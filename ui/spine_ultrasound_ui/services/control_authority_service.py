@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import RLock
-from typing import Any
+from typing import Any, Iterable
 
+from spine_ultrasound_ui.services.role_matrix import RoleMatrix
+from spine_ultrasound_ui.services.runtime_command_catalog import command_capability_claim
 from spine_ultrasound_ui.utils import now_ns, now_text
 
 
@@ -25,6 +27,13 @@ ROLE_PRIORITY = {
 
 @dataclass
 class ControlLease:
+    """Canonical single-owner control lease.
+
+    The lease now carries explicit capability claims so write surfaces can
+    reason about *what* the current owner is allowed to do, not only *who* the
+    owner is.
+    """
+
     lease_id: str
     actor_id: str
     role: str
@@ -36,6 +45,7 @@ class ControlLease:
     refreshed_ts_ns: int = 0
     expires_ts_ns: int = 0
     source: str = "headless"
+    granted_claims: list[str] = field(default_factory=list)
 
     def to_dict(self, *, now_ts_ns: int | None = None) -> dict[str, Any]:
         current_ts_ns = int(now_ts_ns or now_ns())
@@ -53,15 +63,16 @@ class ControlLease:
             "expires_ts_ns": self.expires_ts_ns,
             "expires_in_s": round(expires_in_s, 3),
             "source": self.source,
+            "granted_claims": list(self.granted_claims),
         }
 
 
 class ControlAuthorityService:
-    """Single write-source lease with explicit provenance and binding semantics.
+    """Single write-source lease with explicit capability-claim governance.
 
     All mutations are linearized behind an internal re-entrant lock so that
-    lease acquire/renew/release, session binding, and command guarding observe a
-    consistent ownership snapshot.
+    lease acquire/renew/release, session binding, command guarding, and claim
+    escalation observe a consistent ownership snapshot.
     """
 
     def __init__(
@@ -70,10 +81,12 @@ class ControlAuthorityService:
         lease_ttl_s: int = 180,
         auto_issue_implicit_lease: bool = True,
         strict_mode: bool = False,
+        role_matrix: RoleMatrix | None = None,
     ) -> None:
         self.lease_ttl_s = max(30, int(lease_ttl_s))
         self.auto_issue_implicit_lease = bool(auto_issue_implicit_lease)
         self.strict_mode = bool(strict_mode)
+        self._role_matrix = role_matrix or RoleMatrix()
         self._active_lease: ControlLease | None = None
         self._events: list[dict[str, Any]] = []
         self._last_conflict_reason = ""
@@ -92,6 +105,7 @@ class ControlAuthorityService:
         source: str = "api",
         preempt: bool = False,
         preempt_reason: str = "",
+        requested_claims: Iterable[str] | None = None,
     ) -> dict[str, Any]:
         """Acquire or refresh the active control lease.
 
@@ -106,6 +120,7 @@ class ControlAuthorityService:
             source: Surface that issued the request.
             preempt: Whether preemption is explicitly requested.
             preempt_reason: User-facing rationale for a preemption attempt.
+            requested_claims: Capability claims requested for the lease.
 
         Returns:
             Lease acquisition result with a normalized authority snapshot.
@@ -115,13 +130,27 @@ class ControlAuthorityService:
 
         Boundary behavior:
             Conflicting owners are rejected unless preemption is explicitly
-            requested and the caller outranks the active lease owner.
+            requested and the caller outranks the active lease owner. Unknown or
+            unauthorized capability claims are rejected before the lease is
+            granted.
         """
         with self._lock:
             actor = self._normalize_actor(actor_id)
             normalized_role = self._normalize_role(role)
             normalized_workspace = self._normalize_workspace(workspace)
             normalized_profile = self._normalize_profile(deployment_profile)
+            normalized_claims = self._normalize_claims(requested_claims)
+            unauthorized = [claim for claim in normalized_claims if not self._role_matrix.can_claim(normalized_role, claim)]
+            if unauthorized:
+                detail = f"角色 {normalized_role} 无权申请 capability claims: {', '.join(unauthorized)}"
+                self._record_event_unlocked("lease_claim_rejected", actor, normalized_workspace, normalized_role, session_id, detail)
+                return {
+                    "ok": False,
+                    "summary_state": "blocked",
+                    "summary_label": "控制权 claim 被拒绝",
+                    "detail": detail,
+                    "conflict_reason": detail,
+                }
             ttl = max(30, int(ttl_s or self.lease_ttl_s))
             now_ts = now_ns()
             active = self._get_active_lease_unlocked(now_ts)
@@ -145,7 +174,10 @@ class ControlAuthorityService:
                         "conflict_reason": detail,
                         "active_lease": active.to_dict(now_ts_ns=now_ts),
                     }
-            lease_id = active.lease_id if same_owner else self._make_lease_id(actor, normalized_workspace, normalized_role, session_id)
+            merged_claims = list(normalized_claims)
+            if same_owner and active is not None:
+                merged_claims = sorted(set(active.granted_claims) | set(normalized_claims))
+            lease_id = active.lease_id if same_owner and active is not None else self._make_lease_id(actor, normalized_workspace, normalized_role, session_id)
             self._active_lease = ControlLease(
                 lease_id=lease_id,
                 actor_id=actor,
@@ -154,10 +186,11 @@ class ControlAuthorityService:
                 session_id=str(session_id or (active.session_id if active else "")),
                 intent_reason=str(intent_reason or (active.intent_reason if active else "")),
                 deployment_profile=normalized_profile,
-                acquired_ts_ns=active.acquired_ts_ns if same_owner else now_ts,
+                acquired_ts_ns=active.acquired_ts_ns if same_owner and active is not None else now_ts,
                 refreshed_ts_ns=now_ts,
                 expires_ts_ns=now_ts + ttl * 1_000_000_000,
                 source=source,
+                granted_claims=merged_claims,
             )
             self._last_conflict_reason = ""
             event_name = "lease_acquired" if not same_owner else "lease_refreshed"
@@ -294,8 +327,9 @@ class ControlAuthorityService:
         *,
         current_session_id: str = "",
         source: str = "api",
+        require_lease: bool = True,
     ) -> dict[str, Any]:
-        """Validate command ownership and inject canonical command context.
+        """Validate command ownership, capability claims, and inject context.
 
         Args:
             command: Canonical runtime command name.
@@ -308,8 +342,13 @@ class ControlAuthorityService:
             authority snapshot.
 
         Boundary behavior:
-            When implicit lease issuance is enabled, an empty ownership state can
-            be upgraded into an active lease before the command is evaluated.
+            When ``require_lease`` is ``True`` and implicit lease issuance is
+            enabled, an empty ownership state can be upgraded into an active
+            lease before the command is evaluated. If a command only needs a
+            capability contract check (for example a read-contract command that
+            still carries a scoped capability claim), callers may pass
+            ``require_lease=False`` to validate claims without mutating runtime
+            ownership.
         """
         with self._lock:
             normalized_payload = dict(payload or {})
@@ -324,9 +363,67 @@ class ControlAuthorityService:
             intent_reason = str(context.get("intent_reason", normalized_payload.get("intent_reason", intent)))
             requested_session_id = str(context.get("session_id") or normalized_payload.get("session_id") or current_session_id or "")
             requested_lease_id = str(context.get("lease_id", "")).strip()
+            requested_claims = self._normalize_claims(
+                context.get("requested_claims")
+                or context.get("claims")
+                or normalized_payload.get("requested_claims")
+                or normalized_payload.get("claims")
+            )
+            required_claim = str(command_capability_claim(command)).strip()
+
+            if required_claim and not self._role_matrix.can_claim(role, required_claim):
+                detail = f"角色 {role} 无权获取 {required_claim}，命令 {command} 被拒绝"
+                self._last_conflict_reason = detail
+                self._record_event_unlocked("claim_guard_rejected", actor, workspace, role, requested_session_id, detail)
+                return {
+                    "allowed": False,
+                    "message": detail,
+                    "normalized_payload": normalized_payload,
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
+                }
+            unauthorized_requested = [claim for claim in requested_claims if not self._role_matrix.can_claim(role, claim)]
+            if unauthorized_requested:
+                detail = f"角色 {role} 无权请求 claims: {', '.join(unauthorized_requested)}"
+                self._last_conflict_reason = detail
+                self._record_event_unlocked("claim_guard_rejected", actor, workspace, role, requested_session_id, detail)
+                return {
+                    "allowed": False,
+                    "message": detail,
+                    "normalized_payload": normalized_payload,
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
+                }
+
+            if not require_lease:
+                granted_claims = set(requested_claims)
+                if required_claim:
+                    granted_claims.add(required_claim)
+                normalized_payload["_command_context"] = {
+                    **context,
+                    "actor_id": actor,
+                    "role": role,
+                    "workspace": workspace,
+                    "profile": deployment_profile,
+                    "intent": intent,
+                    "intent_reason": intent_reason,
+                    "session_id": requested_session_id,
+                    "lease_id": requested_lease_id,
+                    "required_claim": required_claim,
+                    "granted_claims": sorted(granted_claims),
+                    "source": source,
+                    "lease_required": False,
+                }
+                return {
+                    "allowed": True,
+                    "message": "capability guard passed",
+                    "normalized_payload": normalized_payload,
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
+                }
 
             active = self._get_active_lease_unlocked()
             if active is None and (requested_lease_id or self.auto_issue_implicit_lease or not self.strict_mode):
+                bootstrap_claims = set(requested_claims)
+                if required_claim:
+                    bootstrap_claims.add(required_claim)
                 acquire_result = self.acquire(
                     actor_id=actor,
                     role=role,
@@ -335,13 +432,14 @@ class ControlAuthorityService:
                     intent_reason=intent_reason or f"implicit:{command}",
                     deployment_profile=deployment_profile,
                     source=source,
+                    requested_claims=sorted(bootstrap_claims),
                 )
                 if not acquire_result.get("ok", False):
                     return {
                         "allowed": False,
                         "message": str(acquire_result.get("detail", "控制权冲突")),
                         "normalized_payload": normalized_payload,
-                        "authority": self._snapshot_unlocked(),
+                        "authority": self._snapshot_unlocked(required_claim=required_claim),
                     }
                 active = self._get_active_lease_unlocked()
             elif active is None:
@@ -349,7 +447,7 @@ class ControlAuthorityService:
                     "allowed": False,
                     "message": "当前命令要求显式控制权租约。",
                     "normalized_payload": normalized_payload,
-                    "authority": self._snapshot_unlocked(),
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
                 }
 
             assert active is not None
@@ -358,7 +456,7 @@ class ControlAuthorityService:
                     "allowed": False,
                     "message": f"lease_id 不匹配，active={active.lease_id}",
                     "normalized_payload": normalized_payload,
-                    "authority": self._snapshot_unlocked(),
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
                 }
             if not self._same_owner(active, actor, workspace, role):
                 detail = self._conflict_detail(active, actor, workspace, role)
@@ -367,7 +465,7 @@ class ControlAuthorityService:
                     "allowed": False,
                     "message": detail,
                     "normalized_payload": normalized_payload,
-                    "authority": self._snapshot_unlocked(),
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
                 }
             if active.session_id and requested_session_id and active.session_id != requested_session_id:
                 detail = f"session 绑定冲突，active={active.session_id}, requested={requested_session_id}"
@@ -376,8 +474,17 @@ class ControlAuthorityService:
                     "allowed": False,
                     "message": detail,
                     "normalized_payload": normalized_payload,
-                    "authority": self._snapshot_unlocked(),
+                    "authority": self._snapshot_unlocked(required_claim=required_claim),
                 }
+
+            granted_claims = set(active.granted_claims)
+            before_claims = set(granted_claims)
+            granted_claims.update(requested_claims)
+            if required_claim:
+                granted_claims.add(required_claim)
+            active.granted_claims = sorted(granted_claims)
+            if granted_claims != before_claims and required_claim:
+                self._record_event_unlocked("claim_granted", active.actor_id, active.workspace, active.role, active.session_id, required_claim)
 
             active.refreshed_ts_ns = now_ns()
             active.expires_ts_ns = active.refreshed_ts_ns + self.lease_ttl_s * 1_000_000_000
@@ -393,6 +500,8 @@ class ControlAuthorityService:
                 "intent": intent,
                 "intent_reason": intent_reason,
                 "profile": deployment_profile,
+                "required_claim": required_claim,
+                "granted_claims": list(active.granted_claims),
                 "command_uid": self._make_command_uid(command, active.actor_id, active.lease_id),
                 "source": source,
                 "issued_at": now_text(),
@@ -402,7 +511,7 @@ class ControlAuthorityService:
                 "allowed": True,
                 "message": "ok",
                 "normalized_payload": normalized_payload,
-                "authority": self._snapshot_unlocked(),
+                "authority": self._snapshot_unlocked(required_claim=required_claim),
             }
 
     def snapshot(self) -> dict[str, Any]:
@@ -410,7 +519,7 @@ class ControlAuthorityService:
         with self._lock:
             return self._snapshot_unlocked()
 
-    def _snapshot_unlocked(self) -> dict[str, Any]:
+    def _snapshot_unlocked(self, *, required_claim: str = "") -> dict[str, Any]:
         now_ts = now_ns()
         active = self._get_active_lease_unlocked(now_ts)
         events = [dict(item) for item in self._events[-10:]]
@@ -425,10 +534,14 @@ class ControlAuthorityService:
                 "strict_mode": self.strict_mode,
                 "auto_issue_implicit_lease": self.auto_issue_implicit_lease,
                 "lease_ttl_s": self.lease_ttl_s,
+                "required_claim": required_claim,
+                "available_claims_for_default_role": sorted(self._role_matrix.allowed_capability_claims(DEFAULT_ROLE)),
                 "has_owner": False,
                 "conflict_reason": self._last_conflict_reason,
                 "active_lease": {},
                 "owner_provenance": {},
+                "granted_claims": [],
+                "claim_bindings": {},
                 "events": events,
             }
         return {
@@ -438,6 +551,8 @@ class ControlAuthorityService:
             "strict_mode": self.strict_mode,
             "auto_issue_implicit_lease": self.auto_issue_implicit_lease,
             "lease_ttl_s": self.lease_ttl_s,
+            "required_claim": required_claim,
+            "available_claims_for_role": sorted(self._role_matrix.allowed_capability_claims(active.role)),
             "has_owner": True,
             "conflict_reason": self._last_conflict_reason,
             "owner": {
@@ -454,6 +569,8 @@ class ControlAuthorityService:
             "workspace_binding": active.workspace,
             "session_binding": active.session_id,
             "active_lease": active.to_dict(now_ts_ns=now_ts),
+            "granted_claims": list(active.granted_claims),
+            "claim_bindings": {claim: {"lease_id": active.lease_id, "session_id": active.session_id, "owner": active.actor_id} for claim in active.granted_claims},
             "events": events,
         }
 
@@ -506,6 +623,18 @@ class ControlAuthorityService:
         cleaned = str(profile or "").strip().lower()
         return cleaned or DEFAULT_PROFILE
 
+    @staticmethod
+    def _normalize_claims(raw_claims: Any) -> list[str]:
+        if raw_claims is None:
+            return []
+        if isinstance(raw_claims, str):
+            claims = [item.strip() for item in raw_claims.split(",") if item.strip()]
+            return sorted(set(claims))
+        if isinstance(raw_claims, Iterable):
+            claims = [str(item).strip() for item in raw_claims if str(item).strip()]
+            return sorted(set(claims))
+        return []
+
     def _make_lease_id(self, actor_id: str, workspace: str, role: str, session_id: str) -> str:
         raw = json.dumps({
             "actor_id": actor_id,
@@ -518,31 +647,29 @@ class ControlAuthorityService:
 
     def _make_command_uid(self, command: str, actor_id: str, lease_id: str) -> str:
         raw = json.dumps({"command": command, "actor_id": actor_id, "lease_id": lease_id, "ts_ns": now_ns()}, sort_keys=True).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()[:20]
+        return hashlib.sha256(raw).hexdigest()[:16]
 
-    def _record_event(self, event: str, actor_id: str, workspace: str, role: str, session_id: str, detail: str) -> None:
-        with self._lock:
-            self._record_event_unlocked(event, actor_id, workspace, role, session_id, detail)
+    @staticmethod
+    def _can_preempt(active: ControlLease, actor_id: str, role: str) -> bool:
+        del actor_id
+        return ROLE_PRIORITY.get(role, 0) > ROLE_PRIORITY.get(active.role, 0)
+
+    @staticmethod
+    def _conflict_detail(active: ControlLease, actor_id: str, workspace: str, role: str) -> str:
+        return (
+            f"控制权已被 {active.actor_id}@{active.workspace}/{active.role} 持有，"
+            f"当前请求为 {actor_id}@{workspace}/{role}"
+        )
 
     def _record_event_unlocked(self, event: str, actor_id: str, workspace: str, role: str, session_id: str, detail: str) -> None:
         self._events.append({
             "event": event,
+            "ts_ns": now_ns(),
             "actor_id": actor_id,
             "workspace": workspace,
             "role": role,
             "session_id": session_id,
             "detail": detail,
-            "ts": now_text(),
         })
-        self._events = self._events[-40:]
-
-    def _can_preempt(self, active: ControlLease, actor_id: str, role: str) -> bool:
-        if actor_id == active.actor_id:
-            return True
-        return ROLE_PRIORITY.get(role, 0) > ROLE_PRIORITY.get(active.role, 0)
-
-    def _conflict_detail(self, active: ControlLease, actor_id: str, workspace: str, role: str) -> str:
-        return (
-            f"控制权当前由 {active.actor_id}@{active.workspace}/{active.role} 持有，"
-            f"requested={actor_id}@{workspace}/{role}, lease={active.lease_id}。"
-        )
+        if len(self._events) > 64:
+            self._events = self._events[-64:]

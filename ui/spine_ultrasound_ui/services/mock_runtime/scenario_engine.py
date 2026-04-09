@@ -148,6 +148,7 @@ class MockRuntimeScenarioEngineMixin:
             )
             self.force_sensor_status = force_sample.status
             self.force_sensor_source = force_sample.source
+            self.last_force_wrench_n = list(force_sample.wrench_n)
             measured_pressure = abs(float(force_sample.wrench_n[2])) if force_sample.status == "ok" else 0.0
             if force_sample.status == "ok":
                 self.force_sensor_stale_ticks = 0
@@ -391,7 +392,7 @@ class MockRuntimeScenarioEngineMixin:
                 "force_status": self.force_sensor_status,
                 "force_source": self.force_sensor_source,
                 "desired_force_n": float(self.force_control["desired_contact_force_n"]),
-                "wrench_n": list(force_sample.wrench_n),
+                "wrench_n": list(self.last_force_wrench_n),
             }
             progress_payload = {
                 "execution_state": self.execution_state.value,

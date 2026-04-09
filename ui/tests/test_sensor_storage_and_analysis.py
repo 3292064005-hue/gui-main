@@ -8,6 +8,15 @@ from PySide6.QtGui import QPixmap
 from spine_ultrasound_ui.core.app_controller import AppController
 from spine_ultrasound_ui.services.mock_backend import MockBackend
 from spine_ultrasound_ui.services.force_control_config import load_force_control_config
+def _device_roster() -> dict:
+    return {
+        "robot": {"online": True, "fresh": True, "fact_source": "test"},
+        "camera": {"online": True, "fresh": True, "fact_source": "test"},
+        "ultrasound": {"online": True, "fresh": True, "fact_source": "test"},
+        "pressure": {"online": True, "fresh": True, "fact_source": "test"},
+    }
+
+
 from spine_ultrasound_ui.services.localization_strategies import FallbackRegistrationStrategy
 
 
@@ -17,7 +26,7 @@ def _build_locked_session(tmp_path: Path):
     controller.session_service.current_experiment = record
     controller.workflow_artifacts.has_experiment = True
     controller.workflow_artifacts.experiment_id = record.exp_id
-    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config)
+    controller.localization_result = FallbackRegistrationStrategy().run(controller.session_service.current_experiment, controller.config, device_roster=_device_roster())
     controller.workflow_artifacts.localization = controller.localization_result.status
     controller.workflow_artifacts.localization_review_required = True
     controller.workflow_artifacts.localization_source_type = 'fallback_simulated'

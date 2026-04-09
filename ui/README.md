@@ -20,6 +20,7 @@
 - `robot_model = xmate3`
 - `sdk_robot_class = xMateRobot`
 - `axis_count = 6`
+- `preferred_link = wired_direct`
 - RT 主线固定为 `cartesianImpedance`
 - 真实 SDK 绑定仅允许在 `cpp_robot_core` 内建立
 
@@ -39,7 +40,7 @@ C++ robot_core 主线：
 - CMake 3.24+
 - `g++` 或 `clang++`
 - `libssl-dev`
-- 官方 xCore SDK（prod/HIL 构建时显式提供；可通过 `XCORE_SDK_ROOT` 或 `ROKAE_SDK_ROOT` 指定）
+- 仓库内已附带 vendored xCore SDK（`third_party/rokae_xcore_sdk/robot`）；prod/HIL 主机也可通过 `XCORE_SDK_ROOT` 或 `ROKAE_SDK_ROOT` 显式覆盖为官方安装路径
 - C++ 主线已移除对系统级 `protoc/libprotobuf-dev` 的硬依赖；Python 侧仍需 `protobuf` 运行时（当前主线要求 `protobuf>=3.20.3,<8`）
 
 推荐先执行：
@@ -64,9 +65,9 @@ python run.py --backend mock
 
 - `dev`：desktop 默认 `mock`；headless 默认 `mock`
 - `lab` / `research` / `clinical`：desktop 默认 `core`；headless 只允许 `core`
-- `review`：desktop 默认 `api`；headless 只允许 `core`
+- `review`：desktop 默认 `api`；headless 默认 `core`，显式 `mock` 仅允许只读 evidence / replay / contract inspection
 - 当 profile 要求 live SDK（`research` / `clinical`）时，写命令不会再静默落到 `mock`、contract-only 或 `core + 非 live binding` 运行面
-- `scripts/start_demo.sh` / `start_hil.sh` / `start_prod.sh` / `start_headless.sh` 已显式固定默认 profile + backend，不再依赖跨运行面环境变量串扰
+- `scripts/start_demo.sh` / `start_hil.sh` / `start_prod.sh` 保持显式固定 profile + backend；`scripts/start_headless.sh` 改为委托 `runtime_mode_policy` 解析 headless 默认 backend，避免脚本与策略漂移
 
 Python 主线测试：
 
@@ -83,10 +84,12 @@ VERIFY_PHASE=python ./scripts/verify_mainline.sh
 # 仅跑 mock / hil / prod 单阶段 gate
 VERIFY_PHASE=mock ./scripts/verify_mainline.sh
 VERIFY_PHASE=hil ./scripts/verify_mainline.sh
-VERIFY_PHASE=prod ./scripts/verify_mainline.sh
+VERIFY_PHASE=prod ROBOT_CORE_WITH_XCORE_SDK=OFF ROBOT_CORE_WITH_XMATE_MODEL=OFF ./scripts/verify_mainline.sh
 ```
 
 `verify_mainline.sh` 会为 `mock` / `hil` / `prod` 使用独立 build 目录，并在 `ctest` 前输出注册测试清单；`VERIFY_PHASE=python` 在默认主线模式下会将 pytest 拆成确定性的多个批次，以降低受限容器内长进程被外部终止的概率；实时运行脚本默认把 C++ 构建产物放到 `/tmp`，避免污染仓库 payload。
+
+验证口径边界见 `docs/VERIFICATION_BOUNDARY.md`。同时请运行 `python scripts/check_robot_identity_registry.py`，确保 xMate3/xMateRobot/6 轴主线身份事实未在 Python/C++/文档之间漂移。其中 `VERIFY_PHASE=python` 只闭合 repository/Python 级 gate，不得表述为 HIL / prod / live-controller 已验证。建议把 `scripts/write_verification_report.py` 产出的执行报告与 `scripts/doctor_runtime.py --manifest-only` 的 readiness manifest 一并归档。
 
 ## 目录说明
 
@@ -146,7 +149,7 @@ After session freeze these artifacts remain advisory lineage and do not grant th
 - `camera_guidance_input_mode` supports `synthetic`, `filesystem`, and `opencv_camera`.
 - `filesystem` mode consumes `.npy/.npz` or common image files from `camera_guidance_source_path` and is the preferred offline validation path.
 - When guidance falls back to `READY_WITH_REVIEW`, call `approve_localization_review(...)` from the application controller before path generation or session lock. Approval records a `manual_adjustment` artifact, re-runs the freeze gate, and flips workflow readiness so planning can proceed.
-- `device_readiness` now cross-checks `source_frame_set`, guidance plugin registry completeness, and review approval state instead of relying on optimistic constants alone.
+- `device_readiness` now cross-checks `source_frame_set`, guidance plugin registry completeness, and review approval state against the runtime/telemetry device snapshot; localization callers must provide an authoritative pre-freeze device roster. Guidance-only freeze no longer synthesizes compatibility artifacts when canonical localization evidence is missing, and canonical `source_frame_set` contracts now require `device_fact_sources`.
 - Camera guidance remains pre-scan only and never becomes RT execution authority; xCore RT remains the single control source and runs at the controller 1 ms cycle boundary.
 
 
@@ -279,3 +282,28 @@ python scripts/run_frame_anatomy_benchmark.py --runtime configs/models/frame_ana
 ```
 
 The bundled `frame_anatomy_keypoint` package is an exported research package trained and benchmarked on repository-local synthetic fixtures. It is therefore a genuine exported-weight runtime package with explicit gates, but it is **not** a clinical claim or a substitute for phantom/HIL/retrospective validation.
+
+
+## Environment readiness manifest
+
+The runtime doctor now emits an explicit readiness manifest that separates static/sandbox readiness from real live-runtime verification. `scripts/doctor_runtime.py --manifest-only --write-manifest <path>` must not be interpreted as proof that HIL or robot-side validation has already passed.
+
+## Control authority capability claims
+
+- 控制权不再只表示“谁持有租约”，还会显式记录当前 owner 已拿到的 capability claims。
+- 写命令按 `hardware_lifecycle_write / session_freeze_write / nrt_motion_write / rt_motion_write / recovery_write / fault_injection_write / plan_compile / runtime_validation` 收口。
+- `validate_scan_plan` 是 canonical 的 plan precheck/read-contract 命令；兼容别名 `compile_scan_plan` 仍会走 capability guard，但不会被提升为写命令或强制占用控制租约。
+
+## Scan-plan adapter pipeline
+
+- preview / execution / rescan plan 在 planner 输出后统一进入 adapter pipeline。
+- 当前 pipeline 固定执行：`resolve_frames -> surface_constraints -> safety_limits -> time_parameterization -> plan_digest`。
+- adapter evidence 会写入 `scan_plan.validation_summary.adapter_pipeline`，用于后续 session freeze / rationale / replay 审计。
+
+
+## Session-product materialization contract
+
+Headless/session read APIs now operate in **materialized-only** mode for session-intelligence products. Missing lineage / release / governance artifacts are reported as `not_materialized` and must be regenerated through `SessionService.refresh_session_intelligence()` (or the equivalent finalize/export path) rather than being created on demand by a GET/read surface.
+
+
+真实环境验证必须提供 `scripts/package_live_evidence_bundle.py` 生成的归档证据包；`scripts/write_verification_report.py --live-evidence-bundle ...` 现在会校验证据包是否真实存在且结构完整，单独给一个路径字符串不再被当成 live-controller proof。

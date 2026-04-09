@@ -12,7 +12,7 @@ class SdkRobotFacade;
 struct ModelAuthoritySnapshot {
   std::string authority_source{"cpp_robot_core"};
   std::string runtime_source{"simulated_contract"};
-  std::string family_key{"xmate_6_collaborative"};
+  std::string family_key{"xmate3_cobot_6"};
   std::string family_label{"xMate collaborative 6-axis"};
   std::string robot_model{"xmate3"};
   std::string sdk_robot_class{"xMateRobot"};

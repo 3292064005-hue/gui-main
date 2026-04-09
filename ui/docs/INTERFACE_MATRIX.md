@@ -14,5 +14,5 @@
 | Contract | Producer | Primary consumers | Notes |
 |---|---|---|---|
 | `ControlPlaneSnapshot` | headless / backend control-plane aggregator | Desktop, Web, replay, evidence | Canonical governance snapshot. |
-| `final_verdict` | `cpp_robot_core` command contract (`compile_scan_plan`, `query_final_verdict`) | Desktop runtime verdict kernel, API bridge, headless review | Python advisory report may enrich presentation but may not overrule it. |
+| `final_verdict` | `cpp_robot_core` command contract (`validate_scan_plan`, `query_final_verdict`; backend canonical API: `resolve_final_verdict(read_only=...)`) | Desktop runtime verdict kernel, API bridge, headless review | Python advisory report may enrich presentation but may not overrule it. |
 | `EvidenceEnvelope` | session intelligence / evidence seal services | replay, diagnostics, export | Freeze-point and lineage governed artifacts. |

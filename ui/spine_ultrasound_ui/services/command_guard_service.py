@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope
+from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope, is_write_command
+from spine_ultrasound_ui.services.runtime_command_catalog import command_capability_claim
 
 
 class CommandGuardService:
@@ -15,25 +16,48 @@ class CommandGuardService:
         self._backend_mode_snapshot = backend_mode_snapshot
         self._control_plane_snapshot = control_plane_snapshot
 
-    def guard_write_command(self, command: str, payload: dict[str, Any]) -> tuple[dict[str, Any], ReplyEnvelope | None]:
-        """Validate authority and deployment restrictions for a write command.
-
-        Args:
-            command: Canonical command name.
-            payload: Requested command payload.
-
-        Returns:
-            A tuple of normalized payload and optional early reply. When the
-            reply is not ``None`` the caller must return it directly.
-        """
+    def _guard_with_authority(self, command: str, payload: dict[str, Any], *, require_lease: bool) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         profile = self._deployment_profile_snapshot()
-        authority_decision = self._control_authority.guard_command(
+        try:
+            authority_decision = self._control_authority.guard_command(
+                command,
+                payload,
+                current_session_id=self._current_session_id(),
+                source="headless",
+                require_lease=require_lease,
+            )
+        except TypeError:
+            authority_decision = self._control_authority.guard_command(
+                command,
+                payload,
+                current_session_id=self._current_session_id(),
+                source="headless",
+            )
+        normalized_payload = dict(authority_decision.get("normalized_payload", payload))
+        return normalized_payload, authority_decision, profile
+
+    def guard_command(self, command: str, payload: dict[str, Any]) -> tuple[dict[str, Any], ReplyEnvelope | None]:
+        """Validate capability/ownership requirements and profile restrictions.
+
+        Write commands require an active lease and must satisfy deployment write
+        gates. Read-contract commands that still carry a non-runtime capability
+        claim are checked through the authority surface without mutating lease
+        ownership.
+        """
+        requires_lease = is_write_command(command)
+        normalized_payload, authority_decision, profile = self._guard_with_authority(
             command,
             payload,
-            current_session_id=self._current_session_id(),
-            source="headless",
+            require_lease=requires_lease,
         )
-        normalized_payload = dict(authority_decision.get("normalized_payload", payload))
+        if not authority_decision.get("allowed", False):
+            return normalized_payload, ReplyEnvelope(
+                ok=False,
+                message=str(authority_decision.get("message", "控制权检查失败")),
+                data={"control_authority": authority_decision.get("authority", {})},
+            )
+        if not requires_lease:
+            return normalized_payload, None
         allowed_roles = set(profile.get("allowed_write_roles", []))
         context = dict(normalized_payload.get("_command_context", {}))
         role = str(context.get("role", "")).strip().lower()
@@ -82,10 +106,8 @@ class CommandGuardService:
                         "blocking_issue": blocker,
                     },
                 )
-        if not authority_decision.get("allowed", False):
-            return normalized_payload, ReplyEnvelope(
-                ok=False,
-                message=str(authority_decision.get("message", "控制权检查失败")),
-                data={"control_authority": authority_decision.get("authority", {})},
-            )
         return normalized_payload, None
+
+    def guard_write_command(self, command: str, payload: dict[str, Any]) -> tuple[dict[str, Any], ReplyEnvelope | None]:
+        """Backward-compatible wrapper for write-command gating."""
+        return self.guard_command(command, payload)

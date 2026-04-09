@@ -63,6 +63,7 @@
     "freeze_ready": {"type": "boolean"},
     "blocking_reasons": {"type": "array", "items": {"type": "string"}},
     "warnings": {"type": "array", "items": {"type": "string"}},
+    "review_approval": {"type": "object"},
     "recommended_action": {"type": "string", "enum": ["freeze", "freeze_after_review", "review", "retry_capture", "recalibrate"]},
     "artifact_refs": {"type": "array", "items": {"type": "string"}},
     "processing_step_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},

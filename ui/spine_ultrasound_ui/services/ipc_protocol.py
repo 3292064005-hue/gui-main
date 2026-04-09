@@ -26,10 +26,17 @@ TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
             "tcp_pose",
             "last_event",
             "last_controller_log",
+            "runtime_source",
+            "pose_source",
+            "force_source",
+            "pose_available",
+            "force_available",
+            "pose_authoritative",
+            "force_authoritative",
         ],
     },
     "contact_state": {
-        "core_fields": ["mode", "confidence", "pressure_current", "recommended_action", "contact_stable"],
+        "core_fields": ["mode", "confidence", "pressure_current", "recommended_action", "pressure_source", "quality_source", "pressure_available", "quality_available", "authoritative", "contact_stable"],
     },
     "scan_progress": {
         "core_fields": ["active_segment", "path_index", "overall_progress", "frame_id"],
@@ -57,7 +64,7 @@ TELEMETRY_TOPIC_SCHEMAS: dict[str, dict[str, Any]] = {
         ],
     },
     "quality_feedback": {
-        "core_fields": ["image_quality", "feature_confidence", "quality_score", "need_resample"],
+        "core_fields": ["image_quality", "feature_confidence", "quality_score", "need_resample", "source", "available", "authoritative"],
     },
 }
 

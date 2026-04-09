@@ -103,7 +103,7 @@ class ReconstructionInputBuilder:
         scan_geometry = self._scan_geometry(patient_registration, calibration_bundle)
 
         coronal_vpi_ref = str(session_dir / 'derived' / 'reconstruction' / 'coronal_vpi.npz')
-        volume_reconstruction_ref = str(session_dir / 'derived' / 'reconstruction' / 'volume_reconstruction_stub.npz')
+        reconstruction_volume_bundle_ref = str(session_dir / 'derived' / 'reconstruction' / 'reconstruction_volume_bundle.npz')
         output = {
             'generated_at': now_text(),
             'session_id': manifest.get('session_id', session_dir.name),
@@ -147,12 +147,14 @@ class ReconstructionInputBuilder:
             'soft_review_reasons': soft_review_reasons,
             'closure_ready': not hard_blockers,
             'coronal_vpi_ref': coronal_vpi_ref,
-            'volume_reconstruction_ref': volume_reconstruction_ref,
+            'reconstruction_volume_bundle_ref': reconstruction_volume_bundle_ref,
+            'volume_reconstruction_ref': reconstruction_volume_bundle_ref,
             'artifacts': dict(manifest.get('artifacts', {})),
         }
         output['model_ready_input_index'] = {
             'coronal_vpi_ref': coronal_vpi_ref,
-            'volume_reconstruction_ref': volume_reconstruction_ref,
+            'reconstruction_volume_bundle_ref': reconstruction_volume_bundle_ref,
+            'volume_reconstruction_ref': reconstruction_volume_bundle_ref,
             'aligned_us_frame_count': len(aligned_us_frames),
             'pose_count': len([item for item in pose_series if item.get('pose_valid', False)]),
             'visible_frame_count': sum(1 for item in frame_visibility_scores if item.get('visible', False)),

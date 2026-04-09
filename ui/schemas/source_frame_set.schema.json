@@ -11,6 +11,7 @@
     "fresh",
     "provider_mode",
     "requested_mode",
+    "device_fact_sources",
     "source_frame_set_hash"
   ],
   "properties": {
@@ -23,6 +24,49 @@
     "fresh": {"type": "boolean"},
     "provider_mode": {"type": "string", "enum": ["synthetic", "filesystem", "opencv_camera"]},
     "requested_mode": {"type": "string", "enum": ["synthetic", "filesystem", "opencv_camera", "webcam", "live"]},
+    "device_fact_sources": {
+      "type": "object",
+      "required": ["camera", "robot", "ultrasound", "pressure"],
+      "properties": {
+        "camera": {
+          "type": "object",
+          "required": ["fact_source", "fact_origin"],
+          "properties": {
+            "fact_source": {"type": "string", "minLength": 1},
+            "fact_origin": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "robot": {
+          "type": "object",
+          "required": ["fact_source", "fact_origin"],
+          "properties": {
+            "fact_source": {"type": "string", "minLength": 1},
+            "fact_origin": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "ultrasound": {
+          "type": "object",
+          "required": ["fact_source", "fact_origin"],
+          "properties": {
+            "fact_source": {"type": "string", "minLength": 1},
+            "fact_origin": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "pressure": {
+          "type": "object",
+          "required": ["fact_source", "fact_origin"],
+          "properties": {
+            "fact_source": {"type": "string", "minLength": 1},
+            "fact_origin": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "source_frame_set_hash": {"type": "string", "minLength": 1}
   },
   "additionalProperties": false

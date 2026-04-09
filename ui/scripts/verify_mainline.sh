@@ -5,11 +5,16 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd)
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 FULL_TESTS="${FULL_TESTS:-0}"
+INCLUDE_ARCHIVE_COMPAT="${INCLUDE_ARCHIVE_COMPAT:-0}"
 BUILD_DIR="${BUILD_DIR:-}"
 VERIFY_PHASE="${VERIFY_PHASE:-all}"
 BUILD_EVIDENCE_REPORT="${BUILD_EVIDENCE_REPORT:-}"
-EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-11}"
+VERIFICATION_REPORT="${VERIFICATION_REPORT:-}"
+READINESS_MANIFEST_REPORT="${READINESS_MANIFEST_REPORT:-}"
+LIVE_EVIDENCE_BUNDLE="${LIVE_EVIDENCE_BUNDLE:-}"
+EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"
 CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-4}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 CURRENT_PHASE="bootstrap"
 CURRENT_PROFILE=""
@@ -55,36 +60,63 @@ fi
 cd "${REPO_ROOT}"
 cleanup_generated_artifacts
 
+emit_phase_scope_note() {
+  case "$1" in
+    python)
+      echo "[scope] VERIFY_PHASE=python closes repository/Python gates only; it is not HIL/prod/live-controller validation."
+      ;;
+    mock)
+      echo "[scope] VERIFY_PHASE=mock proves mock-profile contract/runtime gates only; no live SDK, live telemetry, or HIL truth is implied."
+      ;;
+    hil)
+      if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" != "ON" || "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" != "ON" ]]; then
+        echo "[scope] VERIFY_PHASE=hil is running without live SDK/model bindings; this is contract-shell/build-shell proof, not live SDK validation."
+      fi
+      ;;
+    prod)
+      if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" != "ON" || "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" != "ON" ]]; then
+        echo "[scope] VERIFY_PHASE=prod is running without live SDK/model bindings; this is prod-contract/build/install/package proof, not live-controller validation."
+      fi
+      ;;
+  esac
+}
+
 run_repository_gates() {
   CURRENT_PHASE="repository-gates"
-  ./scripts/check_repo_hygiene.sh
-  python scripts/strict_convergence_audit.py
-  python scripts/check_protocol_sync.py
-  python scripts/check_canonical_imports.py
-  python scripts/check_repository_gates.py
-  python scripts/check_architecture_fitness.py
-  python scripts/generate_p2_acceptance_artifacts.py
-  python scripts/check_p2_acceptance.py
+  bash scripts/check_repo_hygiene.sh
+  "$PYTHON_BIN" scripts/strict_convergence_audit.py
+  "$PYTHON_BIN" scripts/check_protocol_sync.py
+  "$PYTHON_BIN" scripts/check_robot_identity_registry.py
+  "$PYTHON_BIN" scripts/check_python_compile.py
+  "$PYTHON_BIN" scripts/check_canonical_imports.py
+  "$PYTHON_BIN" scripts/check_repository_gates.py
+  # compatibility hint: python scripts/check_architecture_fitness.py
+  "$PYTHON_BIN" scripts/check_architecture_fitness.py
+  "$PYTHON_BIN" scripts/check_verification_boundary.py
+  P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance" "$PYTHON_BIN" scripts/generate_p2_acceptance_artifacts.py
+  P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance" "$PYTHON_BIN" scripts/check_p2_acceptance.py
 }
 
 run_python_pytest_batch() {
   local label="$1"
   shift
   CURRENT_PHASE="python-${label}"
-  python scripts/run_pytest_mainline.py -q "$@"
+  "$PYTHON_BIN" scripts/run_pytest_mainline.py -q "$@"
 }
 
 run_python_gate() {
   CURRENT_PHASE="python"
   run_repository_gates
   if [[ "${FULL_TESTS}" == "1" ]]; then
-    python scripts/run_pytest_mainline.py -q
+    "$PYTHON_BIN" scripts/run_pytest_mainline.py -q
   else
     run_python_pytest_batch control-plane       tests/test_api_contract.py       tests/test_api_security.py       tests/test_control_plane.py       tests/test_control_ownership.py       tests/test_runtime_verdict.py       tests/test_headless_runtime.py
     run_python_pytest_batch release-state       tests/test_release_gate.py       tests/test_replay_determinism.py       tests/test_profile_policy.py       tests/test_spawned_core_integration.py       tests/test_vendor_sdk_and_identity.py
     run_python_pytest_batch repository-gates       tests/test_p2_stage_manifests.py       tests/test_p2_repository_gates.py       tests/test_sdk_runtime_assets_and_model_precheck.py       tests/test_mainline_runtime_doctor.py       tests/test_xmate_mainline.py
     run_python_pytest_batch preweight-closure       tests/test_preweight_semantic_closure.py
-    run_python_pytest_batch archive-compat       tests/archive/test_robot_family_and_profiles_v2.py       tests/archive/test_runtime_contracts_v3.py       tests/archive/test_runtime_contract_enforcement_v4.py
+    if [[ "${INCLUDE_ARCHIVE_COMPAT}" == "1" ]]; then
+      run_python_pytest_batch archive-compat         tests/archive/test_robot_family_and_profiles_v2.py         tests/archive/test_runtime_contracts_v3.py         tests/archive/test_runtime_contract_enforcement_v4.py
+    fi
   fi
 }
 
@@ -120,7 +152,7 @@ build_cpp_profile_targets() {
   CURRENT_PHASE="build-${profile}"
   CURRENT_PROFILE="${profile}"
   CURRENT_BUILD_DIR="${profile_build_dir_path}"
-  python scripts/build_cpp_targets.py --build-dir "${profile_build_dir_path}" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL}" "${CPP_BUILD_TARGETS[@]}"
+  "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "${profile_build_dir_path}" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL}" "${CPP_BUILD_TARGETS[@]}"
 }
 
 assert_registered_cpp_tests() {
@@ -155,15 +187,72 @@ run_cpp_profile_tests() {
   ctest --test-dir "${profile_build_dir_path}" --output-on-failure
 }
 
+run_cpp_profile_install_check() {
+  local profile="$1"
+  local profile_build_dir_path
+  local install_root
+  profile_build_dir_path=$(profile_build_dir "${profile}")
+  install_root="${profile_build_dir_path}/install-root"
+  CURRENT_PHASE="install-${profile}"
+  CURRENT_PROFILE="${profile}"
+  CURRENT_BUILD_DIR="${profile_build_dir_path}"
+  rm -rf "${install_root}"
+  mkdir -p "${install_root}"
+  DESTDIR="${install_root}" cmake --install "${profile_build_dir_path}"
+  local installed_binary="${install_root}/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core"
+  [[ -x "${installed_binary}" ]] || {
+    echo "[FAIL] installed spine_robot_core binary missing at ${installed_binary}" >&2
+    return 1
+  }
+}
+
+run_prod_profile_release_smoke() {
+  CURRENT_PHASE="prod-release-smoke"
+  SPINE_DEPLOYMENT_PROFILE=clinical "$PYTHON_BIN" scripts/deployment_smoke_test.py
+}
+
 run_cpp_profile_gate() {
   local profile="$1"
   configure_cpp_profile "${profile}"
-  if [[ "${profile}" == "prod" ]]; then
-    return 0
-  fi
   build_cpp_profile_targets "${profile}"
   assert_registered_cpp_tests "${profile}"
   run_cpp_profile_tests "${profile}"
+  run_cpp_profile_install_check "${profile}"
+  if [[ "${profile}" == "prod" ]]; then
+    run_prod_profile_release_smoke
+  fi
+}
+
+emit_verification_report() {
+  if [[ -z "${VERIFICATION_REPORT}" ]]; then
+    return 0
+  fi
+  local -a phases=()
+  case "${VERIFY_PHASE}" in
+    all)
+      phases=(python mock hil prod)
+      ;;
+    *)
+      phases=("${VERIFY_PHASE}")
+      ;;
+  esac
+  CURRENT_PHASE="verification-report"
+  local -a args=()
+  for phase in "${phases[@]}"; do
+    args+=(--phase "${phase}")
+  done
+  if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then
+    args+=(--with-sdk)
+  fi
+  if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then
+    args+=(--with-model)
+  fi
+  if [[ -n "${LIVE_EVIDENCE_BUNDLE}" ]]; then
+    args+=(--live-evidence-bundle "${LIVE_EVIDENCE_BUNDLE}")
+  elif [[ -n "${READINESS_MANIFEST_REPORT}" ]]; then
+    args+=(--write-readiness-manifest "${READINESS_MANIFEST_REPORT}")
+  fi
+  "$PYTHON_BIN" scripts/write_verification_report.py "${args[@]}" --output "${VERIFICATION_REPORT}"
 }
 
 emit_build_evidence_report() {
@@ -183,27 +272,35 @@ emit_build_evidence_report() {
   if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then
     EXTRA_EVIDENCE_ARGS+=(--with-model)
   fi
-  python scripts/verify_cpp_build_evidence.py --profile hil "${EXTRA_EVIDENCE_ARGS[@]}" --report "${BUILD_EVIDENCE_REPORT}"
+  "$PYTHON_BIN" scripts/verify_cpp_build_evidence.py --profile hil "${EXTRA_EVIDENCE_ARGS[@]}" --report "${BUILD_EVIDENCE_REPORT}"
 }
 
 case "${VERIFY_PHASE}" in
   python)
+    emit_phase_scope_note python
     run_python_gate
     ;;
   mock)
+    emit_phase_scope_note mock
     run_cpp_profile_gate mock
     ;;
   hil)
+    emit_phase_scope_note hil
     run_cpp_profile_gate hil
     emit_build_evidence_report
     ;;
   prod)
+    emit_phase_scope_note prod
     run_cpp_profile_gate prod
     ;;
   all)
+    emit_phase_scope_note python
     run_python_gate
+    emit_phase_scope_note mock
     run_cpp_profile_gate mock
+    emit_phase_scope_note hil
     run_cpp_profile_gate hil
+    emit_phase_scope_note prod
     run_cpp_profile_gate prod
     emit_build_evidence_report
     ;;
@@ -212,3 +309,7 @@ case "${VERIFY_PHASE}" in
     exit 2
     ;;
 esac
+
+emit_verification_report
+
+exit 0

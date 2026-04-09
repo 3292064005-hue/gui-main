@@ -8,6 +8,15 @@ from .execution_planner import ExecutionPlanner
 from .plan_scorer import PlanScorer
 from .plan_selector import PlanSelector
 from .plan_validator import PlanValidator
+from .request_adapters import (
+    PlanDigestAdapter,
+    ResolveFrameAdapter,
+    SafetyLimitAdapter,
+    ScanPlanAdapterContext,
+    ScanPlanAdapterPipeline,
+    SurfaceConstraintAdapter,
+    TimeParameterizationAdapter,
+)
 from .preview_planner import PreviewPlanner
 from .rescan_patch_planner import RescanPatchPlanner
 from .surface_model import SurfaceModelBuilder
@@ -41,6 +50,9 @@ class PlanningGraph:
         self.selector = PlanSelector()
         self.surface_builder = SurfaceModelBuilder()
         self.contact_builder = ContactModelBuilder()
+        self.preview_pipeline = ScanPlanAdapterPipeline([ResolveFrameAdapter(), SurfaceConstraintAdapter(), SafetyLimitAdapter(), TimeParameterizationAdapter(), PlanDigestAdapter()])
+        self.execution_pipeline = ScanPlanAdapterPipeline([ResolveFrameAdapter(), SurfaceConstraintAdapter(), SafetyLimitAdapter(), TimeParameterizationAdapter(), PlanDigestAdapter()])
+        self.rescan_pipeline = ScanPlanAdapterPipeline([ResolveFrameAdapter(), SurfaceConstraintAdapter(), SafetyLimitAdapter(), TimeParameterizationAdapter(), PlanDigestAdapter()])
 
     def context_for(self, *, localization: LocalizationResult, config: RuntimeConfig) -> PlanningContext:
         surface_model = self.surface_builder.build(
@@ -60,6 +72,8 @@ class PlanningGraph:
         context = self.context_for(localization=localization, config=config)
         plan, planner_context = self.preview_planner.build(experiment_id=experiment.exp_id, localization=localization, config=config)
         plan.surface_model_hash = hash_payload(context.surface_model)
+        adapter_context = ScanPlanAdapterContext(stage="preview", config=config, localization=localization, planner_context={"surface_model": context.surface_model, "contact_model": context.contact_model, **planner_context})
+        plan = self.preview_pipeline.apply(plan, adapter_context)
         score = self.scorer.score(plan, config=config, localization=localization)
         plan.score_summary = score
         plan.validation_summary = {
@@ -91,6 +105,9 @@ class PlanningGraph:
         )
         candidates: list[tuple[ScanPlan, dict]] = []
         for candidate in self.execution_planner.build_candidates(preview_plan, config=config, contact_model=contact_model):
+            score = self.scorer.score(candidate, config=config, localization=localization)
+            adapter_context = ScanPlanAdapterContext(stage="execution", config=config, localization=localization, planner_context={"surface_model": context.surface_model, "contact_model": context.contact_model})
+            candidate = self.execution_pipeline.apply(candidate, adapter_context)
             score = self.scorer.score(candidate, config=config, localization=localization)
             candidate.score_summary = score
             candidates.append((candidate, score))
@@ -162,6 +179,7 @@ class PlanningGraph:
             low_quality_windows=low_quality_windows,
             hotspot_windows=hotspot_windows,
         )
+        patch = self.rescan_pipeline.apply(patch, ScanPlanAdapterContext(stage="rescan", config=RuntimeConfig(image_quality_threshold=quality_target), planner_context={"surface_model": dict(base_plan.validation_summary.get("surface_model", {})), "contact_model": dict(base_plan.validation_summary.get("contact_model", {}))}))
         score = self.scorer.score(patch, config=RuntimeConfig(image_quality_threshold=quality_target))
         patch.score_summary = score
         patch.validation_summary = {

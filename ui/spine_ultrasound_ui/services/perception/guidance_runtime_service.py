@@ -131,17 +131,20 @@ class GuidanceRuntimeService:
             frames=frames,
             requested_mode=str(getattr(config, 'camera_guidance_input_mode', 'synthetic') or 'synthetic').lower(),
         )
-        effective_device_roster = dict(device_roster or {})
+        effective_device_roster = {name: dict(item) for name, item in dict(device_roster or {}).items()}
         effective_device_roster['camera'] = {
             **dict(effective_device_roster.get('camera', {})),
             'online': bool(provider_status.get('available', False)),
             'fresh': bool(provider_status.get('fresh', False)),
+            'fact_source': 'camera_provider',
+            'fact_origin': str(provider_status.get('provider_mode', 'unknown')),
         }
         source_frame_set = self._build_source_frame_set(
             experiment_id=experiment_id,
             calibration_bundle=calibration_bundle,
             frames=frames,
             provider_status=provider_status,
+            device_roster=effective_device_roster,
         )
         observation = self.perception_service.analyze(
             frames=frames,
@@ -256,7 +259,21 @@ class GuidanceRuntimeService:
         calibration_bundle: dict[str, Any],
         frames: list[CapturedFrame],
         provider_status: dict[str, Any],
+        device_roster: dict[str, Any],
     ) -> dict[str, Any]:
+        def _fact(name: str) -> dict[str, str]:
+            raw = dict(device_roster.get(name, {}))
+            default_origin = str(raw.get('health', 'unknown' if raw else 'missing'))
+            if name == 'camera':
+                return {
+                    'fact_source': str(raw.get('fact_source', 'camera_provider')),
+                    'fact_origin': str(raw.get('fact_origin', provider_status.get('provider_mode', default_origin))),
+                }
+            return {
+                'fact_source': str(raw.get('fact_source', 'runtime_snapshot' if raw else 'missing_from_runtime_snapshot')),
+                'fact_origin': str(raw.get('fact_origin', default_origin)),
+            }
+
         payload = {
             'schema_version': '1.0',
             'generated_at': now_text(),
@@ -267,6 +284,12 @@ class GuidanceRuntimeService:
             'fresh': all(bool(frame.fresh) for frame in frames),
             'provider_mode': provider_status.get('provider_mode', 'unknown'),
             'requested_mode': provider_status.get('requested_mode', 'unknown'),
+            'device_fact_sources': {
+                'camera': _fact('camera'),
+                'robot': _fact('robot'),
+                'ultrasound': _fact('ultrasound'),
+                'pressure': _fact('pressure'),
+            },
         }
         payload['source_frame_set_hash'] = self._stable_hash(payload)
         return payload

@@ -13,6 +13,7 @@ struct CommandRegistryEntry {
   const char* name;
   bool write_command;
   const char* state_preconditions_signature;
+  const char* capability_claim;
 };
 
 const std::vector<CommandRegistryEntry>& commandRegistry();
@@ -21,6 +22,7 @@ std::vector<std::string> commandNames();
 bool isRegisteredCommand(const std::string& command);
 bool isWriteCommand(const std::string& command);
 std::vector<std::string> commandStatePreconditions(const std::string& command);
+std::string commandCapabilityClaim(const std::string& command);
 std::size_t commandRegistrySize();
 
 /**

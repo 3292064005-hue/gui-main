@@ -45,7 +45,7 @@ sudo apt-get update
 sudo apt-get install -y cmake g++ libssl-dev
 ```
 
-Real runtime launch honors `XCORE_SDK_ROOT` / `ROKAE_SDK_ROOT` when building the C++ core.
+Real runtime launch defaults to the vendored SDK at `third_party/rokae_xcore_sdk/robot`; hosts with an official SDK install may override it via `XCORE_SDK_ROOT` / `ROKAE_SDK_ROOT` when building the C++ core.
 Desktop entrypoints require a real PySide6>=6.7 installation; only tests may opt into the compatibility stub.
 Python mainline currently expects `protobuf>=3.20.3,<8` at runtime.
 
@@ -69,3 +69,8 @@ Backend/profile truth matrix:
 - `review`: desktop=`api` (default), headless=`core`
 
 A live-SDK profile may not execute write commands on `mock`, contract-only, or `core` surfaces whose runtime doctor/control-plane snapshot still reports vendor-boundary or live-takeover blockers.
+
+
+## Session-product materialization contract
+
+Headless/session read APIs now operate in **materialized-only** mode for session-intelligence products. Missing lineage / release / governance artifacts are reported as `not_materialized` and must be regenerated through `SessionService.refresh_session_intelligence()` (or the equivalent finalize/export path) rather than being created on demand by a GET/read surface.

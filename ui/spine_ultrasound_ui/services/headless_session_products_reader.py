@@ -7,6 +7,7 @@ from spine_ultrasound_ui.services.authoritative_artifact_reader import Authorita
 from spine_ultrasound_ui.services.headless_telemetry_cache import HeadlessTelemetryCache
 from spine_ultrasound_ui.services.session_evidence_seal_service import SessionEvidenceSealService
 from spine_ultrasound_ui.services.session_integrity_service import SessionIntegrityService
+from spine_ultrasound_ui.services.session_intelligence.registry import iter_product_specs
 from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
 
 
@@ -44,6 +45,7 @@ class HeadlessSessionProductsReader:
         self.session_intelligence = session_intelligence
         self.evidence_seal_service = evidence_seal_service
         self._artifact_reader = AuthoritativeArtifactReader()
+        self._product_specs = {spec.product: spec for spec in iter_product_specs()}
 
     def require_session_dir(self) -> Path:
         session_dir = self._resolve_session_dir()
@@ -52,6 +54,11 @@ class HeadlessSessionProductsReader:
         return session_dir
 
     def current_session(self) -> dict[str, Any]:
+        """Return the current session product surface without read-side writes.
+
+        Returns compatibility booleans together with registry-driven
+        materialization facts for session-intelligence products.
+        """
         session_dir = self.require_session_dir()
         manifest = self._read_manifest_if_available(session_dir)
         report_path = session_dir / 'export' / 'session_report.json'
@@ -60,6 +67,8 @@ class HeadlessSessionProductsReader:
         compare_path = session_dir / 'export' / 'session_compare.json'
         trends_path = session_dir / 'export' / 'session_trends.json'
         diagnostics_path = session_dir / 'export' / 'diagnostics_pack.json'
+        assessment_snapshot = self._assessment_availability_snapshot(session_dir)
+        intelligence_products = self._session_intelligence_materialization(session_dir)
         return {
             'session_id': manifest.get('session_id', self._current_session_id() or session_dir.name),
             'session_dir': str(session_dir),
@@ -78,7 +87,9 @@ class HeadlessSessionProductsReader:
             'scan_protocol_available': (session_dir / 'derived' / 'preview' / 'scan_protocol.json').exists(),
             'frame_sync_available': (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists(),
             'command_trace_available': (session_dir / 'raw' / 'ui' / 'command_journal.jsonl').exists(),
-            'assessment_available': (session_dir / 'derived' / 'assessment' / 'cobb_measurement.json').exists() or (report_path.exists() and (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists()),
+            'assessment_available': bool(assessment_snapshot['assessment_available']),
+            'assessment_status': str(assessment_snapshot['assessment_state']),
+            'assessment_authoritative_available': bool(assessment_snapshot['authoritative_available']),
             'contact_available': True,
             'recovery_available': True,
             'integrity_available': (session_dir / 'meta' / 'manifest.json').exists(),
@@ -98,8 +109,15 @@ class HeadlessSessionProductsReader:
             'control_plane_snapshot_available': (session_dir / 'derived' / 'session' / 'control_plane_snapshot.json').exists(),
             'control_authority_snapshot_available': (session_dir / 'derived' / 'session' / 'control_authority_snapshot.json').exists(),
             'bridge_observability_report_available': (session_dir / 'derived' / 'events' / 'bridge_observability_report.json').exists(),
+            'session_intelligence_manifest_available': (session_dir / 'derived' / 'session' / 'session_intelligence_manifest.json').exists(),
             'session_evidence_seal_available': (session_dir / 'meta' / 'session_evidence_seal.json').exists(),
             'evidence_seal_available': (session_dir / 'meta' / 'session_evidence_seal.json').exists(),
+            'session_intelligence_products': intelligence_products,
+            'materialization_contract': {
+                'read_side_effects': False,
+                'refresh_entrypoint': 'SessionService.refresh_session_intelligence',
+                'missing_product_policy': 'report_not_materialized',
+            },
             'status': self._status(),
         }
 
@@ -193,11 +211,7 @@ class HeadlessSessionProductsReader:
         return self._read_or_build('export/release_evidence_pack.json', 'release_evidence_pack')
 
     def current_evidence_seal(self) -> dict[str, Any]:
-        session_dir = self.require_session_dir()
-        path = session_dir / 'meta' / 'session_evidence_seal.json'
-        if path.exists():
-            return self._read_json(path)
-        return self.evidence_seal_service.build(session_dir, manifest=self._read_manifest_if_available(session_dir))
+        return self._read_or_build('meta/session_evidence_seal.json', 'session_evidence_seal')
 
     def current_report(self) -> dict[str, Any]:
         return self._read_json(self.require_session_dir() / 'export' / 'session_report.json')
@@ -272,9 +286,10 @@ class HeadlessSessionProductsReader:
         }
 
     def current_assessment(self) -> dict[str, Any]:
+        """Return the assessment surface without synthesizing missing artifacts."""
         session_dir = self.require_session_dir()
         manifest = self._read_manifest_if_available(session_dir)
-        report = self._read_json(session_dir / 'export' / 'session_report.json')
+        report = self._read_json_if_exists(session_dir / 'export' / 'session_report.json')
         frame_sync = self._read_json_if_exists(session_dir / 'derived' / 'sync' / 'frame_sync_index.json')
         annotations = [entry.get('data', {}) for entry in self._read_jsonl(session_dir / 'raw' / 'ui' / 'annotations.jsonl')]
         authoritative = self._load_assessment_artifacts(session_dir)
@@ -290,14 +305,10 @@ class HeadlessSessionProductsReader:
             landmark_candidates = [dict(item) for item in landmark_track.get('landmarks', []) if isinstance(item, dict)]
             uca = self._read_json_if_exists(session_dir / 'derived' / 'assessment' / 'uca_measurement.json')
             agreement = self._read_json_if_exists(session_dir / 'derived' / 'assessment' / 'assessment_agreement.json')
-            closure_verdict = str(summary_payload.get('closure_verdict', measurement.get('closure_verdict', 'authoritative_measured')) or 'authoritative_measured')
-            contamination_flags = {str(item) for item in list(summary_payload.get('source_contamination_flags', measurement.get('source_contamination_flags', []))) if str(item)}
-            curve_status = effective_status
-            curve_source = effective_source_path
-            if not curve_status:
-                curve_status = 'authoritative'
-            if not curve_source:
-                curve_source = 'derived/assessment/cobb_measurement.json'
+            contamination_flags = sorted({str(item) for item in list(summary_payload.get('source_contamination_flags', measurement.get('source_contamination_flags', []))) if str(item)})
+            curve_status = effective_status or 'authoritative'
+            curve_source = effective_source_path or 'derived/assessment/cobb_measurement.json'
+            assessment_state = self._assessment_state_from_effective_status(curve_status)
             return {
                 'session_id': manifest.get('session_id', session_dir.name),
                 'robot_model': manifest.get('robot_profile', {}).get('robot_model', ''),
@@ -310,7 +321,7 @@ class HeadlessSessionProductsReader:
                 'curve_candidate': {
                     'status': curve_status,
                     'source': curve_source,
-                    'description': 'Authoritative lamina-center Cobb assessment generated from reconstruction and session evidence artifacts.' if curve_status == 'authoritative' else 'Prior-assisted or blocked Cobb assessment derived from explicit closure verdict metadata.',
+                    'description': 'Authoritative lamina-center Cobb assessment generated from reconstruction and session evidence artifacts.' if curve_status == 'authoritative' else 'Prior-assisted, blocked, or degraded Cobb assessment resolved from explicit closure-verdict metadata.',
                     'measurement_source': str(summary_payload.get('measurement_source', measurement.get('measurement_source', 'curve_window_fallback')) or 'curve_window_fallback'),
                 },
                 'cobb_candidate_deg': measurement.get('angle_deg'),
@@ -321,8 +332,17 @@ class HeadlessSessionProductsReader:
                 'landmark_candidates': landmark_candidates,
                 'evidence_frames': evidence_frames,
                 'open_issues': list(report.get('open_issues', [])),
+                'assessment_state': assessment_state,
+                'materialization_state': 'materialized',
+                'authoritative_available': True,
+                'legacy_fallback_used': False,
+                'is_authoritative': curve_status == 'authoritative',
+                'source_contamination_flags': contamination_flags,
             }
-        return self._legacy_assessment_payload(session_dir, manifest, report, frame_sync, annotations)
+        has_legacy_inputs = bool(report) or bool(frame_sync) or bool(annotations) or bool(self._read_json_if_exists(session_dir / 'export' / 'qa_pack.json'))
+        if has_legacy_inputs:
+            return self._legacy_assessment_payload(session_dir, manifest, report, frame_sync, annotations)
+        return self._missing_assessment_payload(session_dir, manifest)
 
     def _load_assessment_artifacts(self, session_dir: Path) -> dict[str, dict[str, Any]]:
         """Load authoritative assessment artifacts when available.
@@ -405,9 +425,9 @@ class HeadlessSessionProductsReader:
                 'confidence': confidence,
             },
             'curve_candidate': {
-                'status': 'legacy_fallback',
+                'status': 'legacy_fallback_only',
                 'source': 'session_report',
-                'description': 'Legacy session without authoritative assessment artifacts; synthesized QA evidence is returned for backward compatibility.',
+                'description': 'Legacy session without authoritative assessment artifacts; synthesized QA evidence is returned for backward compatibility only.',
             },
             'cobb_candidate_deg': qa_pack.get('assessment', {}).get('cobb_candidate_deg') if isinstance(qa_pack.get('assessment'), dict) else None,
             'confidence': confidence,
@@ -415,11 +435,139 @@ class HeadlessSessionProductsReader:
             'landmark_candidates': landmark_candidates,
             'evidence_frames': evidence_frames,
             'open_issues': open_issues,
+            'assessment_state': 'legacy_fallback_only',
+            'materialization_state': 'legacy_fallback_only',
+            'authoritative_available': False,
+            'legacy_fallback_used': True,
+            'is_authoritative': False,
+            'source_contamination_flags': [],
+        }
+
+    def _missing_assessment_payload(self, session_dir: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+        return {
+            'session_id': manifest.get('session_id', session_dir.name),
+            'robot_model': manifest.get('robot_profile', {}).get('robot_model', ''),
+            'summary': {
+                'avg_quality_score': 0.0,
+                'usable_sync_ratio': 0.0,
+                'annotation_count': 0,
+                'confidence': 0.0,
+            },
+            'curve_candidate': {
+                'status': 'missing',
+                'source': '',
+                'description': 'Assessment artifacts have not been materialized. Refresh session intelligence or rerun postprocess stages before reading assessment outputs.',
+            },
+            'cobb_candidate_deg': None,
+            'uca_candidate_deg': None,
+            'agreement': {},
+            'confidence': 0.0,
+            'requires_manual_review': True,
+            'landmark_candidates': [],
+            'evidence_frames': [],
+            'open_issues': ['assessment_not_materialized'],
+            'assessment_state': 'missing',
+            'materialization_state': 'not_materialized',
+            'authoritative_available': False,
+            'legacy_fallback_used': False,
+            'is_authoritative': False,
+            'source_contamination_flags': [],
+        }
+
+    def _session_intelligence_materialization(self, session_dir: Path) -> list[dict[str, Any]]:
+        return [self._materialization_fact(session_dir, spec.product) for spec in self._product_specs.values()]
+
+    def _assessment_availability_snapshot(self, session_dir: Path) -> dict[str, Any]:
+        resolution = self._artifact_reader.read_cobb_measurement(session_dir)
+        has_authoritative_surface = bool(resolution.get('effective_payload')) or bool(resolution.get('summary'))
+        if has_authoritative_surface:
+            status = self._assessment_state_from_effective_status(str(resolution.get('effective_status', 'authoritative')))
+            return {
+                'assessment_available': True,
+                'authoritative_available': True,
+                'assessment_state': status,
+            }
+        if (session_dir / 'export' / 'session_report.json').exists() and (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists():
+            return {
+                'assessment_available': False,
+                'authoritative_available': False,
+                'assessment_state': 'legacy_fallback_only',
+            }
+        return {
+            'assessment_available': False,
+            'authoritative_available': False,
+            'assessment_state': 'missing',
+        }
+
+    @staticmethod
+    def _assessment_state_from_effective_status(effective_status: str) -> str:
+        mapping = {
+            'authoritative': 'authoritative_ready',
+            'prior_assisted': 'prior_assisted_ready',
+            'blocked': 'blocked_ready',
+            'degraded': 'degraded_ready',
+        }
+        return mapping.get(str(effective_status or 'authoritative'), 'authoritative_ready')
+
+    def _materialization_fact(self, session_dir: Path, product_name: str) -> dict[str, Any]:
+        spec = self._product_specs.get(product_name)
+        if spec is None:
+            return {
+                'product': product_name,
+                'output_artifact': '',
+                'materialization_phase': 'unknown',
+                'read_policy': 'unknown',
+                'stale_policy': 'unknown',
+                'materialization_state': 'unknown',
+                'artifact_exists': False,
+            }
+        artifact_path = session_dir.joinpath(*spec.output_artifact.split('/'))
+        return {
+            'product': spec.product,
+            'output_artifact': spec.output_artifact,
+            'owner_domain': spec.owner_domain,
+            'performance_budget_ms': spec.performance_budget_ms,
+            'materialization_phase': spec.materialization_phase,
+            'read_policy': spec.read_policy,
+            'stale_policy': spec.stale_policy,
+            'materialization_state': 'materialized' if artifact_path.exists() else 'not_materialized',
+            'artifact_exists': artifact_path.exists(),
         }
 
     def _read_or_build(self, relative_path: str, intelligence_key: str) -> dict[str, Any]:
         session_dir = self.require_session_dir()
         path = session_dir.joinpath(*relative_path.split('/'))
         if path.exists():
-            return self._read_json(path)
-        return self.session_intelligence.build_all(session_dir)[intelligence_key]
+            payload = self._read_json(path)
+            result = dict(payload)
+            spec = self._product_specs.get(intelligence_key)
+            result.setdefault('session_id', self._read_manifest_if_available(session_dir).get('session_id', session_dir.name))
+            result.setdefault('product', intelligence_key)
+            result.setdefault('output_artifact', relative_path)
+            if spec is not None:
+                result.setdefault('owner_domain', spec.owner_domain)
+                result.setdefault('performance_budget_ms', spec.performance_budget_ms)
+                result.setdefault('materialization_phase', spec.materialization_phase)
+                result.setdefault('read_policy', spec.read_policy)
+                result.setdefault('stale_policy', spec.stale_policy)
+            result['materialization_state'] = 'materialized'
+            result['artifact_exists'] = True
+            return result
+        spec = self._product_specs.get(intelligence_key)
+        response = {
+            'session_id': self._read_manifest_if_available(session_dir).get('session_id', session_dir.name),
+            'product': intelligence_key,
+            'output_artifact': relative_path,
+            'artifact_exists': False,
+            'materialization_state': 'not_materialized',
+            'detail': 'Artifact has not been materialized by the session-finalize pipeline.',
+        }
+        if spec is not None:
+            response.update({
+                'owner_domain': spec.owner_domain,
+                'performance_budget_ms': spec.performance_budget_ms,
+                'materialization_phase': spec.materialization_phase,
+                'read_policy': spec.read_policy,
+                'stale_policy': spec.stale_policy,
+            })
+        return response

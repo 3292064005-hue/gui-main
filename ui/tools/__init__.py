@@ -1,1 +1,1 @@
-"""Offline tools package for annotation and training helpers."""
+"""Offline tooling packages shipped with the repository."""

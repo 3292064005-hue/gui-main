@@ -11,7 +11,18 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["product", "output_artifact", "dependencies", "retryable", "performance_budget_ms", "owner_domain", "materialized"],
+        "required": [
+          "product",
+          "output_artifact",
+          "dependencies",
+          "retryable",
+          "performance_budget_ms",
+          "owner_domain",
+          "materialization_phase",
+          "read_policy",
+          "stale_policy",
+          "materialized"
+        ],
         "properties": {
           "product": {"type": "string"},
           "output_artifact": {"type": "string"},
@@ -19,6 +30,9 @@
           "retryable": {"type": "boolean"},
           "performance_budget_ms": {"type": "integer"},
           "owner_domain": {"type": "string"},
+          "materialization_phase": {"type": "string"},
+          "read_policy": {"type": "string"},
+          "stale_policy": {"type": "string"},
           "materialized": {"type": "boolean"}
         }
       }

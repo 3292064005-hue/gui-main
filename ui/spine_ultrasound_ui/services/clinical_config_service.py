@@ -227,9 +227,9 @@ class ClinicalConfigService:
         checks.append(self._check(
             "主线配置贴合度",
             config.rt_mode == self.identity.rt_mode and config.preferred_link == self.identity.preferred_link and bool(config.requires_single_control_source),
-            "warning",
+            "blocker",
             f"rt_mode={config.rt_mode}, link={config.preferred_link}, single_source={config.requires_single_control_source}",
-            "当前配置与 xMate 主线基线存在偏差，建议应用主线基线后再继续。",
+            "当前配置与 xMate 主线基线存在偏差，必须应用主线基线后才能继续。",
         ))
         checks.append(self._check(
             "工具/TCP 命名",
@@ -285,6 +285,7 @@ class ClinicalConfigService:
             "remote_ip": self.profile.remote_ip,
             "preferred_link": self.identity.preferred_link,
             "rt_mode": self.identity.rt_mode,
+            "requires_single_control_source": self.identity.requires_single_control_source,
             "tool_name": self.profile.tool_name,
             "tcp_name": self.profile.tcp_name,
             "rt_network_tolerance_percent": self.profile.rt_network_tolerance_percent,

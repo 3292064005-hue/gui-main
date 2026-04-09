@@ -106,7 +106,11 @@ def run_localization(host: AppWorkflowHost) -> None:
         host._log("WARN", "请先创建实验，再执行视觉定位。")
         return
     try:
-        host.localization_result = host.plan_service.run_localization(host.session_service.current_experiment, host.config)
+        host.localization_result = host.plan_service.run_localization(
+            host.session_service.current_experiment,
+            host.config,
+            device_roster=host.telemetry.device_roster(),
+        )
     except (RuntimeError, ValueError) as exc:
         host.workflow_artifacts.localization = host.workflow_artifacts.localization.__class__(
             ready=False,

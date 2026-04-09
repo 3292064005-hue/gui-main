@@ -33,6 +33,7 @@ def test_core_runtime_dispatch_uses_handler_registry() -> None:
     assert "handleConnectionCommand" in source
     assert "handleQueryCommand" in source
     assert "handleExecutionCommand" in source
+    assert "commandCapabilityClaim" in source
 
 
 def test_recording_service_decouples_rt_capture_from_flush() -> None:

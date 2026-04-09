@@ -19,8 +19,10 @@ class _AdapterStub:
 
 
 def test_compile_and_query_final_verdict_are_registered_as_read_contract_commands() -> None:
+    assert 'validate_scan_plan' in COMMAND_SPECS
     assert 'compile_scan_plan' in COMMAND_SPECS
     assert 'query_final_verdict' in COMMAND_SPECS
+    assert is_write_command('validate_scan_plan') is False
     assert is_write_command('compile_scan_plan') is False
     assert is_write_command('query_final_verdict') is False
 
@@ -65,7 +67,7 @@ def test_headless_adapter_allows_read_contract_commands_in_review_profile(tmp_pa
             os.environ['SPINE_DEPLOYMENT_PROFILE'] = old_profile
     result = adapter.command('query_final_verdict', {})
     assert result['ok'] is True
-    compile_result = adapter.command('compile_scan_plan', {
+    compile_result = adapter.command('validate_scan_plan', {
         'scan_plan': {
             'session_id': 'S1',
             'plan_id': 'P1',

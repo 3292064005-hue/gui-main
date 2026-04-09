@@ -56,3 +56,31 @@ def test_environment_doctor_reports_runtime_version_policy_checks() -> None:
     assert 'PySide6' in checks
     assert 'Python protobuf runtime' in checks
     assert '>=3.20.3, <8' in checks['Python protobuf runtime']['detail']
+
+
+
+def test_runtime_readiness_manifest_downgrades_top_level_state_when_doctor_blocked(monkeypatch) -> None:
+    from spine_ultrasound_ui.services.runtime_readiness_manifest_service import RuntimeReadinessManifestService
+
+    class _ModeDecision:
+        requires_live_sdk = False
+
+        def to_dict(self):
+            return {'mode': 'mock', 'requires_live_sdk': False}
+
+    monkeypatch.setattr(
+        'spine_ultrasound_ui.services.runtime_readiness_manifest_service.SdkEnvironmentDoctorService.inspect',
+        lambda self, config: {'summary_state': 'blocked', 'blockers': [{'name': 'TLS runtime 目录', 'detail': 'configs/tls/runtime'}], 'warnings': []},
+    )
+    monkeypatch.setattr(
+        'spine_ultrasound_ui.services.runtime_readiness_manifest_service.DeploymentProfileService.build_snapshot',
+        lambda self, config: {'name': 'dev', 'requires_hil_gate': False},
+    )
+    monkeypatch.setattr(
+        'spine_ultrasound_ui.services.runtime_readiness_manifest_service.resolve_runtime_mode',
+        lambda explicit_mode, surface, config, env: _ModeDecision(),
+    )
+    payload = RuntimeReadinessManifestService(Path('.')).build(config=RuntimeConfig(), surface='desktop')
+    assert payload['summary_state'] == 'warning'
+    assert payload['verification']['live_runtime_ready'] is False
+    assert payload['verification']['verification_boundary'] == 'environment_blocked'

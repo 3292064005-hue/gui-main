@@ -73,6 +73,12 @@ def test_reconstruction_writer_sanitizes_canonical_curve_and_assessment_reads_si
     (session_dir / 'derived' / 'reconstruction' / 'landmark_track.json').write_text(json.dumps({}), encoding='utf-8')
     (session_dir / 'derived' / 'reconstruction' / 'reconstruction_evidence.json').write_text(json.dumps({}), encoding='utf-8')
 
+    bundle_path = session_dir / 'derived' / 'reconstruction' / 'reconstruction_volume_bundle.npz'
+    assert bundle_path.exists()
+    model_ready = json.loads((session_dir / 'derived' / 'reconstruction' / 'model_ready_input_index.json').read_text(encoding='utf-8'))
+    assert model_ready['reconstruction_volume_bundle_ref'].endswith('reconstruction_volume_bundle.npz')
+    assert model_ready['volume_reconstruction_ref'].endswith('reconstruction_volume_bundle.npz')
+
     canonical = json.loads((session_dir / 'derived' / 'reconstruction' / 'spine_curve.json').read_text(encoding='utf-8'))
     assert canonical['measurement_source'] == 'authoritative_curve_unavailable'
     assert canonical['authoritative_available'] is False

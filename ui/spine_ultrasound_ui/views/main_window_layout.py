@@ -73,14 +73,14 @@ class MainWindowLayoutBuilder:
         toolbar.setMovable(False)
         w.addToolBar(toolbar)
         for text, fn in [
-            ("新建实验", w.backend.create_experiment),
-            ("刷新 SDK", w.backend.refresh_sdk_assets),
-            ("应用主线基线", w.backend.apply_clinical_baseline),
-            ("导出治理", w.backend.export_governance_snapshot),
+            ("新建实验", w.action_router.dispatch("create_experiment")),
+            ("刷新 SDK", w.action_router.dispatch("refresh_sdk_assets")),
+            ("应用主线基线", w.action_router.dispatch("apply_clinical_baseline")),
+            ("导出治理", w.action_router.dispatch("export_governance_snapshot")),
             ("保存配置", w._save_runtime_config),
-            ("保存结果", w.backend.save_results),
-            ("导出摘要", w.backend.export_summary),
-            ("安全退让", w.backend.safe_retreat),
+            ("保存结果", w.action_router.dispatch("save_results")),
+            ("导出摘要", w.action_router.dispatch("export_summary")),
+            ("安全退让", w.action_router.dispatch("safe_retreat")),
         ]:
             action = QAction(text, w)
             action.triggered.connect(fn)
@@ -181,10 +181,10 @@ class MainWindowLayoutBuilder:
         w.governance_summary = QLabel("控制面、控制权、证据链状态将在此处收敛显示。")
         w.governance_summary.setWordWrap(True)
         governance_layout.addWidget(w.governance_summary)
-        governance_layout.addWidget(self._make_button("刷新治理", w.backend.refresh_session_governance))
-        governance_layout.addWidget(self._make_button("导出治理", w.backend.export_governance_snapshot))
+        governance_layout.addWidget(self._make_button("刷新治理", w.action_router.dispatch("refresh_session_governance")))
+        governance_layout.addWidget(self._make_button("导出治理", w.action_router.dispatch("export_governance_snapshot")))
         if hasattr(w.backend, "browse_evidence_offline"):
-            governance_layout.addWidget(self._make_button("离线证据浏览", w.backend.browse_evidence_offline))
+            governance_layout.addWidget(self._make_button("离线证据浏览", w.action_router.dispatch("browse_evidence_offline")))
         layout.addWidget(governance)
         layout.addStretch(1)
         return panel
@@ -283,7 +283,7 @@ class MainWindowLayoutBuilder:
                 ("btn_scan_start", "开始扫查", "start_scan"),
                 ("btn_scan_pause", "暂停", "pause_scan"),
                 ("btn_scan_resume", "恢复", "resume_scan"),
-                ("btn_scan_stop", "停止", "stop_scan"),
+                ("btn_scan_stop", "结束本轮扫查", "stop_scan"),
             ],
             "图像与结果": [
                 ("btn_pre", "预处理", "run_preprocess"),
@@ -311,7 +311,7 @@ class MainWindowLayoutBuilder:
         grid.setVerticalSpacing(8)
         buttons = []
         for attr, text, backend_method in spec:
-            button = self._make_button(text, getattr(w.backend, backend_method, lambda: QMessageBox.information(w, "提示", f"{text} 暂未接线")))
+            button = self._make_button(text, getattr(w.action_router, "dispatch")(backend_method) if hasattr(w, "action_router") and hasattr(w, f"_action_{backend_method}") else (lambda: QMessageBox.information(w, "提示", f"{text} 暂未接线")))
             setattr(w, attr, button)
             buttons.append(button)
         self._fill_grid(grid, buttons, columns=2, last_span=True)

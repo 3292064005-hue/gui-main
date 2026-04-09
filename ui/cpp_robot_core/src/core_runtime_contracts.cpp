@@ -5,6 +5,7 @@
 #include <filesystem>
 
 #include "json_utils.h"
+#include "robot_core/command_registry.h"
 #include "robot_core/force_state.h"
 #include "robot_core/robot_identity_contract.h"
 #include "robot_core/robot_family_descriptor.h"
@@ -113,6 +114,20 @@ std::string pathArrayJson(const std::vector<SdkRobotPathInfo>& paths) {
 }
 
 std::string vectorJson(const std::vector<double>& values) { return json::array(values); }
+
+
+std::string capabilityClaimCatalogJson() {
+  std::map<std::string, std::vector<std::string>> claims;
+  for (const auto& entry : commandRegistry()) {
+    if (entry.capability_claim == nullptr || *entry.capability_claim == '\0') continue;
+    claims[entry.capability_claim].push_back(entry.name);
+  }
+  std::vector<std::string> claim_entries;
+  for (const auto& [claim, commands] : claims) {
+    claim_entries.push_back(json::object({json::field("claim", json::quote(claim)), json::field("commands", json::stringArray(commands))}));
+  }
+  return objectArray(claim_entries);
+}
 
 std::string dhArrayJson(const std::vector<OfficialDhParameter>& params) {
   std::vector<std::string> entries;
@@ -382,7 +397,8 @@ std::string CoreRuntime::controlGovernanceContractJsonLocked() const {
       field("rt_loop_active", boolLiteral(rt_snapshot.loop_active)),
       field("rt_move_active", boolLiteral(rt_snapshot.move_active)),
       field("nrt_last_command", quote(nrt_snapshot.last_command)),
-      field("detail", quote("single control source contract requires session freeze + AUTO + powered + cartesianImpedance mainline"))
+      field("required_capability_claims", capabilityClaimCatalogJson()),
+      field("detail", quote("single control source contract requires session freeze + AUTO + powered + cartesianImpedance mainline with explicit capability claims"))
   });
 }
 
@@ -718,10 +734,27 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
           field("source", quote("cpp_robot_core"))
       })),
       field("owner_provenance", object({field("source", quote("cpp_robot_core"))})),
+      field("granted_claims", stringArray({"hardware_lifecycle_write", "runtime_validation", "plan_compile", "session_freeze_write", "nrt_motion_write", "rt_motion_write", "recovery_write", "fault_injection_write"})),
       field("workspace_binding", quote("runtime")),
       field("session_binding", quote(session_id_)),
       field("blockers", objectArray(blocker_entries)),
       field("warnings", objectArray(warning_entries))
+  });
+  const auto telemetry_authority = object({
+      field("runtime_source", quote(sdk_robot_.queryPort().runtimeSource())),
+      field("fact_policy", quote(simulatedTelemetryAllowedLocked() ? std::string("mock_profile_simulated_facts") : std::string("measured_only_or_unavailable"))),
+      field("quality", object({
+          field("source", quote(quality_source_)),
+          field("available", boolLiteral(quality_available_)),
+          field("authoritative", boolLiteral(quality_authoritative_))
+      })),
+      field("contact", object({
+          field("pressure_source", quote(contact_state_.pressure_source)),
+          field("quality_source", quote(contact_state_.quality_source)),
+          field("pressure_available", boolLiteral(contact_state_.pressure_available)),
+          field("quality_available", boolLiteral(contact_state_.quality_available)),
+          field("authoritative", boolLiteral(contact_state_.authoritative))
+      }))
   });
   const auto plan_digest = object({
       field("plan_id", quote(plan_id_)),
@@ -737,6 +770,7 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
       field("protocol_version", std::to_string(kProtocolVersion)),
       field("control_authority", control_authority),
       field("runtime_config_applied", applied_runtime_config),
+      field("telemetry_authority", telemetry_authority),
       field("session_freeze", session_freeze),
       field("plan_digest", plan_digest),
       field("final_verdict", finalVerdictJson(last_final_verdict_))

@@ -22,7 +22,7 @@ class RobotIdentity:
     label: str
     sdk_robot_class: str
     axis_count: int
-    family_key: str = "xmate_6_collaborative"
+    family_key: str = "xmate3_cobot_6"
     family_label: str = "xMate collaborative 6-axis"
     controller_series: str = "xCore"
     controller_version: str = "v2.1+"
@@ -88,8 +88,10 @@ XMATE3_IDENTITY = RobotIdentity(
     label="xMate3",
     sdk_robot_class="xMateRobot",
     axis_count=6,
-    family_key="xmate_6_collaborative",
+    family_key="xmate3_cobot_6",
     family_label="xMate collaborative 6-axis",
+    preferred_link="wired_direct",
+    rt_mode="cartesianImpedance",
     official_dh_parameters=(
         OfficialDhParameter(1, 0.0, -_PI_2, 341.5),
         OfficialDhParameter(2, 394.0, 0.0, 0.0),
@@ -126,10 +128,11 @@ _SUPPORTED_IDENTITIES = {
 
 class RobotIdentityService:
     def __init__(self, default_model: str = "xmate3") -> None:
-        self.default_model = "xmate3"
+        normalized = (default_model or XMATE3_IDENTITY.robot_model).strip().lower()
+        self.default_model = normalized or XMATE3_IDENTITY.robot_model
 
     def resolve(self, robot_model: str | None = None, sdk_robot_class: str | None = None, axis_count: int | None = None) -> RobotIdentity:
-        model = (robot_model or XMATE3_IDENTITY.robot_model).strip().lower()
+        model = (robot_model or self.default_model or XMATE3_IDENTITY.robot_model).strip().lower()
         sdk_class = (sdk_robot_class or XMATE3_IDENTITY.sdk_robot_class).strip()
         resolved_axis = int(axis_count if axis_count is not None else XMATE3_IDENTITY.axis_count)
         identity = _SUPPORTED_IDENTITIES.get((model, sdk_class, resolved_axis))

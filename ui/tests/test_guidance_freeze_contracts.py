@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+
+import jsonschema
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
-from spine_ultrasound_ui.contracts import schema_catalog
+from spine_ultrasound_ui.contracts import schema_catalog, validate_payload_against_schema
 from spine_ultrasound_ui.core.app_controller import AppController
 from spine_ultrasound_ui.services.mock_backend import MockBackend
 
@@ -162,7 +164,7 @@ def test_guidance_lock_rejects_review_required_bundle(tmp_path: Path) -> None:
         raise AssertionError("review-required guidance bundle should be rejected")
 
 
-def test_session_service_guidance_only_lock_compatibility_without_localization_result(tmp_path: Path) -> None:
+def test_session_service_guidance_only_lock_requires_canonical_localization_result(tmp_path: Path) -> None:
     manager = ExperimentManager(Path(tmp_path))
     session_service = SessionService(manager)
     runtime = RuntimeConfig()
@@ -181,45 +183,152 @@ def test_session_service_guidance_only_lock_compatibility_without_localization_r
         "registration_id": "REG_COMPAT",
         "registration_hash": "reg-compat-hash",
         "camera_device_id": "camera-0",
-        "camera_frame_refs": ["frame-1", "frame-2"],
-        "camera_intrinsics_hash": "intrinsics-hash",
-        "camera_to_base_hash": "camera-base-hash",
-        "probe_tcp_hash": "probe-hash",
-        "temporal_sync_hash": "sync-hash",
-        "algorithm_bundle_hash": "algo-hash",
-        "processing_step_refs": ["step-1"],
-        "freeze_ready": True,
-        "generated_at": "2026-04-03T00:00:00Z",
-        "review_approval": {"approved": True, "reviewer": "qa"},
     }
 
-    locked = session_service.ensure_locked(
-        runtime,
-        {},
-        preview,
-        protocol_version=1,
-        safety_thresholds={},
-        device_health_snapshot={},
-        patient_registration=registration,
-        localization_result=None,
-        control_authority={},
+    try:
+        session_service.ensure_locked(
+            runtime,
+            {},
+            preview,
+            protocol_version=1,
+            safety_thresholds={},
+            device_health_snapshot={},
+            patient_registration=registration,
+            localization_result=None,
+            control_authority={},
+        )
+    except RuntimeError as exc:
+        assert 'canonical localization_result' in str(exc)
+    else:
+        raise AssertionError('guidance-only session lock should reject non-canonical compatibility freeze synthesis')
+
+
+def test_source_frame_set_schema_accepts_device_fact_sources(tmp_path: Path) -> None:
+    _app()
+    backend = MockBackend(Path(tmp_path))
+    controller = AppController(Path(tmp_path), backend)
+    controller.connect_robot()
+    controller.power_on()
+    controller.set_auto_mode()
+    controller.create_experiment()
+    controller.run_localization()
+    controller.generate_path()
+    controller.start_scan()
+
+    session_dir = controller.session_service.current_session_dir
+    assert session_dir is not None
+    payload = json.loads((session_dir / "derived" / "sync" / "source_frame_set.json").read_text(encoding="utf-8"))
+    validate_payload_against_schema(schema_name='source_frame_set.schema.json', payload=payload)
+    assert set(payload['device_fact_sources']) == {'camera', 'robot', 'ultrasound', 'pressure'}
+
+
+def test_localization_strategy_requires_authoritative_device_roster() -> None:
+    class _Exp:
+        exp_id = 'EXP-STRICT-ROSTER'
+
+    from spine_ultrasound_ui.services.localization_strategies import FallbackRegistrationStrategy
+
+    try:
+        FallbackRegistrationStrategy().run(_Exp(), RuntimeConfig())
+    except ValueError as exc:
+        assert 'device_roster' in str(exc)
+    else:
+        raise AssertionError('localization without authoritative device roster should fail')
+
+
+def test_source_frame_set_schema_requires_device_fact_sources() -> None:
+    payload = {
+        'schema_version': '1.0',
+        'camera_device_id': 'camera-0',
+        'frame_refs': ['frame-1'],
+        'frame_envelopes': [{
+            'storage_ref': 'frame-1',
+            'provider_mode': 'synthetic',
+            'captured_at': '2026-04-09T00:00:00Z',
+            'fresh': True,
+            'roi_center_y_mm': 0.0,
+            'confidence': 0.8,
+            'frame_size_px': {'width': 640, 'height': 480},
+        }],
+        'frame_count': 1,
+        'fresh': True,
+        'provider_mode': 'synthetic',
+        'requested_mode': 'synthetic',
+        'source_frame_set_hash': 'hash',
+    }
+    try:
+        validate_payload_against_schema(schema_name='source_frame_set.schema.json', payload=payload)
+    except ValueError as exc:
+        assert 'device_fact_sources' in str(exc)
+    else:
+        raise AssertionError('source_frame_set payload without device_fact_sources should violate schema')
+
+
+def test_locked_session_guidance_artifacts_match_declared_schemas(tmp_path: Path) -> None:
+    _app()
+    backend = MockBackend(Path(tmp_path))
+    controller = AppController(Path(tmp_path), backend)
+    controller.connect_robot()
+    controller.power_on()
+    controller.set_auto_mode()
+    controller.create_experiment()
+    controller.run_localization()
+    controller.generate_path()
+    controller.start_scan()
+
+    session_dir = controller.session_service.current_session_dir
+    assert session_dir is not None
+    catalog = schema_catalog()
+
+    artifacts = {
+        'registration_candidate': json.loads((session_dir / 'derived' / 'guidance' / 'registration_candidate.json').read_text(encoding='utf-8')),
+        'back_roi': json.loads((session_dir / 'derived' / 'guidance' / 'back_roi.json').read_text(encoding='utf-8')),
+        'midline_polyline': json.loads((session_dir / 'derived' / 'guidance' / 'midline_polyline.json').read_text(encoding='utf-8')),
+        'landmarks': json.loads((session_dir / 'derived' / 'guidance' / 'landmarks.json').read_text(encoding='utf-8')),
+        'body_surface': json.loads((session_dir / 'derived' / 'guidance' / 'body_surface.json').read_text(encoding='utf-8')),
+        'guidance_targets': json.loads((session_dir / 'derived' / 'guidance' / 'guidance_targets.json').read_text(encoding='utf-8')),
+    }
+    for artifact_name, payload in artifacts.items():
+        schema_name = f'{artifact_name}.schema.json'
+        jsonschema.Draft202012Validator(catalog[schema_name]).validate(payload)
+
+
+def test_register_artifact_rejects_schema_invalid_canonical_payload(tmp_path: Path) -> None:
+    manager = ExperimentManager(Path(tmp_path))
+    runtime = RuntimeConfig()
+    exp = manager.create(runtime.to_dict())
+    preview = ScanPlan(
+        session_id="",
+        plan_id="PLAN_REGISTER_INVALID",
+        approach_pose=ScanWaypoint(0, 0, 0, 0, 0, 0),
+        retreat_pose=ScanWaypoint(0, 0, 0, 0, 0, 0),
+        segments=[],
     )
+    locked = manager.lock_session(
+        exp_id=exp["exp_id"],
+        config_snapshot=runtime.to_dict(),
+        device_roster={},
+        software_version=runtime.software_version,
+        build_id=runtime.build_id,
+        scan_plan=preview,
+    )
+    session_dir = Path(locked["session_dir"])
+    artifact_path = session_dir / 'derived' / 'sync' / 'source_frame_set.json'
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text('{}', encoding='utf-8')
 
-    manifest = locked.manifest
-    assert manifest["patient_registration_hash"] == registration["registration_hash"]
-    assert manifest["guidance_mode"] == "guidance_only"
-    assert manifest["calibration_bundle_hash"]
-    assert manifest["source_frame_set_hash"]
-    assert manifest["localization_freeze_hash"]
-
-    session_dir = locked.session_dir
-    readiness = json.loads((session_dir / "meta" / "localization_readiness.json").read_text(encoding="utf-8"))
-    calibration = json.loads((session_dir / "meta" / "calibration_bundle.json").read_text(encoding="utf-8"))
-    source_frame_set = json.loads((session_dir / "derived" / "sync" / "source_frame_set.json").read_text(encoding="utf-8"))
-    replay = json.loads((session_dir / "replay" / "localization_replay_index.json").read_text(encoding="utf-8"))
-
-    assert readiness["status"] == "READY_FOR_FREEZE"
-    assert readiness["readiness_hash"]
-    assert calibration["bundle_hash"]
-    assert source_frame_set["source_frame_set_hash"]
-    assert replay["replay_hash"]
+    try:
+        manager.register_artifact(
+            session_dir,
+            'source_frame_set',
+            {
+                'artifact_type': 'source_frame_set',
+                'path': 'derived/sync/source_frame_set.json',
+                'producer': 'test',
+                'schema': 'source_frame_set.schema.json',
+            },
+        )
+    except RuntimeError as exc:
+        assert 'schema validation failed' in str(exc)
+    else:
+        raise AssertionError('register_artifact should reject schema-invalid canonical artifacts')

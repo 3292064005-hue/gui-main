@@ -49,7 +49,7 @@ class HeadlessAdapterSettings:
             command_port=command_port,
             telemetry_host=telemetry_host,
             telemetry_port=telemetry_port,
-            read_only_mode=os.getenv("SPINE_READ_ONLY_MODE", "0").lower() in {"1", "true", "yes", "on"},
+            read_only_mode=(os.getenv("SPINE_READ_ONLY_MODE", "0").lower() in {"1", "true", "yes", "on"}) or decision.review_only,
             strict_control_authority=os.getenv("SPINE_STRICT_CONTROL_AUTHORITY", "0").lower() in {"1", "true", "yes", "on"},
             implicit_control_lease=os.getenv("SPINE_IMPLICIT_CONTROL_LEASE", "1").lower() not in {"0", "false", "no", "off"},
             deployment_profile=decision.profile_name,
