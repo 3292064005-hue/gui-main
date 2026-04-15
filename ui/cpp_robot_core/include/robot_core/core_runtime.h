@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <string_view>
 #include <set>
@@ -21,10 +22,15 @@
 #include "robot_core/recovery_manager.h"
 #include "robot_core/robot_state_hub.h"
 #include "robot_core/rt_motion_service.h"
+#include "robot_core/runtime_command_contracts.h"
 #include "robot_core/runtime_types.h"
 #include "robot_core/safety_service.h"
 
 namespace robot_core {
+
+class CoreRuntime;
+class CoreRuntimeDispatcher;
+class CoreRuntimeContractPublisher;
 
 class CoreRuntime {
 public:
@@ -35,6 +41,7 @@ public:
   };
 
   CoreRuntime();
+  ~CoreRuntime();
 
   /**
    * @brief Dispatch a JSON command onto the canonical runtime lane.
@@ -93,14 +100,23 @@ public:
   void setState(RobotCoreState state);
   RobotCoreState state() const;
 
+
 private:
-  std::string handleConnectionCommand(const std::string& request_id, const std::string& line);
-  std::string handlePowerModeCommand(const std::string& request_id, const std::string& line);
-  std::string handleValidationCommand(const std::string& request_id, const std::string& line);
-  std::string handleQueryCommand(const std::string& request_id, const std::string& line);
-  std::string handleFaultInjectionCommand(const std::string& request_id, const std::string& line);
-  std::string handleSessionCommand(const std::string& request_id, const std::string& line);
-  std::string handleExecutionCommand(const std::string& request_id, const std::string& line);
+  friend class CoreRuntimeDispatcher;
+  friend class CoreRuntimeContractPublisher;
+
+
+  std::string handleConnectionCommand(const RuntimeCommandInvocation& invocation);
+  std::string handlePowerModeCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleValidationCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleQueryCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleFaultInjectionCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleSessionCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleExecutionCommand(const RuntimeCommandInvocation& invocation);
+#include "robot_core/generated_runtime_command_typed_handler_decls.inc"
+  template <typename RequestT>
+  std::string handleTypedCommand(const RuntimeCommandContext& context, const RequestT& request);
+  std::string dispatchTypedCommand(const RuntimeCommandInvocation& invocation);
   void updateKinematicsLocked();
   void updateQualityLocked(const RtObservedState& observed, const RtPhaseTelemetry& phase_telemetry);
   void updateContactAndProgressLocked(const RtObservedState& observed);
@@ -123,10 +139,18 @@ private:
   void queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step = "", const std::string& request_id = "", const std::string& auto_action = "");
   CoreStateSnapshot buildCoreSnapshotLocked() const;
   ScanProgress buildScanProgressLocked() const;
-  void recordStreamsLocked();
-  void applyConfigFromJsonLocked(const std::string& json_line);
-  void loadPlanFromJsonLocked(const std::string& json_line);
-  FinalVerdict compileScanPlanVerdictLocked(const std::string& json_line);
+  struct PendingRecordBundle {
+    bool enabled{false};
+    RobotStateSnapshot robot_state{};
+    ContactTelemetry contact_state{};
+    CoreStateSnapshot core_state{};
+    ScanProgress scan_progress{};
+  };
+  PendingRecordBundle buildRecordBundleLocked() const;
+  void flushRecordBundle(const PendingRecordBundle& bundle);
+  void applyConfigSnapshotLocked(const std::string& config_snapshot_json);
+  void loadPlanLocked(const std::string& scan_plan_json, const std::string& scan_plan_hash = "");
+  FinalVerdict compileScanPlanVerdictLocked(const std::string& config_snapshot_json, const std::string& scan_plan_json, const std::string& scan_plan_hash = "");
   void appendMainlineContractIssuesLocked(std::vector<std::string>* blockers, std::vector<std::string>* warnings) const;
   bool sessionFreezeConsistentLocked() const;
   std::string capabilityContractJsonLocked() const;
@@ -138,12 +162,17 @@ private:
   std::string rtKernelContractJsonLocked() const;
   std::string sessionDriftContractJsonLocked() const;
   std::string authoritativeRuntimeEnvelopeJsonLocked() const;
+  std::string authoritativeRuntimeEnvelopeJsonInternal() const;
   std::string controlGovernanceContractJsonLocked() const;
+  std::string controlGovernanceContractJsonInternal() const;
   std::string controllerEvidenceJsonLocked() const;
+  std::string controllerEvidenceJsonInternal() const;
   std::string dualStateMachineContractJsonLocked() const;
   std::string mainlineExecutorContractJsonLocked() const;
   std::string releaseContractJsonLocked() const;
+  std::string releaseContractJsonInternal() const;
   std::string deploymentContractJsonLocked() const;
+  std::string deploymentContractJsonInternal() const;
   std::string faultInjectionContractJsonLocked() const;
   bool applyFaultInjectionLocked(const std::string& fault_name, std::string* error_message);
   void clearInjectedFaultsLocked();
@@ -215,6 +244,26 @@ private:
   ModelAuthority model_authority_{};
   ForceControlLimits force_limits_{loadForceControlLimits()};
   std::set<std::string> injected_faults_{};
+  std::unique_ptr<CoreRuntimeDispatcher> runtime_dispatcher_;
+  std::unique_ptr<CoreRuntimeContractPublisher> runtime_contract_publisher_;
 };
+
+}  // namespace robot_core
+
+
+namespace robot_core {
+
+template <typename RequestT>
+inline std::string CoreRuntime::handleTypedCommand(const RuntimeCommandContext& context, const RequestT& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = RequestT::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(RequestT::kCommand);
+  return replyJson(context.request_id, false, std::string("unsupported typed handler: ") + RequestT::kCommand);
+}
+
+#include "robot_core/generated_runtime_command_typed_handlers.inc"
 
 }  // namespace robot_core

@@ -77,6 +77,33 @@ def _load_json_dict(raw: str) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
+
+def _validated_profiles(*, verification_report: dict, requested_profiles: list[str]) -> list[str]:
+    """Return only profiles that are actually closed by verification evidence.
+
+    Args:
+        verification_report: Parsed verification execution report payload.
+        requested_profiles: Profiles the caller says were intended for acceptance.
+
+    Returns:
+        Profiles that are both requested and present in
+        ``proof_scope.profile_phases`` when ``profile_gate_proof`` is true.
+
+    Boundary behavior:
+        When the linked verification report does not close profile-gate proof,
+        this function returns an empty list even if callers passed profile names.
+        This prevents acceptance summaries from overstating repository-only runs
+        as if mock/HIL/prod acceptance had completed.
+    """
+    proof_scope = dict(verification_report.get('proof_scope') or {})
+    if not bool(proof_scope.get('profile_gate_proof', False)):
+        return []
+    proven = [str(item).strip() for item in proof_scope.get('profile_phases', []) if str(item).strip()]
+    requested = [str(item).strip() for item in requested_profiles if str(item).strip()]
+    if not requested:
+        return proven
+    return [item for item in requested if item in proven]
+
 def _verification_snapshot(*, verification_report: dict, readiness_manifest: dict, build_evidence_report: dict) -> dict:
     """Summarize linked verification evidence inside the acceptance payload.
 
@@ -114,6 +141,10 @@ def main() -> int:
     verification_report_payload = _load_json_dict(args.verification_report)
     readiness_manifest_payload = _load_json_dict(args.readiness_manifest)
     build_evidence_payload = _load_json_dict(args.build_evidence_report)
+    validated_profiles = _validated_profiles(
+        verification_report=verification_report_payload,
+        requested_profiles=list(args.profiles),
+    )
     payload = {
         'schema_version': 'acceptance.summary.v2',
         'path_basis': 'relative_to_summary_dir',
@@ -121,11 +152,20 @@ def main() -> int:
         'verification_report': _portable_path(args.verification_report, base_dir=base_dir),
         'readiness_manifest': _portable_path(args.readiness_manifest, base_dir=base_dir),
         'build_evidence_report': _portable_path(args.build_evidence_report, base_dir=base_dir),
-        'profiles': list(args.profiles),
+        'profiles': validated_profiles,
+        'requested_profiles': list(args.profiles),
         'installed_binaries': [_portable_path(item, base_dir=base_dir) for item in args.installed_binaries],
         'requested_bindings': {
             'with_sdk': bool(args.with_sdk),
             'with_model': bool(args.with_model),
+        },
+        'acceptance_scope': {
+            'executed_phases': list(verification_report_payload.get('executed_phases') or []),
+            'repository_proof': bool((verification_report_payload.get('proof_scope') or {}).get('repository_proof', False)),
+            'profile_gate_proof': bool((verification_report_payload.get('proof_scope') or {}).get('profile_gate_proof', False)),
+            'validated_profiles': validated_profiles,
+            'unvalidated_requested_profiles': [item for item in args.profiles if item not in validated_profiles],
+            'claim_boundary': 'profiles only close when verification_report.proof_scope.profile_gate_proof is true',
         },
         'verification_snapshot': _verification_snapshot(
             verification_report=verification_report_payload,

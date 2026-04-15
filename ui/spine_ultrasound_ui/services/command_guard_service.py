@@ -36,6 +36,14 @@ class CommandGuardService:
         normalized_payload = dict(authority_decision.get("normalized_payload", payload))
         return normalized_payload, authority_decision, profile
 
+    @staticmethod
+    def _extract_authoritative_runtime(control_plane_snapshot: dict[str, Any]) -> dict[str, Any]:
+        root_authoritative = dict(control_plane_snapshot.get("authoritative_runtime_envelope") or {})
+        if root_authoritative:
+            return root_authoritative
+        nested = dict(control_plane_snapshot.get("control_plane_snapshot") or control_plane_snapshot.get("control_plane") or {})
+        return dict(nested.get("authoritative_runtime_envelope") or {})
+
     def guard_command(self, command: str, payload: dict[str, Any]) -> tuple[dict[str, Any], ReplyEnvelope | None]:
         """Validate capability/ownership requirements and profile restrictions.
 
@@ -74,6 +82,18 @@ class CommandGuardService:
                 data={"deployment_profile": profile},
             )
         backend_mode = str(self._backend_mode_snapshot() or "")
+        control_plane_snapshot = dict(self._control_plane_snapshot() or {}) if callable(self._control_plane_snapshot) else {}
+        authoritative_runtime = self._extract_authoritative_runtime(control_plane_snapshot)
+        write_capabilities = dict(authoritative_runtime.get("write_capabilities") or control_plane_snapshot.get("write_capabilities") or {})
+        required_claim = str(command_capability_claim(command) or "").strip()
+        if required_claim and write_capabilities:
+            capability_state = dict(write_capabilities.get(required_claim) or {})
+            if capability_state and not bool(capability_state.get("allowed", False)):
+                return normalized_payload, ReplyEnvelope(
+                    ok=False,
+                    message=f"运行时权威能力禁止当前写命令：{required_claim}",
+                    data={"deployment_profile": profile, "backend_mode": backend_mode, "required_claim": required_claim, "capability_state": capability_state},
+                )
         if profile.get("requires_live_sdk", False):
             if backend_mode != "core":
                 return normalized_payload, ReplyEnvelope(
@@ -81,7 +101,6 @@ class CommandGuardService:
                     message="当前部署 profile 要求 live SDK / core backend，禁止在 mock/api-only 运行面执行写命令。",
                     data={"deployment_profile": profile, "backend_mode": backend_mode},
                 )
-            control_plane_snapshot = dict(self._control_plane_snapshot() or {}) if callable(self._control_plane_snapshot) else {}
             runtime_doctor = dict(control_plane_snapshot.get("runtime_doctor", {}))
             runtime_doctor_state = str(runtime_doctor.get("summary_state", "unknown"))
             blockers = [dict(item) for item in control_plane_snapshot.get("blockers", []) or []]

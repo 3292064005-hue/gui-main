@@ -7,12 +7,12 @@ namespace robot_core {
 
 using namespace sdk_robot_facade_internal;
 
-SdkRobotFacade::SdkRobotFacade()
-    : lifecycle_port_(*this),
-      query_port_(*this),
-      nrt_execution_port_(*this),
-      rt_control_port_(*this),
-      collaboration_port_(*this) {
+SdkRobotFacade::SdkRobotFacade() {
+  lifecycle_port_ = std::make_unique<SdkRobotLifecyclePort>(*this);
+  query_port_ = std::make_unique<SdkRobotQueryPort>(*this);
+  nrt_execution_port_ = std::make_unique<SdkRobotNrtExecutionPort>(*this);
+  rt_control_port_ = std::make_unique<SdkRobotRtControlPort>(*this);
+  collaboration_port_ = std::make_unique<SdkRobotCollaborationPort>(*this);
   vendored_sdk_detected_ = sdkAvailable();
   backend_kind_ = vendored_sdk_detected_ ? "vendored_sdk_contract_shell" : "contract_sim";
   binding_detail_ = vendored_sdk_detected_ ? "vendored_sdk_detected_waiting_live_binding" : "no_vendored_sdk_detected";
@@ -167,5 +167,39 @@ void SdkRobotFacade::disconnect() {
 
 SdkRobotFacade::~SdkRobotFacade() = default;
 
+bool SdkRobotFacade::requireLiveWrite(const std::string& prefix, std::string* reason) {
+  if (live_binding_established_ && robot_ != nullptr) {
+    return true;
+  }
+  if (rt_config_.allow_contract_shell_writes) {
+    appendLog(prefix + " contract_shell_write_override");
+    return true;
+  }
+  captureFailure(prefix, vendored_sdk_detected_ ? "live_binding_required" : "sdk_live_binding_unavailable", reason);
+  binding_detail_ = vendored_sdk_detected_ ? "live_write_blocked_contract_shell" : "live_write_blocked_no_sdk";
+  refreshBindingTruth();
+  return false;
+}
+
+void SdkRobotFacade::finalizeNrtStopLocal(const std::string& detail) {
+  active_nrt_profile_ = "idle";
+  if (!detail.empty()) {
+    appendLog("stop() local teardown: " + detail);
+  }
+  refreshRuntimeCaches();
+  refreshBindingTruth();
+}
+
+void SdkRobotFacade::finalizeRtStopLocal(const std::string& detail) {
+  rt_state_stream_started_ = false;
+  rt_loop_active_ = false;
+  active_rt_phase_ = "idle";
+  setRtPhaseCode("idle");
+  if (!detail.empty()) {
+    appendLog("stopRt() local teardown: " + detail);
+  }
+  refreshRuntimeCaches();
+  refreshBindingTruth();
+}
 
 }  // namespace robot_core

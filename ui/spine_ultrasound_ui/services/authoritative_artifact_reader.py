@@ -82,6 +82,13 @@ class AuthoritativeArtifactReader:
             effective_status = 'prior_assisted'
         elif not effective_payload:
             effective_status = 'degraded'
+        authority_metadata = self._build_authority_metadata(
+            effective_status=effective_status,
+            closure_verdict=closure_verdict,
+            effective_source_path=effective_source_path,
+            used_sidecar=use_sidecar,
+            source_contamination_flags=source_contamination_flags,
+        )
         return {
             'canonical': canonical_payload,
             'canonical_path': canonical_relative_path,
@@ -95,6 +102,56 @@ class AuthoritativeArtifactReader:
             'effective_source_path': effective_source_path,
             'effective_status': effective_status,
             'used_sidecar': use_sidecar,
+            'authority_metadata': authority_metadata,
+        }
+
+    @staticmethod
+    def _build_authority_metadata(
+        *,
+        effective_status: str,
+        closure_verdict: str,
+        effective_source_path: str,
+        used_sidecar: bool,
+        source_contamination_flags: list[str],
+    ) -> dict[str, Any]:
+        """Build stable authority metadata for session products.
+
+        Args:
+            effective_status: Resolved effective artifact status.
+            closure_verdict: Summary-declared closure verdict.
+            effective_source_path: Relative source path selected for the payload.
+            used_sidecar: Whether the selected payload came from a sidecar artifact.
+            source_contamination_flags: Declared contamination flags.
+
+        Returns:
+            Additive-only authority metadata describing source class, fallback
+            reason, and review suitability.
+        """
+        status = str(effective_status or 'degraded')
+        source_class = {
+            'authoritative': 'authoritative',
+            'prior_assisted': 'prior_assisted',
+            'degraded': 'degraded',
+            'blocked': 'blocked',
+        }.get(status, 'derived')
+        authority_level = {
+            'authoritative': 'runtime_authoritative',
+            'prior_assisted': 'derived_prior_assisted',
+            'degraded': 'derived_degraded',
+            'blocked': 'derived_blocked',
+        }.get(status, 'derived_unknown')
+        fallback_reason = ''
+        if status != 'authoritative':
+            fallback_reason = closure_verdict or ('source_contamination' if source_contamination_flags else 'missing_authoritative_artifact')
+        review_suitability = status in {'authoritative', 'prior_assisted', 'degraded'}
+        return {
+            'source_class': source_class,
+            'authority_level': authority_level,
+            'fallback_reason': fallback_reason,
+            'effective_source_path': effective_source_path,
+            'sidecar_selected': bool(used_sidecar),
+            'source_contamination_flags': list(source_contamination_flags),
+            'review_suitability': review_suitability,
         }
 
     @staticmethod

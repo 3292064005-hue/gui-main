@@ -84,10 +84,8 @@ class ApiBridgeVerdictService:
             verdict = self._host._authoritative_service.extract_final_verdict(reply.data)
             if verdict:
                 return verdict
-            with self._host._lock:
-                cached = dict(self._host._last_final_verdict)
-                control_plane = dict(self._host._control_plane_cache)
-            return cached or self._host._authoritative_service.extract_final_verdict(control_plane)
+            authoritative_envelope = self._host.resolve_authoritative_runtime_envelope()
+            return self._host._authoritative_service.extract_final_verdict(authoritative_envelope)
 
         reply = self._host.send_command(
             "validate_scan_plan",

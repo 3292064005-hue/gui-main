@@ -67,12 +67,70 @@ def build_system_router(adapter_getter: Callable[[], Any], deployment_profile_ge
     @router.get("/api/v1/control-authority")
     async def get_control_authority():
         adapter = adapter_getter()
+        if hasattr(adapter, "resolve_control_authority"):
+            payload = adapter.resolve_control_authority()
+            if payload:
+                return payload
+            return {
+                "summary_state": "degraded",
+                "summary_label": "control authority unavailable",
+                "detail": "adapter canonical authority surface returned no runtime-owned control authority",
+            }
         if hasattr(adapter, "control_authority_status"):
             return adapter.control_authority_status()
         return {
             "summary_state": "ready",
             "summary_label": "control authority unavailable",
             "detail": "adapter does not expose control authority",
+        }
+
+    @router.get("/api/v1/authoritative-runtime-envelope")
+    async def get_authoritative_runtime_envelope():
+        adapter = adapter_getter()
+        if hasattr(adapter, "resolve_authoritative_runtime_envelope"):
+            payload = adapter.resolve_authoritative_runtime_envelope()
+            if payload:
+                return payload
+            return {
+                "summary_state": "degraded",
+                "summary_label": "authoritative runtime envelope unavailable",
+                "detail": "adapter canonical authority surface returned no runtime-published authoritative envelope",
+            }
+        if hasattr(adapter, "control_plane_status"):
+            control_plane = adapter.control_plane_status()
+            if isinstance(control_plane, dict):
+                return dict(control_plane.get("authoritative_runtime_envelope", {}))
+        return {
+            "summary_state": "degraded",
+            "summary_label": "authoritative runtime envelope unavailable",
+            "detail": "adapter does not expose an authoritative runtime envelope",
+        }
+
+    @router.get("/api/v1/final-verdict")
+    async def get_final_verdict():
+        adapter = adapter_getter()
+        if hasattr(adapter, "query_final_verdict_snapshot"):
+            payload = adapter.query_final_verdict_snapshot()
+            if payload:
+                return payload
+            return {
+                "summary_state": "degraded",
+                "summary_label": "final verdict unavailable",
+                "detail": "adapter canonical final-verdict surface returned no runtime-owned verdict",
+            }
+        if hasattr(adapter, "resolve_final_verdict"):
+            payload = adapter.resolve_final_verdict(None, None, read_only=True)
+            if payload:
+                return payload
+            return {
+                "summary_state": "degraded",
+                "summary_label": "final verdict unavailable",
+                "detail": "adapter canonical final-verdict surface returned no runtime-owned verdict",
+            }
+        return {
+            "summary_state": "degraded",
+            "summary_label": "final verdict unavailable",
+            "detail": "adapter does not expose final verdict queries",
         }
 
     @router.post("/api/v1/control-lease/acquire")

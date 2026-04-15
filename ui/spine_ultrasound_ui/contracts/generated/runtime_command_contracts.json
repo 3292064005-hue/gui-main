@@ -1,0 +1,4351 @@
+{
+  "schema_version": 1,
+  "commands": [
+    {
+      "name": "approach_prescan",
+      "canonical_command": "approach_prescan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "PATH_VALIDATED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "PATH_VALIDATED"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "approach_prescan",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "cancel_record_path",
+      "canonical_command": "cancel_record_path",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "cancel_record_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "clear_fault",
+      "canonical_command": "clear_fault",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "recovery_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "FAULT"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "FAULT"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "clear_fault",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "clear_injected_faults",
+      "canonical_command": "clear_injected_faults",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "fault_injection_write",
+      "handler_group": "handleFaultInjectionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "clear_injected_faults",
+        "handler_group": "handleFaultInjectionCommand"
+      }
+    },
+    {
+      "name": "compile_scan_plan",
+      "canonical_command": "validate_scan_plan",
+      "alias_kind": "deprecated_alias",
+      "write_command": false,
+      "capability_claim": "plan_compile",
+      "handler_group": "handleValidationCommand",
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [
+        {
+          "name": "config_snapshot",
+          "required": false,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [
+            "plan_id",
+            "segments",
+            "plan_hash"
+          ],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan_hash",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "warn_only",
+      "removal_target": "2026-Q4",
+      "replacement_command": "validate_scan_plan",
+      "compatibility_note": "Deprecated alias retained for compatibility; new code must call validate_scan_plan.",
+      "request_contract": {
+        "required_fields": [
+          "scan_plan"
+        ],
+        "fields": [
+          {
+            "name": "config_snapshot",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "plan_id",
+              "segments",
+              "plan_hash"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan_hash",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "final_verdict",
+        "data_required_fields": [
+          "final_verdict"
+        ],
+        "data_fields": [
+          {
+            "name": "final_verdict",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "accepted",
+              "authoritative",
+              "reason"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "validate_scan_plan",
+        "handler_group": "handleValidationCommand"
+      }
+    },
+    {
+      "name": "connect_robot",
+      "canonical_command": "connect_robot",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handleConnectionCommand",
+      "state_preconditions": [
+        "BOOT",
+        "DISCONNECTED"
+      ],
+      "fields": [
+        {
+          "name": "local_ip",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "remote_ip",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "local_ip",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "remote_ip",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "BOOT",
+          "DISCONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "connect_robot",
+        "handler_group": "handleConnectionCommand"
+      }
+    },
+    {
+      "name": "disable_drag",
+      "canonical_command": "disable_drag",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "disable_drag",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "disconnect_robot",
+      "canonical_command": "disconnect_robot",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handleConnectionCommand",
+      "state_preconditions": [
+        "BOOT",
+        "DISCONNECTED",
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "FAULT",
+        "ESTOP"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "BOOT",
+          "DISCONNECTED",
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY",
+          "FAULT",
+          "ESTOP"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "disconnect_robot",
+        "handler_group": "handleConnectionCommand"
+      }
+    },
+    {
+      "name": "emergency_stop",
+      "canonical_command": "emergency_stop",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "recovery_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "emergency_stop",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "enable_drag",
+      "canonical_command": "enable_drag",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [
+        {
+          "name": "space",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "type",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "space",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "type",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "enable_drag",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "get_authoritative_runtime_envelope",
+      "canonical_command": "get_authoritative_runtime_envelope",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "authoritative_runtime_envelope",
+        "data_required_fields": [
+          "authoritative_runtime_envelope_present",
+          "control_authority",
+          "final_verdict"
+        ],
+        "data_fields": [
+          {
+            "name": "authoritative_runtime_envelope_present",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "control_authority",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "summary_state",
+              "detail"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "final_verdict",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "accepted",
+              "authoritative",
+              "reason"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_authoritative_runtime_envelope",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_capability_contract",
+      "canonical_command": "get_capability_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "capability_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_capability_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_clinical_mainline_contract",
+      "canonical_command": "get_clinical_mainline_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "clinical_mainline_contract",
+        "data_required_fields": [
+          "robot_model",
+          "clinical_mainline_mode",
+          "required_sequence"
+        ],
+        "data_fields": [
+          {
+            "name": "robot_model",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "clinical_mainline_mode",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "required_sequence",
+            "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "string",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_clinical_mainline_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_control_governance_contract",
+      "canonical_command": "get_control_governance_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "control_governance_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_control_governance_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_controller_evidence",
+      "canonical_command": "get_controller_evidence",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "controller_evidence",
+        "data_required_fields": [
+          "runtime_source",
+          "last_event",
+          "last_transition"
+        ],
+        "data_fields": [
+          {
+            "name": "runtime_source",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "last_event",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "last_transition",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_controller_evidence",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_deployment_contract",
+      "canonical_command": "get_deployment_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "deployment_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_deployment_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_dual_state_machine_contract",
+      "canonical_command": "get_dual_state_machine_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "dual_state_machine_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_dual_state_machine_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_fault_injection_contract",
+      "canonical_command": "get_fault_injection_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "fault_injection_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail",
+          "active_faults"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "active_faults",
+            "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "string",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_fault_injection_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_hardware_lifecycle_contract",
+      "canonical_command": "get_hardware_lifecycle_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "hardware_lifecycle_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_hardware_lifecycle_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_identity_contract",
+      "canonical_command": "get_identity_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "identity_contract",
+        "data_required_fields": [
+          "robot_model",
+          "sdk_robot_class",
+          "axis_count"
+        ],
+        "data_fields": [
+          {
+            "name": "robot_model",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "sdk_robot_class",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "axis_count",
+            "required": true,
+            "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_identity_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_io_snapshot",
+      "canonical_command": "get_io_snapshot",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "io_snapshot",
+        "data_required_fields": [
+          "di",
+          "do",
+          "ai",
+          "ao",
+          "registers",
+          "xpanel_vout_mode"
+        ],
+        "data_fields": [
+          {
+            "name": "di",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "do",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "ai",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "ao",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "registers",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "xpanel_vout_mode",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_io_snapshot",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_mainline_executor_contract",
+      "canonical_command": "get_mainline_executor_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "mainline_executor_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_mainline_executor_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_model_authority_contract",
+      "canonical_command": "get_model_authority_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "model_authority_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_model_authority_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_motion_contract",
+      "canonical_command": "get_motion_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "motion_contract",
+        "data_required_fields": [
+          "rt_mode",
+          "sdk_boundary_units",
+          "rt_contract",
+          "nrt_contract"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_mode",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "sdk_boundary_units",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "rt_contract",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "nrt_contract",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_motion_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_recovery_contract",
+      "canonical_command": "get_recovery_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "recovery_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_recovery_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_register_snapshot",
+      "canonical_command": "get_register_snapshot",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "register_snapshot",
+        "data_required_fields": [
+          "registers"
+        ],
+        "data_fields": [
+          {
+            "name": "registers",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_register_snapshot",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_release_contract",
+      "canonical_command": "get_release_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "release_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_release_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_robot_family_contract",
+      "canonical_command": "get_robot_family_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "robot_family_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_robot_family_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_rt_kernel_contract",
+      "canonical_command": "get_rt_kernel_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_kernel_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_rt_kernel_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_runtime_alignment",
+      "canonical_command": "get_runtime_alignment",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "runtime_alignment",
+        "data_required_fields": [
+          "runtime_source",
+          "sdk_available",
+          "robot_family"
+        ],
+        "data_fields": [
+          {
+            "name": "runtime_source",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "sdk_available",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "robot_family",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_runtime_alignment",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_safety_config",
+      "canonical_command": "get_safety_config",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "safety_config",
+        "data_required_fields": [
+          "collision_detection_enabled",
+          "soft_limit_enabled"
+        ],
+        "data_fields": [
+          {
+            "name": "collision_detection_enabled",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "soft_limit_enabled",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_safety_config",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_safety_recovery_contract",
+      "canonical_command": "get_safety_recovery_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "safety_recovery_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_safety_recovery_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_sdk_runtime_config",
+      "canonical_command": "get_sdk_runtime_config",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "sdk_runtime_config",
+        "data_required_fields": [
+          "remote_ip",
+          "local_ip",
+          "rt_mode",
+          "rt_phase_contract"
+        ],
+        "data_fields": [
+          {
+            "name": "remote_ip",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "local_ip",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "rt_mode",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "rt_phase_contract",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_sdk_runtime_config",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_session_drift_contract",
+      "canonical_command": "get_session_drift_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "session_drift_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_session_drift_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_session_freeze",
+      "canonical_command": "get_session_freeze",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "session_freeze",
+        "data_required_fields": [
+          "session_locked",
+          "session_id",
+          "plan_hash"
+        ],
+        "data_fields": [
+          {
+            "name": "session_locked",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "session_id",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "plan_hash",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_session_freeze",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_vendor_boundary_contract",
+      "canonical_command": "get_vendor_boundary_contract",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "vendor_boundary_contract",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_vendor_boundary_contract",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "get_xmate_model_summary",
+      "canonical_command": "get_xmate_model_summary",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "xmate_model_summary",
+        "data_required_fields": [
+          "model_source",
+          "kinematics_ready",
+          "dynamics_ready"
+        ],
+        "data_fields": [
+          {
+            "name": "model_source",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "kinematics_ready",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "dynamics_ready",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "get_xmate_model_summary",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "go_home",
+      "canonical_command": "go_home",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE",
+        "SEGMENT_ABORTED",
+        "PLAN_ABORTED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE",
+          "SEGMENT_ABORTED",
+          "PLAN_ABORTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "go_home",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "inject_fault",
+      "canonical_command": "inject_fault",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "fault_injection_write",
+      "handler_group": "handleFaultInjectionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [
+        {
+          "name": "fault_name",
+          "required": true,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [
+          "fault_name"
+        ],
+        "fields": [
+          {
+            "name": "fault_name",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "inject_fault",
+        "handler_group": "handleFaultInjectionCommand"
+      }
+    },
+    {
+      "name": "load_scan_plan",
+      "canonical_command": "load_scan_plan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "session_freeze_write",
+      "handler_group": "handleSessionCommand",
+      "state_preconditions": [
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [
+        {
+          "name": "scan_plan",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [
+            "plan_id",
+            "segments"
+          ],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan_hash",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [
+          "scan_plan"
+        ],
+        "fields": [
+          {
+            "name": "scan_plan",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "plan_id",
+              "segments"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan_hash",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "session_command_ack",
+        "data_required_fields": [
+          "session_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "session_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "SESSION_LOCKED",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "load_scan_plan",
+        "handler_group": "handleSessionCommand"
+      }
+    },
+    {
+      "name": "lock_session",
+      "canonical_command": "lock_session",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "session_freeze_write",
+      "handler_group": "handleSessionCommand",
+      "state_preconditions": [
+        "AUTO_READY"
+      ],
+      "fields": [
+        {
+          "name": "config_snapshot",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "device_roster",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan_hash",
+          "required": true,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "session_dir",
+          "required": true,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "session_id",
+          "required": true,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [
+          "session_id",
+          "session_dir",
+          "config_snapshot",
+          "device_roster",
+          "scan_plan_hash"
+        ],
+        "fields": [
+          {
+            "name": "config_snapshot",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "device_roster",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan_hash",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "session_dir",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "session_id",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "session_command_ack",
+        "data_required_fields": [
+          "session_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "session_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "lock_session",
+        "handler_group": "handleSessionCommand"
+      }
+    },
+    {
+      "name": "pause_rl_project",
+      "canonical_command": "pause_rl_project",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "AUTO_READY",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY",
+          "SCANNING",
+          "PAUSED_HOLD",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "pause_rl_project",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "pause_scan",
+      "canonical_command": "pause_scan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "SCANNING"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "SCANNING"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "pause_scan",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "power_off",
+      "canonical_command": "power_off",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handlePowerModeCommand",
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "power_off",
+        "handler_group": "handlePowerModeCommand"
+      }
+    },
+    {
+      "name": "power_on",
+      "canonical_command": "power_on",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handlePowerModeCommand",
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "power_on",
+        "handler_group": "handlePowerModeCommand"
+      }
+    },
+    {
+      "name": "query_controller_log",
+      "canonical_command": "query_controller_log",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "controller_log",
+        "data_required_fields": [
+          "logs"
+        ],
+        "data_fields": [
+          {
+            "name": "logs",
+            "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "object",
+            "array_item_required_fields": [
+              "level",
+              "source",
+              "message"
+            ]
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "query_controller_log",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "query_final_verdict",
+      "canonical_command": "query_final_verdict",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleValidationCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "final_verdict",
+        "data_required_fields": [
+          "final_verdict"
+        ],
+        "data_fields": [
+          {
+            "name": "final_verdict",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "accepted",
+              "authoritative",
+              "reason"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "query_final_verdict",
+        "handler_group": "handleValidationCommand"
+      }
+    },
+    {
+      "name": "query_path_lists",
+      "canonical_command": "query_path_lists",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "path_lists",
+        "data_required_fields": [
+          "paths",
+          "drag"
+        ],
+        "data_fields": [
+          {
+            "name": "paths",
+            "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "object",
+            "array_item_required_fields": [
+              "name",
+              "rate",
+              "points"
+            ]
+          },
+          {
+            "name": "drag",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "enabled",
+              "space",
+              "type"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "query_path_lists",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "query_rl_projects",
+      "canonical_command": "query_rl_projects",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "handler_group": "handleQueryCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rl_projects",
+        "data_required_fields": [
+          "projects",
+          "status"
+        ],
+        "data_fields": [
+          {
+            "name": "projects",
+            "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "object",
+            "array_item_required_fields": [
+              "name",
+              "tasks"
+            ]
+          },
+          {
+            "name": "status",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "query_rl_projects",
+        "handler_group": "handleQueryCommand"
+      }
+    },
+    {
+      "name": "replay_path",
+      "canonical_command": "replay_path",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "AUTO_READY",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [
+        {
+          "name": "name",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "rate",
+          "required": false,
+          "field_type": "double",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "name",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "rate",
+            "required": false,
+            "field_type": "double",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "replay_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "resume_scan",
+      "canonical_command": "resume_scan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "PAUSED_HOLD"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "PAUSED_HOLD"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "resume_scan",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "run_rl_project",
+      "canonical_command": "run_rl_project",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [
+        {
+          "name": "project",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "task",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "project",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "task",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "run_rl_project",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "safe_retreat",
+      "canonical_command": "safe_retreat",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "APPROACHING",
+        "CONTACT_SEEKING",
+        "CONTACT_STABLE",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT",
+        "FAULT"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "PATH_VALIDATED",
+          "APPROACHING",
+          "CONTACT_SEEKING",
+          "CONTACT_STABLE",
+          "SCANNING",
+          "PAUSED_HOLD",
+          "RECOVERY_RETRACT",
+          "FAULT"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "safe_retreat",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "save_record_path",
+      "canonical_command": "save_record_path",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [
+        {
+          "name": "name",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "save_as",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "name",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "save_as",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "save_record_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "seek_contact",
+      "canonical_command": "seek_contact",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "APPROACHING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "PATH_VALIDATED",
+          "APPROACHING",
+          "PAUSED_HOLD",
+          "RECOVERY_RETRACT"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "seek_contact",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "set_auto_mode",
+      "canonical_command": "set_auto_mode",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handlePowerModeCommand",
+      "state_preconditions": [
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "POWERED",
+          "AUTO_READY"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "set_auto_mode",
+        "handler_group": "handlePowerModeCommand"
+      }
+    },
+    {
+      "name": "set_manual_mode",
+      "canonical_command": "set_manual_mode",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "hardware_lifecycle_write",
+      "handler_group": "handlePowerModeCommand",
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "command_ack",
+        "data_required_fields": [
+          "command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "set_manual_mode",
+        "handler_group": "handlePowerModeCommand"
+      }
+    },
+    {
+      "name": "start_record_path",
+      "canonical_command": "start_record_path",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [
+        {
+          "name": "duration_s",
+          "required": false,
+          "field_type": "integer",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "duration_s",
+            "required": false,
+            "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "start_record_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "start_scan",
+      "canonical_command": "start_scan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONTACT_STABLE",
+        "PAUSED_HOLD"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONTACT_STABLE",
+          "PAUSED_HOLD"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "start_scan",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "stop_record_path",
+      "canonical_command": "stop_record_path",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "nrt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "execution_command_ack",
+        "data_required_fields": [
+          "execution_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "execution_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "stop_record_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "validate_scan_plan",
+      "canonical_command": "validate_scan_plan",
+      "alias_kind": "canonical",
+      "write_command": false,
+      "capability_claim": "plan_compile",
+      "handler_group": "handleValidationCommand",
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "fields": [
+        {
+          "name": "config_snapshot",
+          "required": false,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [
+            "plan_id",
+            "segments",
+            "plan_hash"
+          ],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "scan_plan_hash",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [
+          "scan_plan"
+        ],
+        "fields": [
+          {
+            "name": "config_snapshot",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "plan_id",
+              "segments",
+              "plan_hash"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "scan_plan_hash",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "final_verdict",
+        "data_required_fields": [
+          "final_verdict"
+        ],
+        "data_fields": [
+          {
+            "name": "final_verdict",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "accepted",
+              "authoritative",
+              "reason"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": true
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "AUTO_READY",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED",
+          "SCAN_COMPLETE"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "validate_scan_plan",
+        "handler_group": "handleValidationCommand"
+      }
+    },
+    {
+      "name": "validate_setup",
+      "canonical_command": "validate_setup",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "runtime_validation",
+      "handler_group": "handleValidationCommand",
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": []
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "validation_report",
+        "data_required_fields": [
+          "validation_report"
+        ],
+        "data_fields": [
+          {
+            "name": "validation_report",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "CONNECTED",
+          "POWERED",
+          "AUTO_READY",
+          "SESSION_LOCKED",
+          "PATH_VALIDATED"
+        ],
+        "lane": "query"
+      },
+      "dispatch_contract": {
+        "canonical_command": "validate_setup",
+        "handler_group": "handleValidationCommand"
+      }
+    }
+  ]
+}

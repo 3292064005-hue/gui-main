@@ -5,6 +5,25 @@
 #include <string>
 #include <vector>
 
+#ifndef ROBOT_CORE_MAINLINE_FAMILY_KEY
+#define ROBOT_CORE_MAINLINE_FAMILY_KEY "xmate3_cobot_6"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_ROBOT_MODEL
+#define ROBOT_CORE_DEFAULT_ROBOT_MODEL "xmate3"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_SDK_CLASS
+#define ROBOT_CORE_DEFAULT_SDK_CLASS "xMateRobot"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_AXIS_COUNT
+#define ROBOT_CORE_DEFAULT_AXIS_COUNT 6
+#endif
+#ifndef ROBOT_CORE_DEFAULT_PREFERRED_LINK
+#define ROBOT_CORE_DEFAULT_PREFERRED_LINK "wired_direct"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE
+#define ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE "cartesianImpedance"
+#endif
+
 namespace robot_core {
 
 struct ContactControlConfig {
@@ -114,7 +133,7 @@ struct RuntimeConfig {
   double reconstruction_step{0.5};
   double feature_threshold{0.6};
   std::string roi_mode{"auto"};
-  std::string rt_mode{"cartesianImpedance"};
+  std::string rt_mode{ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE};
   int network_stale_ms{150};
   int pressure_stale_ms{100};
   int telemetry_rate_hz{20};
@@ -127,11 +146,12 @@ struct RuntimeConfig {
   ContactControlConfig contact_control{};
   ForceEstimatorRuntimeConfig force_estimator{};
   OrientationTrimRuntimeConfig orientation_trim{};
-  std::string robot_model{"xmate3"};
-  int axis_count{6};
-  std::string sdk_robot_class{"xMateRobot"};
-  std::string preferred_link{"wired_direct"};
+  std::string robot_model{ROBOT_CORE_DEFAULT_ROBOT_MODEL};
+  int axis_count{ROBOT_CORE_DEFAULT_AXIS_COUNT};
+  std::string sdk_robot_class{ROBOT_CORE_DEFAULT_SDK_CLASS};
+  std::string preferred_link{ROBOT_CORE_DEFAULT_PREFERRED_LINK};
   bool requires_single_control_source{true};
+  bool allow_contract_shell_writes{false};
   std::string build_id{"dev"};
   std::string software_version{"0.3.0"};
   int rt_network_tolerance_percent{15};

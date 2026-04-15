@@ -56,7 +56,14 @@ def main() -> int:
 
     tls_cert = ROOT / 'configs/tls/robot_core_server.crt'
     record('tls-repo-clean', not tls_cert.exists(), f'committed_cert_present={tls_cert.exists()}')
-    record('protocol-plan-compile-command', file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"validate_scan_plan"\s*:\s*\{') and file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"compile_scan_plan"\s*:\s*\{') and file_contains('spine_ultrasound_ui/services/runtime_command_catalog.py', r'"query_final_verdict"\s*:\s*\{'), 'validate/query contract commands registered; compile alias retained for compatibility')
+    record(
+        'protocol-plan-compile-command',
+        file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"validate_scan_plan"')
+        and file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"compile_scan_plan"')
+        and file_contains('schemas/runtime_command_manifest.json', r'"canonical_command"\s*:\s*"validate_scan_plan"')
+        and file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"query_final_verdict"'),
+        'validate/query contract commands registered in canonical manifest; compile alias retained for compatibility',
+    )
     runtime_final_verdict_patterns = {
         'validate_scan_plan': [
             r'command == "validate_scan_plan"',
@@ -101,16 +108,18 @@ def main() -> int:
     record('protocol-cpp-wire-codec', (ROOT / 'cpp_robot_core/include/ipc_messages.pb.h').exists() and (ROOT / 'cpp_robot_core/src/ipc_messages.pb.cpp').exists(), 'cpp wire codec assets present')
 
     stable_tests = {
-        'test_api_contract.py',
-        'test_api_security.py',
-        'test_control_plane.py',
+        'test_runtime_refactor_guards.py',
+        'test_backend_link_and_api_bridge.py',
+        'test_api_bridge_verdict_service.py',
         'test_control_ownership.py',
         'test_runtime_verdict.py',
-        'test_headless_runtime.py',
-        'test_release_gate.py',
-        'test_replay_determinism.py',
-        'test_profile_policy.py',
-        'test_spawned_core_integration.py',
+        'test_headless_adapter_surface_refactor.py',
+        'test_runtime_verdict_authority_contract.py',
+        'test_control_authority_claims.py',
+        'test_guidance_freeze_contracts.py',
+        'test_runtime_mode_policy.py',
+        'test_vendor_sdk_and_identity.py',
+        'test_architecture_fitness.py',
     }
     tests_root = ROOT / 'tests'
     root_test_names = {p.name for p in tests_root.glob('test_*.py')}

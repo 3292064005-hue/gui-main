@@ -1,9 +1,9 @@
-
 from __future__ import annotations
 
 from typing import Any
 
 from spine_ultrasound_ui.models import RuntimeConfig
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
 
 
 class MainlineTaskTreeService:
@@ -14,6 +14,9 @@ class MainlineTaskTreeService:
     runtime. The leaf actions are intentionally asynchronous/task-oriented and
     should be executed through cpp_robot_core rather than in Python.
     """
+
+    def __init__(self, governance_projection: RuntimeGovernanceQuerySurface | None = None) -> None:
+        self._governance_projection = governance_projection or RuntimeGovernanceQuerySurface()
 
     _ORDER = [
         'ensure_connected',
@@ -48,6 +51,12 @@ class MainlineTaskTreeService:
         model_report = dict(model_report or {})
         session_governance = dict(session_governance or {})
 
+        governance_projection = self._governance_projection.build_projection(
+            backend_link=backend_link,
+            control_plane_snapshot=backend_link.get("control_plane", {}).get("control_plane_snapshot", {}),
+            model_report=model_report,
+            sdk_runtime=sdk_runtime,
+        )
         control = dict(sdk_runtime.get('control_governance_contract', {}))
         clinical = dict(sdk_runtime.get('clinical_mainline_contract', {}))
         release_contract = dict(sdk_runtime.get('release_contract', {}))
@@ -58,10 +67,10 @@ class MainlineTaskTreeService:
         rt_kernel = dict(sdk_runtime.get('rt_kernel_contract', {}))
         session_freeze = dict(sdk_runtime.get('session_freeze', {}))
         session_drift = dict(sdk_runtime.get('session_drift_contract', {}))
-        final_verdict = dict(model_report.get('final_verdict', {}))
+        final_verdict = dict(governance_projection.get('final_verdict', {}))
         if not final_verdict:
             final_verdict = dict(release_contract.get('final_verdict', {}))
-        ownership = dict(backend_link.get('control_plane', {})).get('control_authority', {}) or {}
+        ownership = dict(governance_projection.get('control_authority', {}))
 
         runtime_state = str(control.get('current_execution_state') or dual.get('runtime_state') or 'BOOT')
         clinical_task_state = str(dual.get('clinical_task_state') or 'boot')

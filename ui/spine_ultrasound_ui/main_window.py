@@ -168,12 +168,15 @@ class MainWindow(QMainWindow):
     def _append_log(self, level: str, message: str) -> None:
         self.runtime_bridge.append_log(level, message)
 
+    @Slot(object)
     def _update_camera_pixmap(self, pix) -> None:
         self.runtime_bridge.update_camera_pixmap(pix)
 
+    @Slot(object)
     def _update_ultrasound_pixmap(self, pix) -> None:
         self.runtime_bridge.update_ultrasound_pixmap(pix)
 
+    @Slot(object)
     def _update_reconstruction_pixmap(self, pix) -> None:
         self.runtime_bridge.update_reconstruction_pixmap(pix)
 

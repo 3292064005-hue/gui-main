@@ -54,12 +54,14 @@ class BackendLinkService:
         extra_errors: list[str] | None = None,
         control_plane: dict[str, Any] | None = None,
         local_runtime_config: dict[str, Any] | None = None,
+        authoritative_runtime_envelope: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         status = dict(status or {})
         health = dict(health or {})
         metrics = metrics or BackendLinkMetrics()
         control_plane = dict(control_plane or {})
         local_runtime_config = dict(local_runtime_config or {})
+        authoritative_runtime_envelope = dict(authoritative_runtime_envelope or {})
         errors = [str(item) for item in (extra_errors or []) if str(item).strip()]
         if metrics.last_error:
             errors.append(metrics.last_error)
@@ -157,4 +159,15 @@ class BackendLinkService:
             "session_id": status.get("session_id", ""),
             "control_plane": control_plane,
             "local_runtime_config": local_runtime_config,
+            "authoritative_runtime_envelope": authoritative_runtime_envelope,
+            # Top-level authority/verdict fields are canonical-only. They must not
+            # fall back to control-plane projections, otherwise read consumers can no
+            # longer distinguish runtime-owned truth from compatibility views.
+            "control_authority": dict(authoritative_runtime_envelope.get("control_authority", {})),
+            "final_verdict": dict(authoritative_runtime_envelope.get("final_verdict", {})),
+            # Compatibility/projection copies remain available under explicit names so
+            # operator/status surfaces can still render degraded views without
+            # masquerading as canonical runtime truth.
+            "projected_control_authority": dict(control_plane.get("control_authority", {})),
+            "projected_final_verdict": dict(control_plane.get("final_verdict", {})),
         }

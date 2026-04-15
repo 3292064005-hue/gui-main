@@ -8,7 +8,7 @@ from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.models import CapabilityStatus, ImplementationState
 from spine_ultrasound_ui.core.postprocess_job_manager import PostprocessJobManager
 from spine_ultrasound_ui.services.algorithms import PluginExecutor, PluginPlane, PluginRegistry
-from spine_ultrasound_ui.services.authoritative_artifact_reader import AuthoritativeArtifactReader
+from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.services.assessment import (
     AssessmentArtifactWriter,
     AssessmentEvidenceRenderer,
@@ -69,7 +69,7 @@ class PostprocessService:
         self.uca_measurement_service = UCAMeasurementService()
         self.assessment_evidence_renderer = AssessmentEvidenceRenderer()
         self.assessment_writer = AssessmentArtifactWriter(exp_manager)
-        self.authoritative_artifact_reader = AuthoritativeArtifactReader()
+        self.authoritative_artifact_reader = SessionProductsAuthoritySurface()
         self.dataset_export_service = SessionExportService()
         self.annotation_manifest_builder = AnnotationManifestBuilder()
         self.job_manager = PostprocessJobManager()

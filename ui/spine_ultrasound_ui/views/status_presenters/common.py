@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any
 
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
+
 
 @dataclass(frozen=True)
 class StatusViewContext:
@@ -119,7 +121,13 @@ def build_status_context(window: Any, payload: dict[str, Any]) -> StatusViewCont
     backend_link = payload.get("backend_link", {})
     bridge_observability = payload.get("bridge_observability", {})
     control_plane = dict(backend_link.get("control_plane", {}))
-    control_authority = dict(payload.get("control_authority", control_plane.get("control_authority", {})))
+    governance_projection = RuntimeGovernanceQuerySurface().build_projection(
+        backend_link=backend_link,
+        control_plane_snapshot=payload.get("control_plane_snapshot", {}),
+        model_report=model_report,
+        sdk_runtime=sdk_runtime,
+    )
+    control_authority = dict(governance_projection.get("control_authority") or control_plane.get("control_authority") or payload.get("control_authority", {}))
     persistence = payload.get("persistence", {})
     system_state = payload["state"]
     pose = metrics["tcp_pose"]
@@ -166,7 +174,7 @@ def build_status_context(window: Any, payload: dict[str, Any]) -> StatusViewCont
         session_governance=session_governance,
         backend_link=backend_link,
         bridge_observability=bridge_observability,
-        control_plane=control_plane,
+        control_plane={**control_plane, "authoritative_projection": dict(governance_projection)},
         control_authority=control_authority,
         persistence=persistence,
         system_state=system_state,

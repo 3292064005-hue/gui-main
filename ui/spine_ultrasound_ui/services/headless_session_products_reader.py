@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from spine_ultrasound_ui.services.authoritative_artifact_reader import AuthoritativeArtifactReader
+from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.services.headless_telemetry_cache import HeadlessTelemetryCache
 from spine_ultrasound_ui.services.session_evidence_seal_service import SessionEvidenceSealService
 from spine_ultrasound_ui.services.session_integrity_service import SessionIntegrityService
@@ -44,7 +44,7 @@ class HeadlessSessionProductsReader:
         self.integrity_service = integrity_service
         self.session_intelligence = session_intelligence
         self.evidence_seal_service = evidence_seal_service
-        self._artifact_reader = AuthoritativeArtifactReader()
+        self._artifact_reader = SessionProductsAuthoritySurface()
         self._product_specs = {spec.product: spec for spec in iter_product_specs()}
 
     def require_session_dir(self) -> Path:
@@ -90,6 +90,7 @@ class HeadlessSessionProductsReader:
             'assessment_available': bool(assessment_snapshot['assessment_available']),
             'assessment_status': str(assessment_snapshot['assessment_state']),
             'assessment_authoritative_available': bool(assessment_snapshot['authoritative_available']),
+            'assessment_authority_metadata': dict(assessment_snapshot.get('authority_metadata', {})),
             'contact_available': True,
             'recovery_available': True,
             'integrity_available': (session_dir / 'meta' / 'manifest.json').exists(),
@@ -298,6 +299,7 @@ class HeadlessSessionProductsReader:
         effective_source_path = str(authoritative.get('measurement_source_path', 'derived/assessment/cobb_measurement.json'))
         effective_status = str(authoritative.get('effective_status', 'authoritative'))
         if measurement or summary_payload:
+            authority_metadata = dict(authoritative.get('authority_metadata', {}))
             confidence = float(summary_payload.get('confidence', measurement.get('confidence', 0.0)) or 0.0)
             manual_review = bool(summary_payload.get('requires_manual_review', measurement.get('requires_manual_review', False))) or len(annotations) > 0
             evidence_frames = [dict(item) for item in measurement.get('evidence_refs', []) if isinstance(item, dict)]
@@ -338,6 +340,7 @@ class HeadlessSessionProductsReader:
                 'legacy_fallback_used': False,
                 'is_authoritative': curve_status == 'authoritative',
                 'source_contamination_flags': contamination_flags,
+                'authority_metadata': authority_metadata,
             }
         has_legacy_inputs = bool(report) or bool(frame_sync) or bool(annotations) or bool(self._read_json_if_exists(session_dir / 'export' / 'qa_pack.json'))
         if has_legacy_inputs:
@@ -362,6 +365,7 @@ class HeadlessSessionProductsReader:
             'measurement': dict(measurement_resolution.get('effective_payload', {})),
             'measurement_source_path': str(measurement_resolution.get('effective_source_path', 'derived/assessment/cobb_measurement.json')),
             'effective_status': str(measurement_resolution.get('effective_status', 'authoritative')),
+            'authority_metadata': dict(measurement_resolution.get('authority_metadata', {})),
             'summary': dict(measurement_resolution.get('summary', {})),
             'prior_assisted_cobb': dict(measurement_resolution.get('sidecar', {})),
         }
@@ -472,6 +476,7 @@ class HeadlessSessionProductsReader:
             'legacy_fallback_used': False,
             'is_authoritative': False,
             'source_contamination_flags': [],
+            'authority_metadata': {},
         }
 
     def _session_intelligence_materialization(self, session_dir: Path) -> list[dict[str, Any]]:
@@ -486,17 +491,20 @@ class HeadlessSessionProductsReader:
                 'assessment_available': True,
                 'authoritative_available': True,
                 'assessment_state': status,
+                'authority_metadata': dict(resolution.get('authority_metadata', {})),
             }
         if (session_dir / 'export' / 'session_report.json').exists() and (session_dir / 'derived' / 'sync' / 'frame_sync_index.json').exists():
             return {
                 'assessment_available': False,
                 'authoritative_available': False,
                 'assessment_state': 'legacy_fallback_only',
+                'authority_metadata': {},
             }
         return {
             'assessment_available': False,
             'authoritative_available': False,
             'assessment_state': 'missing',
+            'authority_metadata': {},
         }
 
     @staticmethod

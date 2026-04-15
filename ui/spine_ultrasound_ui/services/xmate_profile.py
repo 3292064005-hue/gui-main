@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from spine_ultrasound_ui.services.robot_identity_service import RobotIdentityService
+from spine_ultrasound_ui.utils.mainline_identity_defaults import MAINLINE_IDENTITY_DEFAULTS
 from spine_ultrasound_ui.utils.sdk_unit_contract import with_sdk_boundary_fields
 
 
@@ -23,18 +24,19 @@ class DhParameter:
 
 @dataclass
 class XMateProfile:
-    robot_model: str = "xmate3"
-    sdk_robot_class: str = "xMateRobot"
-    controller_series: str = "xCore"
-    controller_version: str = "v2.1+"
-    axis_count: int = 6
+    robot_model: str = MAINLINE_IDENTITY_DEFAULTS.robot_model
+    sdk_robot_class: str = MAINLINE_IDENTITY_DEFAULTS.sdk_robot_class
+    controller_series: str = MAINLINE_IDENTITY_DEFAULTS.controller_family
+    controller_version: str = MAINLINE_IDENTITY_DEFAULTS.controller_version
+    axis_count: int = MAINLINE_IDENTITY_DEFAULTS.axis_count
     remote_ip: str = "192.168.0.160"
     local_ip: str = "192.168.0.100"
-    preferred_link: str = "wired_direct"
+    preferred_link: str = MAINLINE_IDENTITY_DEFAULTS.preferred_link
     requires_single_control_source: bool = True
+    allow_contract_shell_writes: bool = False
     realtime_client_language: str = "C++"
     rt_loop_hz: int = 1000
-    rt_mode: str = "cartesianImpedance"
+    rt_mode: str = MAINLINE_IDENTITY_DEFAULTS.clinical_mainline_mode
     supported_rt_modes: list[str] = field(default_factory=lambda: [
         "jointPosition",
         "cartesianPosition",
@@ -365,7 +367,8 @@ def _coerce_list(value: Any, length: int, default: list[float]) -> list[float]:
 
 
 def _identity_default_profile() -> XMateProfile:
-    identity = RobotIdentityService().resolve("xmate3", "xMateRobot", 6)
+    default_service = RobotIdentityService()
+    identity = default_service.resolve(default_service.default_model, None, None)
     return XMateProfile(
         robot_model=identity.robot_model,
         sdk_robot_class=identity.sdk_robot_class,

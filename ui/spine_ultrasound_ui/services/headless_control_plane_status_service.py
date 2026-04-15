@@ -53,6 +53,7 @@ class HeadlessControlPlaneStatusService:
             control_authority=control_authority,
             session_governance=session_governance,
             evidence_seal=evidence_seal,
+            authoritative_runtime_envelope=adapter.resolve_authoritative_runtime_envelope() if hasattr(adapter, 'resolve_authoritative_runtime_envelope') else None,
         )
         return {
             **summary,

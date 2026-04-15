@@ -1,0 +1,1136 @@
+{
+  "schema_version": 1,
+  "commands": [
+    {
+      "name": "connect_robot",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "BOOT",
+        "DISCONNECTED"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "connect_robot",
+      "alias_kind": "canonical",
+      "handler_group": "handleConnectionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "remote_ip": "string",
+        "local_ip": "string"
+      }
+    },
+    {
+      "name": "disconnect_robot",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "BOOT",
+        "DISCONNECTED",
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "FAULT",
+        "ESTOP"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "disconnect_robot",
+      "alias_kind": "canonical",
+      "handler_group": "handleConnectionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "power_on",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "power_on",
+      "alias_kind": "canonical",
+      "handler_group": "handlePowerModeCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "power_off",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "power_off",
+      "alias_kind": "canonical",
+      "handler_group": "handlePowerModeCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "set_auto_mode",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "set_auto_mode",
+      "alias_kind": "canonical",
+      "handler_group": "handlePowerModeCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "set_manual_mode",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY"
+      ],
+      "capability_claim": "hardware_lifecycle_write",
+      "write_command": true,
+      "canonical_command": "set_manual_mode",
+      "alias_kind": "canonical",
+      "handler_group": "handlePowerModeCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "validate_setup",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED"
+      ],
+      "capability_claim": "runtime_validation",
+      "write_command": true,
+      "canonical_command": "validate_setup",
+      "alias_kind": "canonical",
+      "handler_group": "handleValidationCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "validate_scan_plan",
+      "required_payload_fields": [
+        "scan_plan"
+      ],
+      "required_nested_fields": {
+        "scan_plan": [
+          "plan_id",
+          "segments",
+          "plan_hash"
+        ]
+      },
+      "field_types": {
+        "scan_plan": "object",
+        "config_snapshot": "object",
+        "scan_plan_hash": "string"
+      },
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "write_command": false,
+      "capability_claim": "plan_compile",
+      "legacy_aliases": [
+        "compile_scan_plan"
+      ],
+      "canonical_command": "validate_scan_plan",
+      "alias_kind": "canonical",
+      "handler_group": "handleValidationCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "compile_scan_plan",
+      "required_payload_fields": [
+        "scan_plan"
+      ],
+      "required_nested_fields": {
+        "scan_plan": [
+          "plan_id",
+          "segments",
+          "plan_hash"
+        ]
+      },
+      "field_types": {
+        "scan_plan": "object",
+        "config_snapshot": "object",
+        "scan_plan_hash": "string"
+      },
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "write_command": false,
+      "capability_claim": "plan_compile",
+      "canonical_command": "validate_scan_plan",
+      "alias_kind": "deprecated_alias",
+      "handler_group": "handleValidationCommand",
+      "deprecation_stage": "warn_only",
+      "removal_target": "2026-Q4",
+      "replacement_command": "validate_scan_plan",
+      "compatibility_note": "Deprecated alias retained for compatibility; new code must call validate_scan_plan."
+    },
+    {
+      "name": "query_final_verdict",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "query_final_verdict",
+      "alias_kind": "canonical",
+      "handler_group": "handleValidationCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "query_controller_log",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "query_controller_log",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "query_rl_projects",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "query_rl_projects",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "query_path_lists",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "query_path_lists",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_io_snapshot",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_io_snapshot",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_safety_config",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_safety_config",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_motion_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_motion_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_register_snapshot",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_register_snapshot",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_runtime_alignment",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_runtime_alignment",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_xmate_model_summary",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_xmate_model_summary",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_sdk_runtime_config",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_sdk_runtime_config",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_identity_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_identity_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_robot_family_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_robot_family_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_vendor_boundary_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_vendor_boundary_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_clinical_mainline_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_clinical_mainline_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_session_freeze",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_session_freeze",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_authoritative_runtime_envelope",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_authoritative_runtime_envelope",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_session_drift_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_session_drift_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_hardware_lifecycle_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_hardware_lifecycle_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_rt_kernel_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_rt_kernel_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_control_governance_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_control_governance_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_controller_evidence",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_controller_evidence",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_dual_state_machine_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_dual_state_machine_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_mainline_executor_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_mainline_executor_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_recovery_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_recovery_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_safety_recovery_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_safety_recovery_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_capability_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_capability_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_model_authority_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_model_authority_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_release_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_release_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_deployment_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_deployment_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "get_fault_injection_contract",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "write_command": false,
+      "capability_claim": "runtime_read",
+      "canonical_command": "get_fault_injection_contract",
+      "alias_kind": "canonical",
+      "handler_group": "handleQueryCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "inject_fault",
+      "required_payload_fields": [
+        "fault_name"
+      ],
+      "field_types": {
+        "fault_name": "string"
+      },
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "fault_injection_write",
+      "write_command": true,
+      "canonical_command": "inject_fault",
+      "alias_kind": "canonical",
+      "handler_group": "handleFaultInjectionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "clear_injected_faults",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "fault_injection_write",
+      "write_command": true,
+      "canonical_command": "clear_injected_faults",
+      "alias_kind": "canonical",
+      "handler_group": "handleFaultInjectionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "lock_session",
+      "required_payload_fields": [
+        "session_id",
+        "session_dir",
+        "config_snapshot",
+        "device_roster",
+        "scan_plan_hash"
+      ],
+      "field_types": {
+        "session_id": "string",
+        "session_dir": "string",
+        "config_snapshot": "object",
+        "device_roster": "object",
+        "scan_plan_hash": "string"
+      },
+      "state_preconditions": [
+        "AUTO_READY"
+      ],
+      "capability_claim": "session_freeze_write",
+      "write_command": true,
+      "canonical_command": "lock_session",
+      "alias_kind": "canonical",
+      "handler_group": "handleSessionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "load_scan_plan",
+      "required_payload_fields": [
+        "scan_plan"
+      ],
+      "required_nested_fields": {
+        "scan_plan": [
+          "plan_id",
+          "segments"
+        ]
+      },
+      "field_types": {
+        "scan_plan": "object",
+        "scan_plan_hash": "string"
+      },
+      "state_preconditions": [
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "capability_claim": "session_freeze_write",
+      "write_command": true,
+      "canonical_command": "load_scan_plan",
+      "alias_kind": "canonical",
+      "handler_group": "handleSessionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "approach_prescan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PATH_VALIDATED"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "approach_prescan",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "seek_contact",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "APPROACHING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "seek_contact",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "start_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONTACT_STABLE",
+        "PAUSED_HOLD"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "start_scan",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "pause_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "SCANNING"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "pause_scan",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "resume_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PAUSED_HOLD"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "resume_scan",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "safe_retreat",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "APPROACHING",
+        "CONTACT_SEEKING",
+        "CONTACT_STABLE",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT",
+        "FAULT"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "safe_retreat",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "go_home",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED",
+        "POWERED",
+        "AUTO_READY",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE",
+        "SEGMENT_ABORTED",
+        "PLAN_ABORTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "go_home",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "run_rl_project",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "run_rl_project",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "project": "string",
+        "task": "string"
+      }
+    },
+    {
+      "name": "pause_rl_project",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "AUTO_READY",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "pause_rl_project",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "enable_drag",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "enable_drag",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "space": "string",
+        "type": "string"
+      }
+    },
+    {
+      "name": "disable_drag",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "disable_drag",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "replay_path",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "AUTO_READY",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "replay_path",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "name": "string",
+        "rate": "double"
+      }
+    },
+    {
+      "name": "start_record_path",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "start_record_path",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "duration_s": "integer"
+      }
+    },
+    {
+      "name": "stop_record_path",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "stop_record_path",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "cancel_record_path",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "cancel_record_path",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "save_record_path",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "CONNECTED"
+      ],
+      "capability_claim": "nrt_motion_write",
+      "write_command": true,
+      "canonical_command": "save_record_path",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "name": "string",
+        "save_as": "string"
+      }
+    },
+    {
+      "name": "clear_fault",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "FAULT"
+      ],
+      "capability_claim": "recovery_write",
+      "write_command": true,
+      "canonical_command": "clear_fault",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "emergency_stop",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "recovery_write",
+      "write_command": true,
+      "canonical_command": "emergency_stop",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "baseline_expectations": {
+    "section": "rt_kernel",
+    "expected_blockers": []
+  },
+  "scenarios": [
+    {
+      "name": "rt_cycle_overrun_detected",
+      "patch": {
+        "overrun_count": 1,
+        "loop_samples": [
+          {"execution_ms": 1.05, "wake_jitter_ms": 0.04, "overrun": false},
+          {"execution_ms": 1.28, "wake_jitter_ms": 0.06, "overrun": true}
+        ]
+      },
+      "expected_blockers": ["rt_cycle_overrun_detected", "rt_quality_gate_failed"]
+    },
+    {
+      "name": "rt_wake_jitter_budget_exceeded",
+      "patch": {
+        "last_wake_jitter_ms": 0.5,
+        "loop_samples": [
+          {"execution_ms": 1.02, "wake_jitter_ms": 0.08, "overrun": false},
+          {"execution_ms": 1.08, "wake_jitter_ms": 0.52, "overrun": false}
+        ]
+      },
+      "expected_blockers": ["rt_wake_jitter_budget_exceeded", "rt_quality_gate_failed"]
+    },
+    {
+      "name": "rt_cycle_budget_exceeded",
+      "patch": {
+        "max_cycle_ms": 1.4,
+        "loop_samples": [
+          {"execution_ms": 1.02, "wake_jitter_ms": 0.04, "overrun": false},
+          {"execution_ms": 1.41, "wake_jitter_ms": 0.05, "overrun": false}
+        ]
+      },
+      "expected_blockers": ["rt_cycle_budget_exceeded", "rt_quality_gate_failed"]
+    },
+    {
+      "name": "rt_quality_gate_failed",
+      "patch": {
+        "rt_quality_gate_passed": false,
+        "loop_samples": [
+          {"execution_ms": 1.03, "wake_jitter_ms": 0.04, "overrun": false}
+        ]
+      },
+      "expected_blockers": ["rt_quality_gate_failed"]
+    }
+  ]
+}

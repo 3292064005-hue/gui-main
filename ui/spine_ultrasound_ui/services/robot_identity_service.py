@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from spine_ultrasound_ui.utils.mainline_identity_defaults import MAINLINE_IDENTITY_DEFAULTS
+
 
 @dataclass(frozen=True)
 class OfficialDhParameter:
@@ -84,14 +86,14 @@ class RobotIdentity:
 _PI_2 = 1.57079632679
 
 XMATE3_IDENTITY = RobotIdentity(
-    robot_model="xmate3",
-    label="xMate3",
-    sdk_robot_class="xMateRobot",
-    axis_count=6,
-    family_key="xmate3_cobot_6",
+    robot_model=MAINLINE_IDENTITY_DEFAULTS.robot_model,
+    label=MAINLINE_IDENTITY_DEFAULTS.display_name,
+    sdk_robot_class=MAINLINE_IDENTITY_DEFAULTS.sdk_robot_class,
+    axis_count=MAINLINE_IDENTITY_DEFAULTS.axis_count,
+    family_key=MAINLINE_IDENTITY_DEFAULTS.family_key,
     family_label="xMate collaborative 6-axis",
-    preferred_link="wired_direct",
-    rt_mode="cartesianImpedance",
+    preferred_link=MAINLINE_IDENTITY_DEFAULTS.preferred_link,
+    rt_mode=MAINLINE_IDENTITY_DEFAULTS.clinical_mainline_mode,
     official_dh_parameters=(
         OfficialDhParameter(1, 0.0, -_PI_2, 341.5),
         OfficialDhParameter(2, 394.0, 0.0, 0.0),
@@ -127,7 +129,7 @@ _SUPPORTED_IDENTITIES = {
 
 
 class RobotIdentityService:
-    def __init__(self, default_model: str = "xmate3") -> None:
+    def __init__(self, default_model: str = MAINLINE_IDENTITY_DEFAULTS.robot_model) -> None:
         normalized = (default_model or XMATE3_IDENTITY.robot_model).strip().lower()
         self.default_model = normalized or XMATE3_IDENTITY.robot_model
 

@@ -8,9 +8,8 @@
 namespace robot_core {
 
 
-void CoreRuntime::applyConfigFromJsonLocked(const std::string& json_line) {
-  const auto config_json = json::extractObject(json_line, "config_snapshot", "{}");
-  const auto& source = config_json != "{}" ? config_json : json_line;
+void CoreRuntime::applyConfigSnapshotLocked(const std::string& config_snapshot_json) {
+  const auto& source = config_snapshot_json.empty() ? std::string("{}") : config_snapshot_json;
   config_.pressure_target = json::extractDouble(source, "pressure_target", config_.pressure_target);
   config_.pressure_upper = json::extractDouble(source, "pressure_upper", config_.pressure_upper);
   config_.pressure_lower = json::extractDouble(source, "pressure_lower", config_.pressure_lower);
@@ -108,11 +107,12 @@ void CoreRuntime::applyConfigFromJsonLocked(const std::string& json_line) {
   config_.rt_integrator_limit_n = config_.contact_control.anti_windup_limit_n;
   config_.scan_pose_trim_gain = config_.orientation_trim.gain;
   config_.rt_max_pose_trim_deg = config_.orientation_trim.max_trim_deg;
-  config_.robot_model = "xmate3";
-  config_.axis_count = 6;
-  config_.sdk_robot_class = "xMateRobot";
-  config_.preferred_link = "wired_direct";
+  config_.robot_model = ROBOT_CORE_DEFAULT_ROBOT_MODEL;
+  config_.axis_count = ROBOT_CORE_DEFAULT_AXIS_COUNT;
+  config_.sdk_robot_class = ROBOT_CORE_DEFAULT_SDK_CLASS;
+  config_.preferred_link = ROBOT_CORE_DEFAULT_PREFERRED_LINK;
   config_.requires_single_control_source = json::extractBool(source, "requires_single_control_source", config_.requires_single_control_source);
+  config_.allow_contract_shell_writes = json::extractBool(source, "allow_contract_shell_writes", config_.allow_contract_shell_writes);
   config_.build_id = json::extractString(source, "build_id", config_.build_id);
   config_.software_version = json::extractString(source, "software_version", config_.software_version);
   config_.rt_network_tolerance_percent = json::extractInt(source, "rt_network_tolerance_percent", config_.rt_network_tolerance_percent);
@@ -146,8 +146,8 @@ void CoreRuntime::applyConfigFromJsonLocked(const std::string& json_line) {
 
 
 
-void CoreRuntime::loadPlanFromJsonLocked(const std::string& json_line) {
-  const auto plan = scan_plan_parser_.parseJsonEnvelope(json_line);
+void CoreRuntime::loadPlanLocked(const std::string& scan_plan_json, const std::string& scan_plan_hash) {
+  const auto plan = scan_plan_parser_.parseJsonEnvelope(scan_plan_json.empty() ? std::string("{}") : scan_plan_json);
   std::string error;
   if (!scan_plan_validator_.validate(plan, &error)) {
     plan_loaded_ = false;
@@ -155,7 +155,7 @@ void CoreRuntime::loadPlanFromJsonLocked(const std::string& json_line) {
     return;
   }
   plan_id_ = plan.plan_id;
-  plan_hash_ = !plan.plan_hash.empty() ? plan.plan_hash : json::extractString(json_line, "scan_plan_hash");
+  plan_hash_ = !plan.plan_hash.empty() ? plan.plan_hash : scan_plan_hash;
   total_segments_ = static_cast<int>(plan.segments.size());
   total_points_ = std::max(total_segments_ * std::max(static_cast<int>(config_.segment_length_mm / std::max(config_.sample_step_mm, 0.1)), 2), 0);
   path_index_ = 0;
@@ -168,12 +168,11 @@ void CoreRuntime::loadPlanFromJsonLocked(const std::string& json_line) {
 
 
 
-FinalVerdict CoreRuntime::compileScanPlanVerdictLocked(const std::string& json_line) {
-  applyConfigFromJsonLocked(json_line);
-  const auto plan_json = json::extractObject(json_line, "scan_plan", "{}");
-  auto plan = scan_plan_parser_.parseJsonEnvelope(plan_json == "{}" ? json_line : plan_json);
+FinalVerdict CoreRuntime::compileScanPlanVerdictLocked(const std::string& config_snapshot_json, const std::string& scan_plan_json, const std::string& scan_plan_hash) {
+  applyConfigSnapshotLocked(config_snapshot_json);
+  auto plan = scan_plan_parser_.parseJsonEnvelope(scan_plan_json.empty() ? std::string("{}") : scan_plan_json);
   if (plan.plan_hash.empty()) {
-    plan.plan_hash = json::extractString(json_line, "scan_plan_hash", plan_hash_);
+    plan.plan_hash = scan_plan_hash.empty() ? plan_hash_ : scan_plan_hash;
   }
   FinalVerdict verdict;
   verdict.source = "cpp_robot_core";
@@ -222,7 +221,7 @@ FinalVerdict CoreRuntime::compileScanPlanVerdictLocked(const std::string& json_l
 
 
 void CoreRuntime::appendMainlineContractIssuesLocked(std::vector<std::string>* blockers, std::vector<std::string>* warnings) const {
-  const auto& identity = resolveRobotIdentity("xmate3", "xMateRobot", 6);
+  const auto& identity = resolveRobotIdentity(config_.robot_model, config_.sdk_robot_class, config_.axis_count);
   auto push_blocker = [&](const std::string& message) {
     if (blockers) blockers->push_back(message);
   };

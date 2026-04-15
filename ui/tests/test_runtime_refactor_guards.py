@@ -33,6 +33,13 @@ class _StubAdapter:
         return {"protocol_version": 1}
 
 
+class _StubContainer:
+    def __init__(self, runtime_adapter: _StubAdapter) -> None:
+        self.runtime_adapter = runtime_adapter
+        self.deployment_profile_service = None
+        self.command_guard_service = None
+
+
 def test_control_authority_service_linearizes_conflicting_acquire() -> None:
     service = ControlAuthorityService(strict_mode=True, auto_issue_implicit_lease=False)
     barrier = threading.Barrier(2)
@@ -67,7 +74,9 @@ def test_backend_projection_cache_snapshot_is_coherent() -> None:
 
 def test_create_app_uses_app_local_runtime_container() -> None:
     stub_adapter = _StubAdapter()
-    app = api_server.create_app(adapter_getter=lambda: stub_adapter, allowed_origins=["http://localhost:3000"])
+    runtime_container = _StubContainer(stub_adapter)
+    app = api_server.create_app(runtime_container=runtime_container, allowed_origins=["http://localhost:3000"])
+    assert app.state.runtime_container is runtime_container
     with TestClient(app) as client:
         response = client.get("/api/v1/status")
         assert response.status_code == 200
@@ -76,30 +85,25 @@ def test_create_app_uses_app_local_runtime_container() -> None:
     assert stub_adapter.stopped == 1
 
 
-def test_create_app_prefers_app_local_runtime_container_over_module_singleton() -> None:
-    original_container = api_server._runtime_container
+def test_create_app_keeps_runtime_containers_isolated_per_instance() -> None:
+    first_adapter = _StubAdapter()
+    second_adapter = _StubAdapter()
+    first_app = api_server.create_app(runtime_container=_StubContainer(first_adapter), allowed_origins=["http://localhost:3000"])
+    second_app = api_server.create_app(runtime_container=_StubContainer(second_adapter), allowed_origins=["http://localhost:3000"])
 
-    class _Container:
-        def __init__(self, runtime_adapter):
-            self.runtime_adapter = runtime_adapter
-            self.deployment_profile_service = None
-            self.command_guard_service = None
+    with TestClient(first_app) as first_client:
+        response = first_client.get("/api/v1/status")
+        assert response.status_code == 200
+        assert response.json()["backend_mode"] == "mock"
+    with TestClient(second_app) as second_client:
+        response = second_client.get("/api/v1/status")
+        assert response.status_code == 200
+        assert response.json()["backend_mode"] == "mock"
 
-    global_adapter = _StubAdapter()
-    local_adapter = _StubAdapter()
-    api_server._runtime_container = _Container(global_adapter)
-    try:
-        app = api_server.create_app(adapter_getter=lambda: local_adapter, allowed_origins=["http://localhost:3000"])
-        with TestClient(app) as client:
-            response = client.get("/api/v1/status")
-            assert response.status_code == 200
-            assert response.json()["backend_mode"] == "mock"
-        assert local_adapter.started == 1
-        assert local_adapter.stopped == 1
-        assert global_adapter.started == 0
-        assert global_adapter.stopped == 0
-    finally:
-        api_server._runtime_container = original_container
+    assert first_adapter.started == 1
+    assert first_adapter.stopped == 1
+    assert second_adapter.started == 1
+    assert second_adapter.stopped == 1
 
 
 def test_api_server_settings_from_env_falls_back_on_invalid_ports() -> None:

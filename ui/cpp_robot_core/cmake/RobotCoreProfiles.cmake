@@ -15,6 +15,12 @@ if(NOT ROBOT_CORE_PROFILE)
   message(FATAL_ERROR "ROBOT_CORE_PROFILE must be explicitly set to mock, hil, or prod.")
 endif()
 
+
+if(ROBOT_CORE_PROFILE STREQUAL "mock")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O0 -DNDEBUG" CACHE STRING "Release flags" FORCE)
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O0 -g -DNDEBUG" CACHE STRING "RelWithDebInfo flags" FORCE)
+endif()
+
 include(cmake/RobotCoreBuildOptions.cmake)
 include(cmake/RobotCoreSdkPolicy.cmake)
 

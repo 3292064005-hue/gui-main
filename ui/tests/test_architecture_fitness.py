@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import ast
 from pathlib import Path
 
 from spine_ultrasound_ui.models import RuntimeConfig
@@ -59,11 +60,16 @@ def test_verify_mainline_runs_architecture_fitness_gate() -> None:
 def test_sdk_robot_facade_exposes_controlled_ports_and_call_sites_use_them() -> None:
     header = Path('cpp_robot_core/include/robot_core/sdk_robot_facade.h').read_text(encoding='utf-8')
     for required in (
-        'class LifecyclePort',
-        'class QueryPort',
-        'class NrtExecutionPort',
-        'class RtControlPort',
-        'class CollaborationPort',
+        'class SdkRobotLifecyclePort',
+        'class SdkRobotQueryPort',
+        'class SdkRobotNrtExecutionPort',
+        'class SdkRobotRtControlPort',
+        'class SdkRobotCollaborationPort',
+        'using LifecyclePort = SdkRobotLifecyclePort;',
+        'using QueryPort = SdkRobotQueryPort;',
+        'using NrtExecutionPort = SdkRobotNrtExecutionPort;',
+        'using RtControlPort = SdkRobotRtControlPort;',
+        'using CollaborationPort = SdkRobotCollaborationPort;',
         'LifecyclePort& lifecyclePort()',
         'QueryPort& queryPort()',
         'NrtExecutionPort& nrtExecutionPort()',
@@ -80,12 +86,12 @@ def test_sdk_robot_facade_exposes_controlled_ports_and_call_sites_use_them() -> 
 
 
 def test_runtime_lane_routes_rt_commands_to_rt_control_mutex() -> None:
-    source = Path('cpp_robot_core/src/core_runtime.cpp').read_text(encoding='utf-8')
+    source = Path('cpp_robot_core/src/core_runtime_dispatcher.cpp').read_text(encoding='utf-8')
     for required in (
-        'commandCapabilityClaim',
-        'capability_claim == "rt_motion_write"',
-        'if (lane == RuntimeLane::RtControl)',
-        'std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_)',
+        'runtimeLaneForCommand',
+        'findRuntimeCommandGuardContract',
+        'if (lane == CoreRuntime::RuntimeLane::RtControl)',
+        'return dispatch_with_contract(owner_.rt_lane_mutex_)',
     ):
         assert required in source
 
@@ -217,9 +223,170 @@ def test_api_bridge_backend_uses_split_lease_and_verdict_services() -> None:
     assert 'Failed read/compile attempts do not fall back to cached verdicts' in verdict_source
 
 
+
+
+def test_runtime_command_catalog_is_manifest_backed_and_generated_cpp_registry_exists() -> None:
+    source = Path('spine_ultrasound_ui/services/runtime_command_catalog.py').read_text(encoding='utf-8')
+    assert 'runtime_command_manifest.json' in source
+    assert 'json.loads' in source
+    generated = Path('cpp_robot_core/include/robot_core/generated_command_manifest.inc').read_text(encoding='utf-8')
+    assert 'Generated from schemas/runtime_command_manifest.json' in generated
+
+
+def test_api_server_uses_app_state_composition_root_without_module_singletons() -> None:
+    source = Path('spine_ultrasound_ui/api_server.py').read_text(encoding='utf-8')
+    assert 'fastapi_app.state.runtime_container = resolved_container' in source
+    assert '_runtime_container =' not in source
+    assert 'adapter: HeadlessAdapter | None = None' not in source
+
+
+def test_main_window_pixmap_receivers_are_explicit_slots() -> None:
+    source = Path('spine_ultrasound_ui/main_window.py').read_text(encoding='utf-8')
+    assert '@Slot(object)\n    def _update_camera_pixmap' in source
+    assert '@Slot(object)\n    def _update_ultrasound_pixmap' in source
+    assert '@Slot(object)\n    def _update_reconstruction_pixmap' in source
+
+
+
+
+def _contains_archive_import(path: str) -> bool:
+    """Return whether a module imports historical archive tests directly.
+
+    The mainline top-level surface must not import the archived compatibility
+    tree directly. This helper checks actual import nodes instead of grepping
+    for a brittle literal path string.
+    """
+    tree = ast.parse(Path(path).read_text(encoding='utf-8'))
+    archive_prefix = '.'.join(('tests', 'archive'))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ''
+            if module == archive_prefix or module.startswith(f'{archive_prefix}.'):
+                return True
+    return False
+
+def test_rt_state_store_flushes_recording_after_unlock() -> None:
+    source = Path('cpp_robot_core/src/runtime_state_store.cpp').read_text(encoding='utf-8')
+    assert 'PendingRecordBundle record_bundle{};' in source
+    assert 'record_bundle = buildRecordBundleLocked();' in source
+    assert 'flushRecordBundle(record_bundle);' in source
+
+
+def test_stable_control_ownership_surface_no_longer_imports_archive_wrapper() -> None:
+    assert not _contains_archive_import('tests/test_control_ownership.py')
+
+
+def test_stable_runtime_verdict_surface_no_longer_imports_archive_wrapper() -> None:
+    assert not _contains_archive_import('tests/test_runtime_verdict.py')
+
 def test_app_controller_runtime_mixin_uses_queued_qt_connections() -> None:
     source = Path('spine_ultrasound_ui/core/app_controller_runtime_mixin.py').read_text(encoding='utf-8')
     assert 'telemetry_received.connect(self._handle_telemetry, Qt.QueuedConnection)' in source
     assert 'log_generated.connect(self._forward_log, Qt.QueuedConnection)' in source
     assert 'camera_pixmap_ready.connect(self._on_camera_pixmap, Qt.QueuedConnection)' in source
     assert 'ultrasound_pixmap_ready.connect(self._on_ultrasound_pixmap, Qt.QueuedConnection)' in source
+
+
+def test_legacy_archive_wrappers_are_removed_from_top_level_tests_surface() -> None:
+    for rel_path in (
+        'tests/test_api_contract.py',
+        'tests/test_api_security.py',
+        'tests/test_control_plane.py',
+        'tests/test_headless_runtime.py',
+        'tests/test_profile_policy.py',
+        'tests/test_release_gate.py',
+        'tests/test_replay_determinism.py',
+        'tests/test_spawned_core_integration.py',
+    ):
+        assert not Path(rel_path).exists()
+
+
+def test_architecture_gate_enforces_removed_archive_wrappers() -> None:
+    source = Path('scripts/check_architecture_fitness.py').read_text(encoding='utf-8')
+    assert 'LEGACY_ARCHIVE_WRAPPER_BASENAMES' in source
+    assert 'Legacy archive wrapper must not exist in top-level tests surface' in source
+    assert 'run_pytest_mainline must not hardcode legacy archive wrapper ignores once wrappers are removed' in source
+
+
+def test_run_pytest_mainline_only_opt_in_adds_archive_compat_suite() -> None:
+    source = Path('scripts/run_pytest_mainline.py').read_text(encoding='utf-8')
+    assert 'ARCHIVE_COMPAT_DIR' in source
+    assert '--include-archive-compat' in source
+    assert "Path('tests') / 'archive'" in source
+    assert 'ACTIVE_GATE_ARCHIVE_WRAPPERS' not in source
+
+
+def test_robot_core_verdict_service_fail_hard_contract_matches_api_bridge() -> None:
+    source = Path('spine_ultrasound_ui/services/robot_core_verdict_service.py').read_text(encoding='utf-8')
+    assert '_raise_if_reply_failed' in source
+    assert 'Failed replies never' in source
+    assert 'self._raise_if_reply_failed(reply, command="query_final_verdict")' in source
+    assert 'self._raise_if_reply_failed(reply, command="validate_scan_plan")' in source
+
+
+def test_verify_cpp_build_evidence_tracks_current_core_runtime_sources() -> None:
+    source = Path('scripts/verify_cpp_build_evidence.py').read_text(encoding='utf-8')
+    assert 'cpp_robot_core/src/command_registry.cpp' in source
+    assert 'cpp_robot_core/src/core_runtime.cpp' in source
+    assert 'cpp_robot_core/src/runtime_state_store.cpp' in source
+
+
+def test_verify_and_acceptance_generate_runtime_command_artifacts_before_sync_gate() -> None:
+    verify_script = Path('scripts/verify_mainline.sh').read_text(encoding='utf-8')
+    acceptance_script = Path('scripts/final_acceptance_audit.sh').read_text(encoding='utf-8')
+    assert 'scripts/generate_runtime_command_artifacts.py' in verify_script
+    assert 'scripts/generate_runtime_command_artifacts.py' in acceptance_script
+
+
+def test_verify_mainline_runs_rt_purity_and_quality_gates() -> None:
+    script = Path("scripts/verify_mainline.sh").read_text(encoding="utf-8")
+    assert "scripts/check_rt_purity_gate.py" in script
+    assert "scripts/check_rt_quality_gate.py" in script
+
+
+def test_repo_payload_declares_codeowners() -> None:
+    codeowners = Path('.github/CODEOWNERS')
+    assert codeowners.exists()
+    assert '@runtime-architecture' in codeowners.read_text(encoding='utf-8')
+
+
+def test_runtime_command_contracts_generate_cpp_typed_request_response_and_guard_artifacts() -> None:
+    generated = Path('cpp_robot_core/include/robot_core/generated_runtime_command_contracts.inc').read_text(encoding='utf-8')
+    header = Path('cpp_robot_core/include/robot_core/runtime_command_contracts.h').read_text(encoding='utf-8')
+    source = Path('cpp_robot_core/src/runtime_command_contracts.cpp').read_text(encoding='utf-8')
+    dispatcher = Path('cpp_robot_core/src/core_runtime_dispatcher.cpp').read_text(encoding='utf-8')
+    assert 'RuntimeCommandRequestContract' in header
+    assert 'RuntimeCommandResponseContract' in header
+    assert 'RuntimeCommandGuardContract' in header
+    assert 'validateAndParseRuntimeCommandPayload' in source
+    assert 'generated_runtime_command_contracts.inc' in source
+    assert 'RuntimeCommandResponseContract' in generated
+    assert 'RuntimeCommandGuardContract' in generated
+    assert 'buildRuntimeCommandInvocation(line, &invocation, &payload_error)' in dispatcher
+    assert 'dispatchTypedCommand(invocation)' in dispatcher
+
+
+def test_runtime_command_contracts_generate_cpp_typed_request_family() -> None:
+    request_types = Path('cpp_robot_core/include/robot_core/generated_runtime_command_request_types.h').read_text(encoding='utf-8')
+    request_parsers = Path('cpp_robot_core/include/robot_core/generated_runtime_command_request_parsers.inc').read_text(encoding='utf-8')
+    dispatcher = Path('cpp_robot_core/src/core_runtime_dispatcher.cpp').read_text(encoding='utf-8')
+    assert 'using RuntimeTypedRequestVariant = std::variant<' in request_types
+    assert 'ConnectRobotRequest' in request_types
+    assert 'LockSessionRequest' in request_types
+    assert 'ValidateScanPlanRequest' in request_types
+    assert 'if (command == "connect_robot")' in request_parsers
+    assert 'if (command == "lock_session")' in request_parsers
+    assert 'buildTypedRuntimeCommandRequest' in dispatcher or 'buildTypedRuntimeCommandRequest' in Path('cpp_robot_core/src/runtime_command_contracts.cpp').read_text(encoding='utf-8')
+
+
+def test_runtime_command_contracts_generate_cpp_typed_handler_adapter_family() -> None:
+    decls = Path('cpp_robot_core/include/robot_core/generated_runtime_command_typed_handler_decls.inc').read_text(encoding='utf-8')
+    adapters = Path('cpp_robot_core/include/robot_core/generated_runtime_command_typed_handlers.inc').read_text(encoding='utf-8')
+    script = Path('scripts/check_architecture_fitness.py').read_text(encoding='utf-8')
+    assert 'generated_runtime_command_typed_handlers.inc' in script
+    assert 'generated_runtime_command_typed_handler_decls.inc' in script
+    for required in ('handleTypedCommand<ConnectRobotRequest>', 'handleTypedCommand<LockSessionRequest>', 'handleTypedCommand<ValidateScanPlanRequest>'):
+        assert required in adapters
+    for required in ('handleConnectRobotTyped', 'handleLockSessionTyped', 'handleValidateScanPlanTyped'):
+        assert required in decls
+        assert required in adapters

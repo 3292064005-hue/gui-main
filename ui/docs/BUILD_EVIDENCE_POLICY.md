@@ -76,6 +76,7 @@ Every repository/profile proof run must also execute `scripts/check_robot_identi
 
 `final_acceptance_audit.sh` now writes `acceptance_summary.json` alongside `verification_execution_report.json` and `build_evidence_report.json` so the full-profile acceptance run leaves a machine-readable summary of the build/test/install evidence paths.
 The acceptance summary now also mirrors the verification boundary, reported evidence tiers, and build-evidence mode so package consumers can inspect the claim boundary without resolving every linked JSON file first.
+Profiles listed under `acceptance_summary.json.profiles` are now claim-safe validated profiles only. Caller-requested profiles are preserved separately under `requested_profiles`, and repository-only reruns must leave `profiles` empty when `verification_report.proof_scope.profile_gate_proof` is false.
 
 
 ## Path portability

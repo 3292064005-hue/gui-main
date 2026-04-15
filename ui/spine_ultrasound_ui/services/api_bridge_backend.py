@@ -20,6 +20,7 @@ from .api_bridge_lease_service import ApiBridgeLeaseService
 from .api_bridge_verdict_service import ApiBridgeVerdictService
 from .backend_authoritative_contract_service import BackendAuthoritativeContractService
 from .backend_base import BackendBase
+from .backend_control_plane_projection_service import BackendControlPlaneProjectionService
 from .backend_control_plane_service import BackendControlPlaneService
 from .backend_error_mapper import BackendErrorMapper
 from .backend_errors import BackendOperationError, normalize_backend_exception
@@ -99,6 +100,7 @@ class ApiBridgeBackend(QObject, BackendBase):
         self._last_errors: deque[str] = deque(maxlen=ERROR_HISTORY_LIMIT)
         self._last_final_verdict: dict[str, Any] = {}
         self._control_plane_service = BackendControlPlaneService()
+        self._projection_service = BackendControlPlaneProjectionService()
         self._authoritative_service = BackendAuthoritativeContractService()
         self._projection_cache = BackendProjectionCache()
         self._metrics = BackendLinkMetrics(using_websocket_telemetry=ws_connect is not None, using_websocket_media=ws_connect is not None)
@@ -230,18 +232,13 @@ class ApiBridgeBackend(QObject, BackendBase):
             errors = list(self._last_errors)
             control_plane = dict(self._control_plane_cache)
             authoritative_envelope = dict(self._authoritative_envelope)
-            if self._control_authority_cache:
-                control_plane.setdefault("control_authority", dict(self._control_authority_cache))
-            if authoritative_envelope:
-                control_plane["authoritative_runtime_envelope"] = authoritative_envelope
-                control_plane.setdefault("control_authority", dict(authoritative_envelope.get("control_authority", {})))
-                control_plane["runtime_config_applied"] = dict(authoritative_envelope.get("runtime_config_applied", {}))
-                control_plane["final_verdict"] = dict(authoritative_envelope.get("final_verdict", {}))
-                control_plane["session_freeze"] = dict(authoritative_envelope.get("session_freeze", {}))
-                control_plane["plan_digest"] = dict(authoritative_envelope.get("plan_digest", {}))
-                projection_snapshot = self._projection_cache.snapshot()
-                control_plane["projection_revision"] = projection_snapshot["revision"]
-                control_plane["projection_partitions"] = projection_snapshot["partitions"]
+            control_authority = dict(self._control_authority_cache)
+        control_plane = self._projection_service.build(
+            control_plane=control_plane,
+            authoritative_envelope=authoritative_envelope,
+            projection_cache=self._projection_cache,
+            control_authority=control_authority,
+        )
         return self.link_service.build_snapshot(
             mode="api",
             http_base=self.base_url,
@@ -252,7 +249,26 @@ class ApiBridgeBackend(QObject, BackendBase):
             extra_errors=errors,
             control_plane=control_plane,
             local_runtime_config=self.config.to_dict(),
+            authoritative_runtime_envelope=authoritative_envelope,
         )
+    def resolve_authoritative_runtime_envelope(self) -> dict[str, Any]:
+        """Return the canonical runtime-owned authoritative envelope for read consumers."""
+        with self._lock:
+            envelope = dict(self._authoritative_envelope)
+        if envelope:
+            return envelope
+        return self._authoritative_service.build_unavailable_authoritative_runtime_envelope(
+            authority_source="api_bridge",
+            detail="api bridge has not received a runtime-published authoritative envelope",
+            desired_runtime_config=self.config,
+            envelope_origin="api_bridge_cache_empty",
+        )
+
+    def resolve_control_authority(self) -> dict[str, Any]:
+        """Return the canonical control-authority snapshot for read consumers."""
+        envelope = self.resolve_authoritative_runtime_envelope()
+        return dict(envelope.get("control_authority", {}))
+
     def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict[str, Any]:
         """Resolve the authoritative runtime final verdict through the canonical backend API."""
         return self._verdict_service.resolve_final_verdict(plan, config, read_only=read_only)
@@ -304,15 +320,24 @@ class ApiBridgeBackend(QObject, BackendBase):
                 health_resp.raise_for_status()
                 control_resp = self._client.get("/api/v1/control-plane")
                 control_resp.raise_for_status()
+                envelope_resp = self._client.get("/api/v1/authoritative-runtime-envelope")
+                envelope_resp.raise_for_status()
                 status = status_resp.json()
                 health = health_resp.json()
                 control_plane = control_resp.json()
-                authoritative_envelope = self._authoritative_service.normalize_payload(
-                    control_plane,
+                authoritative_envelope = self._authoritative_service.normalize_authoritative_runtime_envelope(
+                    envelope_resp.json() if envelope_resp.content else {},
                     authority_source="api_bridge",
                     desired_runtime_config=self.config,
-                    fallback_control_authority=self._control_authority_cache,
+                    allow_direct_payload=True,
                 )
+                if not authoritative_envelope:
+                    authoritative_envelope = self._authoritative_service.build_unavailable_authoritative_runtime_envelope(
+                        authority_source="api_bridge",
+                        detail="headless API did not return a runtime-published authoritative envelope",
+                        desired_runtime_config=self.config,
+                        envelope_origin="api_bridge_health_loop_missing_envelope",
+                    )
                 with self._lock:
                     self._status_cache = status
                     self._health_cache = health
@@ -427,16 +452,18 @@ class ApiBridgeBackend(QObject, BackendBase):
         self._projection_cache.update_partition(f"topic:{topic}", {"topic": topic, "data": env.data, "ts_ns": env.ts_ns})
         self.telemetry_received.emit(env)
     def _capture_reply_contracts(self, reply: ReplyEnvelope) -> None:
-        authoritative_envelope = self._authoritative_service.normalize_payload(
+        authoritative_envelope = self._authoritative_service.normalize_authoritative_runtime_envelope(
             reply.data,
             authority_source="api_bridge",
             desired_runtime_config=self.config,
-            fallback_control_authority=self._control_authority_cache,
+            allow_direct_payload=True,
         )
-        verdict = dict(authoritative_envelope.get("final_verdict", {}))
+        verdict = self._authoritative_service.extract_final_verdict(reply.data)
+        if not verdict:
+            verdict = dict(authoritative_envelope.get("final_verdict", {}))
         if verdict:
             with self._lock:
-                self._last_final_verdict = verdict
+                self._last_final_verdict = dict(verdict)
         if authoritative_envelope:
             with self._lock:
                 self._authoritative_envelope = authoritative_envelope

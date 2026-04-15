@@ -1,1 +1,0 @@
-{"ok": true, "report": "verification_execution_report.json", "summary": "executed phases: python, mock; repository proof closed; profile gate proof closed; binding mode: contract_shell; treat result as 已静态确认 + 已沙箱验证 only; 未真实环境验证 remains true (no live evidence bundle supplied)", "tiers": {"已静态确认": true, "已沙箱验证": true, "未真实环境验证": true}}

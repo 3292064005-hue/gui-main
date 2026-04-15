@@ -8,6 +8,8 @@ namespace robot_core {
 
 namespace {
 
+// Generated registry metadata carries signatures such as
+// "CONTACT_STABLE|PAUSED_HOLD" for state-aware command guards.
 std::vector<std::string> splitStates(const char* signature) {
   std::vector<std::string> items;
   if (signature == nullptr || *signature == '\0') return items;
@@ -35,68 +37,7 @@ const std::unordered_map<std::string, const CommandRegistryEntry*>& commandRegis
 
 const std::vector<CommandRegistryEntry>& commandRegistry() {
   static const std::vector<CommandRegistryEntry> kRegistry = {
-      {"connect_robot", true, "BOOT|DISCONNECTED", "hardware_lifecycle_write"},
-      {"disconnect_robot", true, "BOOT|DISCONNECTED|CONNECTED|POWERED|AUTO_READY|FAULT|ESTOP", "hardware_lifecycle_write"},
-      {"power_on", true, "CONNECTED|POWERED|AUTO_READY", "hardware_lifecycle_write"},
-      {"power_off", true, "CONNECTED|POWERED|AUTO_READY|SESSION_LOCKED|PATH_VALIDATED", "hardware_lifecycle_write"},
-      {"set_auto_mode", true, "POWERED|AUTO_READY", "hardware_lifecycle_write"},
-      {"set_manual_mode", true, "CONNECTED|POWERED|AUTO_READY", "hardware_lifecycle_write"},
-      {"validate_setup", true, "CONNECTED|POWERED|AUTO_READY|SESSION_LOCKED|PATH_VALIDATED", "runtime_validation"},
-      {"validate_scan_plan", false, "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", "plan_compile"},
-      {"compile_scan_plan", false, "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", "plan_compile"},
-      {"query_final_verdict", false, "*", "runtime_read"},
-      {"query_controller_log", false, "*", "runtime_read"},
-      {"query_rl_projects", false, "*", "runtime_read"},
-      {"query_path_lists", false, "*", "runtime_read"},
-      {"get_io_snapshot", false, "*", "runtime_read"},
-      {"get_register_snapshot", false, "*", "runtime_read"},
-      {"get_safety_config", false, "*", "runtime_read"},
-      {"get_motion_contract", false, "*", "runtime_read"},
-      {"get_runtime_alignment", false, "*", "runtime_read"},
-      {"get_xmate_model_summary", false, "*", "runtime_read"},
-      {"get_sdk_runtime_config", false, "*", "runtime_read"},
-      {"get_identity_contract", false, "*", "runtime_read"},
-      {"get_robot_family_contract", false, "*", "runtime_read"},
-      {"get_vendor_boundary_contract", false, "*", "runtime_read"},
-      {"get_clinical_mainline_contract", false, "*", "runtime_read"},
-      {"get_session_drift_contract", false, "*", "runtime_read"},
-      {"get_hardware_lifecycle_contract", false, "*", "runtime_read"},
-      {"get_rt_kernel_contract", false, "*", "runtime_read"},
-      {"get_session_freeze", false, "*", "runtime_read"},
-      {"get_authoritative_runtime_envelope", false, "*", "runtime_read"},
-      {"get_control_governance_contract", false, "*", "runtime_read"},
-      {"get_controller_evidence", false, "*", "runtime_read"},
-      {"get_dual_state_machine_contract", false, "*", "runtime_read"},
-      {"get_mainline_executor_contract", false, "*", "runtime_read"},
-      {"get_recovery_contract", false, "*", "runtime_read"},
-      {"get_safety_recovery_contract", false, "*", "runtime_read"},
-      {"get_capability_contract", false, "*", "runtime_read"},
-      {"get_model_authority_contract", false, "*", "runtime_read"},
-      {"get_release_contract", false, "*", "runtime_read"},
-      {"get_deployment_contract", false, "*", "runtime_read"},
-      {"get_fault_injection_contract", false, "*", "runtime_read"},
-      {"inject_fault", true, "*", "fault_injection_write"},
-      {"clear_injected_faults", true, "*", "fault_injection_write"},
-      {"lock_session", true, "AUTO_READY", "session_freeze_write"},
-      {"load_scan_plan", true, "SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", "session_freeze_write"},
-      {"approach_prescan", true, "PATH_VALIDATED", "rt_motion_write"},
-      {"seek_contact", true, "PATH_VALIDATED|APPROACHING|PAUSED_HOLD|RECOVERY_RETRACT", "rt_motion_write"},
-      {"start_scan", true, "CONTACT_STABLE|PAUSED_HOLD", "rt_motion_write"},
-      {"pause_scan", true, "SCANNING", "rt_motion_write"},
-      {"resume_scan", true, "PAUSED_HOLD", "rt_motion_write"},
-      {"safe_retreat", true, "PATH_VALIDATED|APPROACHING|CONTACT_SEEKING|CONTACT_STABLE|SCANNING|PAUSED_HOLD|RECOVERY_RETRACT|FAULT", "rt_motion_write"},
-      {"go_home", true, "CONNECTED|POWERED|AUTO_READY|PATH_VALIDATED|SCAN_COMPLETE|SEGMENT_ABORTED|PLAN_ABORTED", "nrt_motion_write"},
-      {"run_rl_project", true, "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", "nrt_motion_write"},
-      {"pause_rl_project", true, "AUTO_READY|SCANNING|PAUSED_HOLD|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", "nrt_motion_write"},
-      {"enable_drag", true, "CONNECTED", "nrt_motion_write"},
-      {"disable_drag", true, "CONNECTED", "nrt_motion_write"},
-      {"replay_path", true, "AUTO_READY|PATH_VALIDATED|SCAN_COMPLETE", "nrt_motion_write"},
-      {"start_record_path", true, "CONNECTED", "nrt_motion_write"},
-      {"stop_record_path", true, "CONNECTED", "nrt_motion_write"},
-      {"cancel_record_path", true, "CONNECTED", "nrt_motion_write"},
-      {"save_record_path", true, "CONNECTED", "nrt_motion_write"},
-      {"clear_fault", true, "FAULT", "recovery_write"},
-      {"emergency_stop", true, "*", "recovery_write"},
+#include "robot_core/generated_command_manifest.inc"
   };
   return kRegistry;
 }
@@ -131,6 +72,52 @@ std::vector<std::string> commandStatePreconditions(const std::string& command) {
 std::string commandCapabilityClaim(const std::string& command) {
   const auto* entry = findCommandRegistryEntry(command);
   return entry == nullptr || entry->capability_claim == nullptr ? std::string{} : std::string(entry->capability_claim);
+}
+
+std::string commandCanonicalName(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->canonical_command == nullptr ? command : std::string(entry->canonical_command);
+}
+
+std::string commandAliasKind(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->alias_kind == nullptr ? std::string{} : std::string(entry->alias_kind);
+}
+
+std::string commandHandlerGroup(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->handler_group == nullptr ? std::string{} : std::string(entry->handler_group);
+}
+
+std::string commandDeprecationStage(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->deprecation_stage == nullptr ? std::string{} : std::string(entry->deprecation_stage);
+}
+
+std::string commandRemovalTarget(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->removal_target == nullptr ? std::string{} : std::string(entry->removal_target);
+}
+
+std::string commandReplacementCommand(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->replacement_command == nullptr ? std::string{} : std::string(entry->replacement_command);
+}
+
+std::string commandCompatibilityNote(const std::string& command) {
+  const auto* entry = findCommandRegistryEntry(command);
+  return entry == nullptr || entry->compatibility_note == nullptr ? std::string{} : std::string(entry->compatibility_note);
+}
+
+CommandRuntimeLane commandRuntimeLane(const std::string& command) {
+  const auto capability_claim = commandCapabilityClaim(command);
+  if (capability_claim == "rt_motion_write") {
+    return CommandRuntimeLane::RtControl;
+  }
+  if (capability_claim == "runtime_read" || capability_claim == "runtime_validation" || capability_claim == "plan_compile") {
+    return CommandRuntimeLane::Query;
+  }
+  return CommandRuntimeLane::Command;
 }
 
 std::size_t commandRegistrySize() {

@@ -5,6 +5,7 @@ from typing import Any
 
 from spine_ultrasound_ui.core.command_journal import summarize_command_payload
 from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope
+from spine_ultrasound_ui.services.runtime_command_catalog import canonical_command_name, command_alias_kind
 from spine_ultrasound_ui.utils import now_ns
 
 RECENT_COMMAND_HISTORY_LIMIT = 20
@@ -60,8 +61,14 @@ class CommandAuditService:
             No exceptions are raised.
         """
         context = dict((payload or {}).get("_command_context", {}))
+        reply_data = dict(getattr(reply, "data", {}) or {})
+        canonical = str(reply_data.get("canonical_command") or canonical_command_name(command) or command)
         record = {
-            "command": command,
+            "requested_command": command,
+            "command": canonical,
+            "canonical_command": canonical,
+            "alias_kind": str(reply_data.get("alias_kind") or command_alias_kind(command) or "canonical"),
+            "deprecated_alias": bool(reply_data.get("deprecated_alias", False)),
             "payload": summarize_command_payload(payload),
             "ok": bool(reply.ok),
             "message": str(reply.message),

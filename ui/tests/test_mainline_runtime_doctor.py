@@ -110,3 +110,37 @@ def test_mainline_runtime_doctor_blocks_mock_runtime_when_profile_requires_live_
     assert result['summary_state'] == 'blocked'
     names = {item['name'] for item in result['blockers']}
     assert 'sdk_not_live' in names or 'vendor_boundary_not_live' in names
+
+
+def test_mainline_runtime_doctor_blocks_rt_quality_budget_violations() -> None:
+    service = MainlineRuntimeDoctorService()
+    config = RuntimeConfig()
+    result = service.inspect(
+        config=config,
+        sdk_runtime={
+            "control_governance_contract": {"single_control_source_required": True, "session_binding_valid": True, "runtime_config_bound": True},
+            "clinical_mainline_contract": {"clinical_mainline_mode": "cartesianImpedance"},
+            "motion_contract": {"rt_mode": "cartesianImpedance", "nrt_contract": {}, "rt_contract": {}},
+            "session_freeze": {"session_locked": True},
+            "model_authority_contract": {"planner_supported": True, "xmate_model_supported": True},
+            "runtime_alignment": {"sdk_available": True},
+            "environment_doctor": {"summary_state": "ready", "summary_label": "ok", "detail": "ok"},
+            "rt_kernel_contract": {
+                "summary_state": "ready",
+                "monitors": {"reference_limiter": True, "freshness_guard": True, "jitter_monitor": True, "network_guard": True},
+                "fixed_period_enforced": True,
+                "network_healthy": True,
+                "overrun_count": 1,
+                "current_period_ms": 1.0,
+                "max_cycle_ms": 1.35,
+                "last_wake_jitter_ms": 0.45,
+                "jitter_budget_ms": 0.2,
+                "rt_quality_gate_passed": False,
+            },
+        },
+        backend_link={"mode": "core", "control_plane": {"control_authority": {"summary_state": "ready"}}},
+        model_report={"final_verdict": {"accepted": True}},
+        session_governance={"summary_state": "ready"},
+    )
+    names = {item["name"] for item in result["blockers"]}
+    assert {"rt_cycle_overrun_detected", "rt_wake_jitter_budget_exceeded", "rt_cycle_budget_exceeded", "rt_quality_gate_failed"} <= names

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session/authority_metadata_v1.schema.json",
+  "title": "AuthorityMetadataV1",
+  "type": "object",
+  "required": [
+    "source_class",
+    "authority_level",
+    "fallback_reason",
+    "effective_source_path",
+    "sidecar_selected",
+    "source_contamination_flags",
+    "review_suitability"
+  ],
+  "properties": {
+    "source_class": {"type": "string"},
+    "authority_level": {"type": "string"},
+    "fallback_reason": {"type": "string"},
+    "effective_source_path": {"type": "string"},
+    "sidecar_selected": {"type": "boolean"},
+    "source_contamination_flags": {"type": "array", "items": {"type": "string"}},
+    "review_suitability": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

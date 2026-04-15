@@ -1,21 +1,65 @@
 # Local TLS material generated for robot_core / headless IPC
-configs/tls/runtime/*.crt
-configs/tls/runtime/*.key
-configs/tls/*.key
+configs/tls/runtime/
+configs/tls/**/*.crt
+configs/tls/**/*.csr
+configs/tls/**/*.key
+*.pem
 
-# Runtime workspace state
+# Runtime workspace state and local operator data
 workspace/
 data/runtime/*.json
+configs/runtime/*.local.*
+configs/**/*.local.yaml
+configs/**/*.local.yml
+configs/**/*.local.json
+runtime/*.pid
+runtime/*.sock
+runtime/**/*.pid
+runtime/**/*.sock
 
-# Python cache
+# Python environments and cache
+.venv/
+venv/
+env/
+ENV/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
-# Native build trees
+# Native build trees and CMake scratch files
 cpp_robot_core/build/
 cpp_robot_core/build*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json
+**/CTestTestfile.cmake
+**/Testing/
+
+# Generated logs, reports, and local verification scratch output
+*.log
+*.tmp
+*.bak
+*.swp
+final_acceptance.log
+full_suite.log
+pytest_full.log
+pytest_mainline.log
+artifacts/verification/sandbox_repository_proof/
+artifacts/verification/tmp/
+artifacts/verification/local/
+
+# Generated postprocess/session manifests
+derived/postprocess/postprocess_stage_manifest.json
+derived/session/session_intelligence_manifest.json
 
 # Frontend build artifacts and dependencies
 ui_frontend/node_modules/
@@ -24,6 +68,11 @@ ui_frontend/playwright-report/
 ui_frontend/test-results/
 ui_frontend/coverage/
 ui_frontend/openapi/spine-openapi.json
-
-# Generated browser/cache files
 *.tsbuildinfo
+
+# Editor, OS, and tool metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace

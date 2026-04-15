@@ -43,12 +43,21 @@ on_error() {
 
 cleanup_generated_artifacts() {
   rm -rf "${BUILD_DIR}" 2>/dev/null || true
-  find "${REPO_ROOT}" -path "${REPO_ROOT}/.git" -prune -o -type d \( -name __pycache__ -o -name .pytest_cache \) -exec rm -rf {} + 2>/dev/null || true
-  find "${REPO_ROOT}" -path "${REPO_ROOT}/.git" -prune -o -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+  local cleanup_roots=(
+    "${REPO_ROOT}/spine_ultrasound_ui"
+    "${REPO_ROOT}/tests"
+    "${REPO_ROOT}/scripts"
+    "${REPO_ROOT}/runtime"
+  )
+  local root
+  for root in "${cleanup_roots[@]}"; do
+    [[ -d "${root}" ]] || continue
+    find "${root}" -type d \( -name __pycache__ -o -name .pytest_cache \) -prune -exec rm -rf {} + 2>/dev/null || true
+    find "${root}" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+  done
 }
 
 trap 'on_error "${LINENO}" "${BASH_COMMAND}"' ERR
-trap cleanup_generated_artifacts EXIT
 
 if [[ -z "${BUILD_DIR}" ]]; then
   BUILD_DIR=$(mktemp -d /tmp/gui_main_cpp_mainline_build.XXXXXX)
@@ -58,6 +67,7 @@ else
 fi
 
 cd "${REPO_ROOT}"
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cleanup_generated_artifacts
 
 emit_phase_scope_note() {
@@ -85,7 +95,11 @@ run_repository_gates() {
   CURRENT_PHASE="repository-gates"
   bash scripts/check_repo_hygiene.sh
   "$PYTHON_BIN" scripts/strict_convergence_audit.py
+  "$PYTHON_BIN" scripts/generate_runtime_command_artifacts.py
   "$PYTHON_BIN" scripts/check_protocol_sync.py
+  "$PYTHON_BIN" scripts/check_backend_authority_parity.py
+  "$PYTHON_BIN" scripts/check_rt_purity_gate.py
+  "$PYTHON_BIN" scripts/check_rt_quality_gate.py
   "$PYTHON_BIN" scripts/check_robot_identity_registry.py
   "$PYTHON_BIN" scripts/check_python_compile.py
   "$PYTHON_BIN" scripts/check_canonical_imports.py
@@ -110,9 +124,9 @@ run_python_gate() {
   if [[ "${FULL_TESTS}" == "1" ]]; then
     "$PYTHON_BIN" scripts/run_pytest_mainline.py -q
   else
-    run_python_pytest_batch control-plane       tests/test_api_contract.py       tests/test_api_security.py       tests/test_control_plane.py       tests/test_control_ownership.py       tests/test_runtime_verdict.py       tests/test_headless_runtime.py
-    run_python_pytest_batch release-state       tests/test_release_gate.py       tests/test_replay_determinism.py       tests/test_profile_policy.py       tests/test_spawned_core_integration.py       tests/test_vendor_sdk_and_identity.py
-    run_python_pytest_batch repository-gates       tests/test_p2_stage_manifests.py       tests/test_p2_repository_gates.py       tests/test_sdk_runtime_assets_and_model_precheck.py       tests/test_mainline_runtime_doctor.py       tests/test_xmate_mainline.py
+    run_python_pytest_batch control-plane       tests/test_runtime_refactor_guards.py       tests/test_backend_link_and_api_bridge.py       tests/test_api_bridge_verdict_service.py       tests/test_control_ownership.py       tests/test_runtime_verdict.py       tests/test_headless_adapter_surface_refactor.py
+    run_python_pytest_batch release-state       tests/test_runtime_verdict_authority_contract.py       tests/test_control_authority_claims.py       tests/test_guidance_freeze_contracts.py       tests/test_runtime_mode_policy.py       tests/test_vendor_sdk_and_identity.py
+    run_python_pytest_batch repository-gates       tests/test_p2_stage_manifests.py       tests/test_p2_repository_gates.py       tests/test_sdk_runtime_assets_and_model_precheck.py       tests/test_mainline_runtime_doctor.py       tests/test_xmate_mainline.py       tests/test_architecture_fitness.py
     run_python_pytest_batch preweight-closure       tests/test_preweight_semantic_closure.py
     if [[ "${INCLUDE_ARCHIVE_COMPAT}" == "1" ]]; then
       run_python_pytest_batch archive-compat         tests/archive/test_robot_family_and_profiles_v2.py         tests/archive/test_runtime_contracts_v3.py         tests/archive/test_runtime_contract_enforcement_v4.py

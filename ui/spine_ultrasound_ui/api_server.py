@@ -76,53 +76,14 @@ class ApiServerSettings:
         )
 
 
-api_server_settings = ApiServerSettings.from_env()
-_runtime_container: ApiRuntimeContainer | None = None
-adapter: HeadlessAdapter | None = None
-deployment_profile_service: DeploymentProfileService | None = None
-command_guard_service: ApiCommandGuardService | None = None
-api_command_guard_service: ApiCommandGuardService | None = None
+DEFAULT_API_SERVER_SETTINGS = ApiServerSettings.from_env()
 
 
-def _ensure_runtime_container() -> ApiRuntimeContainer:
-    global _runtime_container
-    if _runtime_container is None:
-        _runtime_container = ApiRuntimeContainer.build(settings=api_server_settings)
-    return _runtime_container
-
-
-def _resolve_runtime_container(app: FastAPI | None = None) -> ApiRuntimeContainer:
-    """Resolve the runtime container for a specific app instance.
-
-    App-local state takes precedence when an explicit FastAPI instance is
-    provided so multi-instance tests and deployments do not accidentally reuse a
-    previously initialized module-level singleton.
-    """
-    if app is not None and hasattr(app.state, "runtime_container"):
-        return app.state.runtime_container  # type: ignore[return-value]
-    if _runtime_container is not None:
-        return _runtime_container
-    return _ensure_runtime_container()
-
-
-def _resolve_adapter(app: FastAPI | None = None) -> HeadlessAdapter:
-    if adapter is not None:
-        return adapter
-    return _resolve_runtime_container(app).runtime_adapter
-
-
-def _resolve_profile_service(app: FastAPI | None = None) -> DeploymentProfileService:
-    if deployment_profile_service is not None:
-        return deployment_profile_service
-    return _resolve_runtime_container(app).deployment_profile_service
-
-
-def _resolve_command_guard_service(app: FastAPI | None = None) -> ApiCommandGuardService:
-    if command_guard_service is not None:
-        return command_guard_service
-    if api_command_guard_service is not None:
-        return api_command_guard_service
-    return _resolve_runtime_container(app).command_guard_service
+def _runtime_container_from_app(app: FastAPI) -> ApiRuntimeContainer:
+    container = getattr(app.state, "runtime_container", None)
+    if container is None:  # pragma: no cover - indicates create_app misuse
+        raise RuntimeError("FastAPI app is missing runtime_container state")
+    return container
 
 
 def create_app(
@@ -150,12 +111,11 @@ def create_app(
         Configured FastAPI application.
 
     Boundary behavior:
-        Module-level monkeypatched overrides remain supported for backward
-        compatibility, but app-local runtime containers are now stored on
-        ``app.state`` so tests and multi-instance deployments do not share a
-        hidden singleton by default.
+        The application stores its runtime dependencies on ``app.state``.
+        There is no module-level singleton fallback; every instance must resolve
+        dependencies from its own composition root.
     """
-    resolved_settings = settings or api_server_settings
+    resolved_settings = settings or DEFAULT_API_SERVER_SETTINGS
     resolved_container = runtime_container or ApiRuntimeContainer.build(settings=resolved_settings)
     origins = list(allowed_origins or resolved_settings.allowed_origins)
 
@@ -166,17 +126,17 @@ def create_app(
     def _app_adapter() -> HeadlessAdapter:
         if adapter_getter is not None:
             return adapter_getter()
-        return _resolve_adapter(fastapi_app)
+        return _runtime_container_from_app(fastapi_app).runtime_adapter
 
     def _app_profile_service() -> DeploymentProfileService:
         if profile_service_getter is not None:
             return profile_service_getter()
-        return _resolve_profile_service(fastapi_app)
+        return _runtime_container_from_app(fastapi_app).deployment_profile_service
 
     def _app_command_guard() -> ApiCommandGuardService:
         if command_guard_getter is not None:
             return command_guard_getter()
-        return _resolve_command_guard_service(fastapi_app)
+        return _runtime_container_from_app(fastapi_app).command_guard_service
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

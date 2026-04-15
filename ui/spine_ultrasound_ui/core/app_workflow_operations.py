@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from spine_ultrasound_ui.models import WorkflowArtifacts
-from spine_ultrasound_ui.services.authoritative_artifact_reader import AuthoritativeArtifactReader
+from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.services.force_control_config import load_force_control_config
 from spine_ultrasound_ui.services.scan_plan_contract import runtime_scan_plan_payload
 
 
 
 
-_ARTIFACT_READER = AuthoritativeArtifactReader()
+_ARTIFACT_READER = SessionProductsAuthoritySurface()
 
 
 def _read_effective_cobb_measurement(session_dir: Path) -> dict[str, Any]:

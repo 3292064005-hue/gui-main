@@ -18,6 +18,7 @@ This checklist closes the remaining non-sandboxable risk items for the RT phase-
 3. `query_runtime_alignment` reports:
    - `control_source_exclusive = true`
    - `preferred_link = wired_direct`
+   - `allow_contract_shell_writes = false`
 4. NRT smoke:
    - `go_home` completes without error
    - `safe_retreat` completes without error

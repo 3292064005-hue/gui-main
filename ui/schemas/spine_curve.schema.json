@@ -12,7 +12,8 @@
     "scan_corridor": {"type": "object"},
     "points": {"type": "array", "items": {"type": "object"}},
     "fit": {"type": "object"},
-    "evidence_refs": {"type": "array", "items": {"type": "object"}}
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "authority_metadata": {"$ref": "session/authority_metadata_v1.schema.json"}
   },
   "additionalProperties": true
 }

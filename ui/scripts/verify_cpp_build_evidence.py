@@ -18,6 +18,9 @@ KEY_TARGETS = [
 ]
 
 KEY_SOURCES = [
+    'cpp_robot_core/src/command_registry.cpp',
+    'cpp_robot_core/src/core_runtime.cpp',
+    'cpp_robot_core/src/runtime_state_store.cpp',
     'cpp_robot_core/src/sdk_robot_facade.cpp',
     'cpp_robot_core/src/rt_motion_service.cpp',
     'cpp_robot_core/src/core_runtime_session_execution.cpp',

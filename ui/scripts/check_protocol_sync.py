@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -19,8 +20,14 @@ PROTO_PATH = ROOT / 'cpp_robot_core' / 'proto' / 'ipc_messages.proto'
 CPP_HEADER_PATH = ROOT / 'cpp_robot_core' / 'include' / 'ipc_messages.pb.h'
 CPP_SOURCE_PATH = ROOT / 'cpp_robot_core' / 'src' / 'ipc_messages.pb.cpp'
 PY_PB2_PATH = ROOT / 'spine_ultrasound_ui' / 'services' / 'ipc_messages_pb2.py'
-PY_COMMAND_CATALOG_PATH = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_command_catalog.py'
-CPP_COMMAND_REGISTRY_PATH = ROOT / 'cpp_robot_core' / 'src' / 'command_registry.cpp'
+MANIFEST_PATH = ROOT / 'schemas' / 'runtime_command_manifest.json'
+CPP_COMMAND_REGISTRY_INC_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_command_manifest.inc'
+CPP_TYPED_CONTRACTS_INC_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_contracts.inc'
+CPP_TYPED_REQUEST_TYPES_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_request_types.h'
+CPP_TYPED_REQUEST_PARSERS_INC_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_request_parsers.inc'
+CPP_TYPED_HANDLER_DECLS_INC_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_typed_handler_decls.inc'
+CPP_TYPED_HANDLER_ADAPTERS_INC_PATH = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_typed_handlers.inc'
+PY_TYPED_CONTRACTS_PATH = ROOT / 'spine_ultrasound_ui' / 'contracts' / 'generated' / 'runtime_command_contracts.json'
 
 
 @dataclass(frozen=True)
@@ -55,17 +62,8 @@ def parse_proto_specs(source: str) -> dict[str, MessageSpec]:
 def descriptor_specs(ipc_messages_pb2) -> dict[str, MessageSpec]:
     file_desc = ipc_messages_pb2.DESCRIPTOR
     specs: dict[str, MessageSpec] = {}
-    label_map = {
-        1: 'optional',
-        3: 'repeated',
-    }
-    type_map = {
-        1: 'double',
-        3: 'int64',
-        5: 'int32',
-        8: 'bool',
-        9: 'string',
-    }
+    label_map = {1: 'optional', 3: 'repeated'}
+    type_map = {1: 'double', 3: 'int64', 5: 'int32', 8: 'bool', 9: 'string'}
     for msg_desc in file_desc.message_types_by_name.values():
         fields = []
         for field in msg_desc.fields:
@@ -129,39 +127,57 @@ def _load_pb2():
     return ipc_messages_pb2, ''
 
 
-
-def parse_python_command_catalog(source: str) -> dict[str, dict[str, object]]:
-    import ast
-
-    def literal(node: ast.AST):
-        return ast.literal_eval(node)
-
-    module = ast.parse(source)
-    for node in module.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "COMMAND_SPECS" and isinstance(node.value, ast.Dict):
-                    return literal(node.value)
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "COMMAND_SPECS" and isinstance(node.value, ast.Dict):
-            return literal(node.value)
-    return {}
-
-
-def parse_cpp_command_registry(source: str) -> dict[str, dict[str, object]]:
-    pattern = re.compile(r'\{"([a-z_]+)",\s*(true|false),\s*"([^"]*)",\s*"([^"]*)"\}')
+def parse_manifest(path: Path) -> dict[str, dict[str, object]]:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+    commands = payload.get('commands', [])
     registry: dict[str, dict[str, object]] = {}
-    for command, write_flag, state_signature, capability_claim in pattern.findall(source):
+    for item in commands:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get('name', '')).strip()
+        if not name:
+            continue
+        registry[name] = {str(key): item[key] for key in item if key != 'name'}
+    return registry
+
+
+def parse_cpp_manifest_inc(source: str) -> dict[str, dict[str, object]]:
+    pattern = re.compile(
+        r'\{"([a-z_]+)",\s*(true|false),\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)"\}'
+    )
+    registry: dict[str, dict[str, object]] = {}
+    for (
+        command,
+        write_flag,
+        state_signature,
+        capability_claim,
+        canonical_command,
+        alias_kind,
+        handler_group,
+        deprecation_stage,
+        removal_target,
+        replacement_command,
+        compatibility_note,
+    ) in pattern.findall(source):
         registry[command] = {
-            "write_command": write_flag == "true",
-            "state_preconditions": [item for item in state_signature.split('|') if item],
-            "capability_claim": capability_claim,
+            'write_command': write_flag == 'true',
+            'state_preconditions': [item for item in state_signature.split('|') if item],
+            'capability_claim': capability_claim,
+            'canonical_command': canonical_command,
+            'alias_kind': alias_kind,
+            'handler_group': handler_group,
+            'deprecation_stage': deprecation_stage,
+            'removal_target': removal_target,
+            'replacement_command': replacement_command,
+            'compatibility_note': compatibility_note,
         }
     return registry
+
 
 def main() -> int:
     issues: list[str] = []
     try:
-        for path in (PROTO_PATH, CPP_HEADER_PATH, CPP_SOURCE_PATH, PY_PB2_PATH, PY_COMMAND_CATALOG_PATH, CPP_COMMAND_REGISTRY_PATH):
+        for path in (PROTO_PATH, CPP_HEADER_PATH, CPP_SOURCE_PATH, PY_PB2_PATH, MANIFEST_PATH, CPP_COMMAND_REGISTRY_INC_PATH, CPP_TYPED_CONTRACTS_INC_PATH, CPP_TYPED_REQUEST_TYPES_PATH, CPP_TYPED_REQUEST_PARSERS_INC_PATH, CPP_TYPED_HANDLER_DECLS_INC_PATH, CPP_TYPED_HANDLER_ADAPTERS_INC_PATH, PY_TYPED_CONTRACTS_PATH):
             if not path.exists():
                 issues.append(f'missing required protocol asset: {path}')
         if issues:
@@ -173,8 +189,13 @@ def main() -> int:
         header_text = CPP_HEADER_PATH.read_text(encoding='utf-8')
         source_text = CPP_SOURCE_PATH.read_text(encoding='utf-8')
         py_pb2_text = PY_PB2_PATH.read_text(encoding='utf-8')
-        py_command_catalog_text = PY_COMMAND_CATALOG_PATH.read_text(encoding='utf-8')
-        cpp_command_registry_text = CPP_COMMAND_REGISTRY_PATH.read_text(encoding='utf-8')
+        cpp_manifest_inc_text = CPP_COMMAND_REGISTRY_INC_PATH.read_text(encoding='utf-8')
+        cpp_typed_contracts_text = CPP_TYPED_CONTRACTS_INC_PATH.read_text(encoding='utf-8')
+        cpp_typed_request_types_text = CPP_TYPED_REQUEST_TYPES_PATH.read_text(encoding='utf-8')
+        cpp_typed_request_parsers_text = CPP_TYPED_REQUEST_PARSERS_INC_PATH.read_text(encoding='utf-8')
+        cpp_typed_handler_decls_text = CPP_TYPED_HANDLER_DECLS_INC_PATH.read_text(encoding='utf-8')
+        cpp_typed_handler_adapters_text = CPP_TYPED_HANDLER_ADAPTERS_INC_PATH.read_text(encoding='utf-8')
+        typed_contract_text = PY_TYPED_CONTRACTS_PATH.read_text(encoding='utf-8')
 
         proto_specs = parse_proto_specs(proto_text)
         ipc_messages_pb2, pb2_error = _load_pb2()
@@ -199,34 +220,81 @@ def main() -> int:
         if 'Generated by the protocol buffer compiler' not in py_pb2_text:
             issues.append('Python pb2 file no longer advertises generated contract header')
 
-        python_catalog = parse_python_command_catalog(py_command_catalog_text)
-        cpp_catalog = parse_cpp_command_registry(cpp_command_registry_text)
+        manifest_catalog = parse_manifest(MANIFEST_PATH)
+        from spine_ultrasound_ui.services.runtime_command_catalog import COMMAND_SPECS, catalog_schema_version
+        from spine_ultrasound_ui.services.runtime_command_contracts import export_contract_document
+        python_catalog = dict(COMMAND_SPECS)
+        cpp_catalog = parse_cpp_manifest_inc(cpp_manifest_inc_text)
+        generated_contract_catalog = json.loads(typed_contract_text)
         python_commands = set(python_catalog)
+        manifest_commands = set(manifest_catalog)
         cpp_commands = set(cpp_catalog)
-        if python_commands != cpp_commands:
-            issues.append(f'command catalog mismatch: python={sorted(python_commands)} cpp={sorted(cpp_commands)}')
-        for command in sorted(python_commands & cpp_commands):
-            py_spec = dict(python_catalog.get(command, {}))
+        if not (manifest_commands == python_commands == cpp_commands):
+            issues.append(f'command catalog mismatch: manifest={sorted(manifest_commands)} python={sorted(python_commands)} cpp={sorted(cpp_commands)}')
+
+
+        if 'RuntimeCommandResponseContract' not in cpp_typed_contracts_text:
+            issues.append('generated C++ typed runtime command contracts must expose response contracts')
+        if 'RuntimeCommandGuardContract' not in cpp_typed_contracts_text:
+            issues.append('generated C++ typed runtime command contracts must expose guard contracts')
+
+        if 'using RuntimeTypedRequestVariant = std::variant<' not in cpp_typed_request_types_text:
+            issues.append('generated C++ typed request family must expose RuntimeTypedRequestVariant')
+        if 'ConnectRobotRequest' not in cpp_typed_request_types_text or 'LockSessionRequest' not in cpp_typed_request_types_text:
+            issues.append('generated C++ typed request family must include field-bearing request structs')
+        if 'if (command == "connect_robot")' not in cpp_typed_request_parsers_text or 'if (command == "lock_session")' not in cpp_typed_request_parsers_text:
+            issues.append('generated C++ typed request parsers must cover field-bearing commands')
+
+        expected_contract_catalog = export_contract_document()
+        if generated_contract_catalog != expected_contract_catalog:
+            issues.append('generated typed runtime command contracts are out of sync with the manifest-backed export surface')
+
+        schema_version = json.loads(MANIFEST_PATH.read_text(encoding='utf-8')).get('schema_version', 1)
+        if int(schema_version or 1) != catalog_schema_version():
+            issues.append(f'catalog schema_version mismatch: manifest={schema_version} python={catalog_schema_version()}')
+
+        for command in sorted(manifest_commands & python_commands & cpp_commands):
+            manifest_spec = dict(manifest_catalog.get(command, {}))
+            python_spec = dict(python_catalog.get(command, {}))
             cpp_spec = dict(cpp_catalog.get(command, {}))
-            py_write = bool(py_spec.get("write_command", True))
-            cpp_write = bool(cpp_spec.get("write_command", True))
-            if py_write != cpp_write:
-                issues.append(f'command write flag mismatch for {command}: python={py_write} cpp={cpp_write}')
-            py_states = list(py_spec.get("state_preconditions", []))
-            cpp_states = list(cpp_spec.get("state_preconditions", []))
-            if py_states != cpp_states:
-                issues.append(f'command state preconditions mismatch for {command}: python={py_states} cpp={cpp_states}')
-            py_claim = str(py_spec.get("capability_claim", ""))
-            cpp_claim = str(cpp_spec.get("capability_claim", ""))
-            if py_claim != cpp_claim:
-                issues.append(f'command capability claim mismatch for {command}: python={py_claim} cpp={cpp_claim}')
+            for key in (
+                'write_command',
+                'state_preconditions',
+                'capability_claim',
+                'canonical_command',
+                'alias_kind',
+                'handler_group',
+                'deprecation_stage',
+                'removal_target',
+                'replacement_command',
+                'compatibility_note',
+            ):
+                manifest_value = manifest_spec.get(key)
+                python_value = python_spec.get(key)
+                cpp_value = cpp_spec.get(key)
+                if key == 'write_command':
+                    if manifest_value != python_value:
+                        issues.append(f'command write flag mismatch for {command}: manifest={manifest_value!r} python={python_value!r}')
+                    if manifest_value != cpp_value:
+                        issues.append(f'command write flag mismatch for {command}: manifest={manifest_value!r} cpp={cpp_value!r}')
+                    continue
+                if key == 'state_preconditions':
+                    if manifest_value != python_value:
+                        issues.append(f'command state preconditions mismatch for {command}: manifest={manifest_value!r} python={python_value!r}')
+                    if manifest_value != cpp_value:
+                        issues.append(f'command state preconditions mismatch for {command}: manifest={manifest_value!r} cpp={cpp_value!r}')
+                    continue
+                if manifest_value != python_value:
+                    issues.append(f'manifest/python mismatch for {command}.{key}: manifest={manifest_value!r} python={python_value!r}')
+                if manifest_value != cpp_value:
+                    issues.append(f'manifest/cpp mismatch for {command}.{key}: manifest={manifest_value!r} cpp={cpp_value!r}')
 
         if issues:
             for issue in issues:
                 print(f'[FAIL] {issue}')
             return 1
 
-        print('[PASS] protocol source, Python pb2, and C++ wire codec remain aligned')
+        print('[PASS] protocol source, manifest, Python catalog, and generated C++ registry remain aligned')
         return 0
     finally:
         _cleanup_generated_python_artifacts()

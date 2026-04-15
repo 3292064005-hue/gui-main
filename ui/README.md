@@ -21,6 +21,7 @@
 - `sdk_robot_class = xMateRobot`
 - `axis_count = 6`
 - `preferred_link = wired_direct`
+- `allow_contract_shell_writes = false`
 - RT 主线固定为 `cartesianImpedance`
 - 真实 SDK 绑定仅允许在 `cpp_robot_core` 内建立
 
@@ -307,3 +308,12 @@ Headless/session read APIs now operate in **materialized-only** mode for session
 
 
 真实环境验证必须提供 `scripts/package_live_evidence_bundle.py` 生成的归档证据包；`scripts/write_verification_report.py --live-evidence-bundle ...` 现在会校验证据包是否真实存在且结构完整，单独给一个路径字符串不再被当成 live-controller proof。
+
+
+## Runtime command manifest and active gate policy
+
+- `schemas/runtime_command_manifest.json` is the canonical runtime-command source.
+- `spine_ultrasound_ui/services/runtime_command_catalog.py` loads that manifest directly.
+- `cpp_robot_core/include/robot_core/generated_command_manifest.inc` is generated from the same manifest via `python scripts/generate_runtime_command_artifacts.py`.
+- `python scripts/check_protocol_sync.py` verifies manifest/Python/C++ alignment.
+- Stable test files under `tests/` are the current mainline gate. `tests/archive/` remains historical compatibility material and is not the active release gate.

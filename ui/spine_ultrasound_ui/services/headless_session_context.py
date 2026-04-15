@@ -7,6 +7,7 @@ from typing import Any
 from spine_ultrasound_ui.core.command_journal import summarize_command_payload
 from spine_ultrasound_ui.core.session_recorders import JsonlRecorder
 from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope
+from spine_ultrasound_ui.services.runtime_command_catalog import canonical_command_name, command_alias_kind
 from spine_ultrasound_ui.utils import now_ns
 
 
@@ -30,12 +31,18 @@ class HeadlessSessionContext:
     def record_command_journal(self, command: str, payload: dict[str, Any], reply: ReplyEnvelope) -> None:
         if self.command_journal is None:
             return
+        reply_data = dict(getattr(reply, "data", {}) or {})
+        canonical = str(reply_data.get("canonical_command") or canonical_command_name(command) or command)
         self.command_journal.append_event(
             {
                 "ts_ns": now_ns(),
                 "source": "headless",
-                "command": command,
-                "workflow_step": command,
+                "requested_command": command,
+                "command": canonical,
+                "canonical_command": canonical,
+                "alias_kind": str(reply_data.get("alias_kind") or command_alias_kind(command) or "canonical"),
+                "deprecated_alias": bool(reply_data.get("deprecated_alias", False)),
+                "workflow_step": canonical,
                 "auto_action": "",
                 "payload_summary": summarize_command_payload(payload),
                 "reply": {

@@ -28,6 +28,21 @@ class BackendBase:
     def close(self) -> None:
         return None
 
+
+    def resolve_authoritative_runtime_envelope(self) -> dict:
+        """Return the canonical authoritative runtime envelope.
+
+        Returns:
+            Runtime-owned authority/config/freeze/verdict envelope. Empty when
+            the backend cannot currently provide one.
+        """
+        return {}
+
+    def resolve_control_authority(self) -> dict:
+        """Return the canonical control-authority snapshot."""
+        envelope = self.resolve_authoritative_runtime_envelope()
+        return dict(envelope.get("control_authority", {}))
+
     def resolve_final_verdict(self, plan=None, config: Optional[RuntimeConfig] = None, *, read_only: bool) -> dict:
         """Return the canonical authoritative runtime verdict surface.
 

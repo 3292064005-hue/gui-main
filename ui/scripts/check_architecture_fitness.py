@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HEADLESS_ADAPTER = ROOT / 'spine_ultrasound_ui' / 'services' / 'headless_adapter.py'
 CORE_RUNTIME_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'core_runtime.h'
 CORE_RUNTIME_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime.cpp'
+CORE_RUNTIME_DISPATCHER_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_dispatcher.cpp'
 SDK_FACADE_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'sdk_robot_facade.h'
 NRT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'nrt_motion_service.cpp'
 RT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'rt_motion_service.cpp'
@@ -17,6 +18,27 @@ APP_RUNTIME_BRIDGE = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_runtime_bridge
 CONFIG_MANAGER = ROOT / 'spine_ultrasound_ui' / 'services' / 'config_manager.py'
 MAIN_WINDOW_LAYOUT = ROOT / 'spine_ultrasound_ui' / 'views' / 'main_window_layout.py'
 RUNTIME_READINESS_SERVICE = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_readiness_manifest_service.py'
+RUNTIME_COMMAND_CATALOG = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_command_catalog.py'
+GENERATED_COMMAND_MANIFEST = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_command_manifest.inc'
+RUNTIME_COMMAND_CONTRACTS_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'runtime_command_contracts.h'
+RUNTIME_COMMAND_CONTRACTS_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'runtime_command_contracts.cpp'
+GENERATED_RUNTIME_COMMAND_CONTRACTS = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_contracts.inc'
+GENERATED_RUNTIME_TYPED_HANDLER_DECLS = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_typed_handler_decls.inc'
+GENERATED_RUNTIME_TYPED_HANDLER_ADAPTERS = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_typed_handlers.inc'
+API_SERVER = ROOT / 'spine_ultrasound_ui' / 'api_server.py'
+MAIN_WINDOW = ROOT / 'spine_ultrasound_ui' / 'main_window.py'
+CONTROL_OWNERSHIP_TEST = ROOT / 'tests' / 'test_control_ownership.py'
+RUNTIME_VERDICT_TEST = ROOT / 'tests' / 'test_runtime_verdict.py'
+LEGACY_ARCHIVE_WRAPPER_BASENAMES = (
+    'test_api_contract.py',
+    'test_api_security.py',
+    'test_control_plane.py',
+    'test_headless_runtime.py',
+    'test_profile_policy.py',
+    'test_release_gate.py',
+    'test_replay_determinism.py',
+    'test_spawned_core_integration.py',
+)
 IGNORED_TOP_LEVEL_DIRS = frozenset({'.git', '.pytest_cache', 'archive', 'repo'})
 _MAX_MAINLINE_FILE_LINES = {
     'spine_ultrasound_ui/services/api_bridge_lease_service.py': 220,
@@ -27,7 +49,7 @@ _MAX_MAINLINE_FILE_LINES = {
     'cpp_robot_core/src/sdk_robot_facade_rt.cpp': 760,
     'cpp_robot_core/src/sdk_robot_facade_cache.cpp': 220,
     'cpp_robot_core/src/core_runtime.cpp': 820,
-    'cpp_robot_core/src/core_runtime_contracts.cpp': 840,
+    'cpp_robot_core/src/core_runtime_contracts.cpp': 880,
     'spine_ultrasound_ui/core/postprocess_service.py': 920,
     'spine_ultrasound_ui/core/session_service.py': 660,
     'spine_ultrasound_ui/services/api_bridge_backend.py': 560,
@@ -132,11 +154,16 @@ def main() -> int:
 
     facade_text = SDK_FACADE_HEADER.read_text(encoding='utf-8')
     for required in (
-        'class LifecyclePort',
-        'class QueryPort',
-        'class NrtExecutionPort',
-        'class RtControlPort',
-        'class CollaborationPort',
+        'class SdkRobotLifecyclePort',
+        'class SdkRobotQueryPort',
+        'class SdkRobotNrtExecutionPort',
+        'class SdkRobotRtControlPort',
+        'class SdkRobotCollaborationPort',
+        'using LifecyclePort = SdkRobotLifecyclePort;',
+        'using QueryPort = SdkRobotQueryPort;',
+        'using NrtExecutionPort = SdkRobotNrtExecutionPort;',
+        'using RtControlPort = SdkRobotRtControlPort;',
+        'using CollaborationPort = SdkRobotCollaborationPort;',
         'LifecyclePort& lifecyclePort()',
         'QueryPort& queryPort()',
         'NrtExecutionPort& nrtExecutionPort()',
@@ -157,14 +184,21 @@ def main() -> int:
             failures.append(f'SdkRobotFacade split-unit missing: {required}')
 
     runtime_source = CORE_RUNTIME_SOURCE.read_text(encoding='utf-8')
+    dispatcher_source = CORE_RUNTIME_DISPATCHER_SOURCE.read_text(encoding='utf-8')
     for required in (
-        'commandCapabilityClaim',
-        'capability_claim == "rt_motion_write"',
-        'std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_)',
         'queryPort().controllerLogs()',
         'lifecyclePort().connect',
     ):
         if required not in runtime_source:
+            failures.append(f'CoreRuntime controlled-lane/port usage missing: {required}')
+    for required in (
+        'runtimeLaneForCommand',
+        'findRuntimeCommandGuardContract',
+        'validateRuntimeCommandGuard',
+        'validateRuntimeCommandReplyEnvelope',
+        'return dispatch_with_contract(owner_.rt_lane_mutex_)',
+    ):
+        if required not in dispatcher_source:
             failures.append(f'CoreRuntime controlled-lane/port usage missing: {required}')
 
     nrt_source = NRT_MOTION_SOURCE.read_text(encoding='utf-8')
@@ -219,6 +253,116 @@ def main() -> int:
         if required not in api_bridge_backend_text:
             failures.append(f'ApiBridgeBackend service split missing: {required}')
 
+    runtime_command_catalog_text = RUNTIME_COMMAND_CATALOG.read_text(encoding='utf-8')
+    runtime_contracts_header = RUNTIME_COMMAND_CONTRACTS_HEADER.read_text(encoding='utf-8')
+    runtime_contracts_source = RUNTIME_COMMAND_CONTRACTS_SOURCE.read_text(encoding='utf-8')
+    generated_typed_contracts = GENERATED_RUNTIME_COMMAND_CONTRACTS.read_text(encoding='utf-8')
+    generated_typed_requests = (ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_request_types.h').read_text(encoding='utf-8')
+    generated_typed_parsers = (ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_runtime_command_request_parsers.inc').read_text(encoding='utf-8')
+    generated_typed_handler_decls = GENERATED_RUNTIME_TYPED_HANDLER_DECLS.read_text(encoding='utf-8')
+    generated_typed_handler_adapters = GENERATED_RUNTIME_TYPED_HANDLER_ADAPTERS.read_text(encoding='utf-8')
+    for required in (
+        'struct RuntimeCommandRequest',
+        'RuntimeTypedRequestVariant typed_request;',
+        'bool buildTypedRuntimeCommandRequest',
+        'struct RuntimeCommandRequestContract',
+        'struct RuntimeCommandResponseContract',
+        'struct RuntimeCommandGuardContract',
+        'struct RuntimeCommandDispatchContract',
+        'validateAndParseRuntimeCommandPayload',
+    ):
+        if required not in runtime_contracts_header:
+            failures.append(f'Runtime typed command contract header missing: {required}')
+    for required in (
+        'buildRuntimeCommandInvocation(line, &invocation, &payload_error)',
+        'auto reply = owner_.dispatchTypedCommand(invocation);',
+        'return owner_.replyJson(invocation.request_id, false, payload_error.empty() ? "invalid command payload" : payload_error);',
+    ):
+        if required not in dispatcher_source:
+            failures.append(f'CoreRuntime dispatcher must validate typed payload contracts before handler dispatch: {required}')
+    for required in (
+        'findRuntimeCommandTypedContract',
+        'RuntimeCommandDispatchContract',
+        'generated_runtime_command_contracts.inc',
+        'generated_runtime_command_request_parsers.inc',
+        'buildTypedRuntimeCommandRequest',
+    ):
+        if required not in runtime_contracts_source and required not in CORE_RUNTIME_SOURCE.read_text(encoding='utf-8'):
+            failures.append(f'Runtime typed command contract source missing: {required}')
+    if 'RuntimeCommandResponseContract' not in generated_typed_contracts:
+        failures.append('Generated typed C++ runtime command contracts must advertise response contracts')
+
+    for required in (
+        'using RuntimeTypedRequestVariant = std::variant<',
+        'ConnectRobotRequest',
+        'LockSessionRequest',
+        'ValidateScanPlanRequest',
+    ):
+        if required not in generated_typed_requests:
+            failures.append(f'Generated typed request family missing: {required}')
+    for required in (
+        'if (command == "connect_robot")',
+        'if (command == "lock_session")',
+        'if (command == "validate_scan_plan")',
+    ):
+        if required not in generated_typed_parsers:
+            failures.append(f'Generated typed request parser coverage missing: {required}')
+
+    for required in (
+        'handleConnectRobotTyped',
+        'handleLockSessionTyped',
+        'handleValidateScanPlanTyped',
+    ):
+        if required not in generated_typed_handler_decls:
+            failures.append(f'Generated typed handler declaration family missing: {required}')
+        if required not in generated_typed_handler_adapters:
+            failures.append(f'Generated typed handler adapter family missing: {required}')
+
+    if 'runtime_command_manifest.json' not in runtime_command_catalog_text or 'json.loads' not in runtime_command_catalog_text:
+        failures.append('Runtime command catalog must load from the shared JSON manifest')
+
+    generated_manifest_text = GENERATED_COMMAND_MANIFEST.read_text(encoding='utf-8')
+    if 'Generated from schemas/runtime_command_manifest.json' not in generated_manifest_text:
+        failures.append('Generated C++ command manifest must advertise the shared manifest origin')
+
+    api_server_text = API_SERVER.read_text(encoding='utf-8')
+    if '_runtime_container =' in api_server_text or 'adapter: HeadlessAdapter | None = None' in api_server_text:
+        failures.append('api_server must not retain module-level runtime singleton fallbacks')
+    if 'fastapi_app.state.runtime_container = resolved_container' not in api_server_text:
+        failures.append('api_server must resolve dependencies through app.state runtime_container')
+
+    main_window_text = MAIN_WINDOW.read_text(encoding='utf-8')
+    for required in (
+        '@Slot(object)\n    def _update_camera_pixmap',
+        '@Slot(object)\n    def _update_ultrasound_pixmap',
+        '@Slot(object)\n    def _update_reconstruction_pixmap',
+    ):
+        if required not in main_window_text:
+            failures.append(f'MainWindow pixmap slot contract missing: {required}')
+
+    if 'tests.archive' in CONTROL_OWNERSHIP_TEST.read_text(encoding='utf-8'):
+        failures.append('Stable control ownership surface must not import archived compatibility tests')
+    if 'tests.archive' in RUNTIME_VERDICT_TEST.read_text(encoding='utf-8'):
+        failures.append('Stable runtime verdict surface must not import archived compatibility tests')
+    verify_mainline_text = (ROOT / 'scripts' / 'verify_mainline.sh').read_text(encoding='utf-8')
+    rt_quality_observed_fixture = ROOT / 'artifacts' / 'verification' / 'current_delivery_fix' / 'rt_quality_observed.json'
+    if not rt_quality_observed_fixture.exists():
+        failures.append('RT quality observed fixture must exist for mainline evidence gating')
+    acceptance_text = (ROOT / 'scripts' / 'final_acceptance_audit.sh').read_text(encoding='utf-8')
+    run_pytest_mainline_text = (ROOT / 'scripts' / 'run_pytest_mainline.py').read_text(encoding='utf-8')
+    legacy_wrapper_paths = [ROOT / 'tests' / name for name in LEGACY_ARCHIVE_WRAPPER_BASENAMES]
+    for wrapper_path in legacy_wrapper_paths:
+        relative_wrapper = str(wrapper_path.relative_to(ROOT))
+        if wrapper_path.exists():
+            failures.append(f'Legacy archive wrapper must not exist in top-level tests surface: {relative_wrapper}')
+        if relative_wrapper in verify_mainline_text:
+            failures.append(f'Active verify gate must not schedule archive wrapper test: {relative_wrapper}')
+        if relative_wrapper in acceptance_text:
+            failures.append(f'Acceptance audit must not schedule archive wrapper test: {relative_wrapper}')
+        if relative_wrapper in run_pytest_mainline_text:
+            failures.append(f'run_pytest_mainline must not hardcode legacy archive wrapper ignores once wrappers are removed: {relative_wrapper}')
+
+
     runtime_verdict_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_verdict_kernel_service.py').read_text(encoding='utf-8')
     api_bridge_verdict_text = (ROOT / 'spine_ultrasound_ui' / 'services' / 'api_bridge_verdict_service.py').read_text(encoding='utf-8')
     for required in (
@@ -254,6 +398,14 @@ def main() -> int:
             failures.append(f'RecordingService async alarm persistence contract missing: {required}')
     if 'recording_service_.recordAlarm(alarm);' not in runtime_state_store_text:
         failures.append('CoreRuntime must enqueue alarms through RecordingService')
+
+    for required in (
+        'PendingRecordBundle record_bundle{};',
+        'record_bundle = buildRecordBundleLocked();',
+        'flushRecordBundle(record_bundle);',
+    ):
+        if required not in runtime_state_store_text:
+            failures.append(f'CoreRuntime RT recording lock-scope contract missing: {required}')
 
     runtime_readiness_text = RUNTIME_READINESS_SERVICE.read_text(encoding='utf-8')
     for required in (

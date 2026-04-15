@@ -118,11 +118,19 @@ private:
 
   static constexpr std::size_t kQueueCapacity = 1024;
 
-  void append(const std::filesystem::path& path, const std::string& payload_json);
+  void append(const std::filesystem::path& path, const std::string& payload_json, int64_t source_ts_ns);
+  void appendTimelineEntry(const QueuedSample& sample, const std::string& payload_json, int64_t source_ts_ns);
   void recordQueuedSample(const QueuedSample& sample);
   void enqueueSample(const QueuedSample& sample);
   void recorderLoop();
   void stopWorker(bool drain_pending);
+  void materializeConsumerArtifacts();
+  void writeConsumerManifest();
+  std::filesystem::path derivedPath(const std::string& name) const;
+  std::string sampleStreamName(const QueuedSample& sample) const;
+  std::string samplePayloadJson(const QueuedSample& sample) const;
+  int64_t sampleSourceTimestampNs(const QueuedSample& sample) const;
+  std::filesystem::path samplePath(const QueuedSample& sample) const;
 
   std::filesystem::path session_dir_;
   std::string session_id_;

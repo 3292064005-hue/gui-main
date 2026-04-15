@@ -5,6 +5,34 @@
 #include <stdexcept>
 #include <vector>
 
+#ifndef ROBOT_CORE_MAINLINE_FAMILY_KEY
+#define ROBOT_CORE_MAINLINE_FAMILY_KEY "xmate3_cobot_6"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_ROBOT_MODEL
+#define ROBOT_CORE_DEFAULT_ROBOT_MODEL "xmate3"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_ROBOT_LABEL
+#define ROBOT_CORE_DEFAULT_ROBOT_LABEL "xMate3"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_SDK_CLASS
+#define ROBOT_CORE_DEFAULT_SDK_CLASS "xMateRobot"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_AXIS_COUNT
+#define ROBOT_CORE_DEFAULT_AXIS_COUNT 6
+#endif
+#ifndef ROBOT_CORE_DEFAULT_CONTROLLER_FAMILY
+#define ROBOT_CORE_DEFAULT_CONTROLLER_FAMILY "xCore"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_CONTROLLER_VERSION
+#define ROBOT_CORE_DEFAULT_CONTROLLER_VERSION "v2.1+"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_PREFERRED_LINK
+#define ROBOT_CORE_DEFAULT_PREFERRED_LINK "wired_direct"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE
+#define ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE "cartesianImpedance"
+#endif
+
 namespace robot_core {
 
 struct OfficialDhParameter {
@@ -16,14 +44,14 @@ struct OfficialDhParameter {
 };
 
 struct RobotIdentityContract {
-  std::string robot_model{"xmate3"};
-  std::string label{"xMate3"};
-  std::string sdk_robot_class{"xMateRobot"};
-  int axis_count{6};
-  std::string controller_series{"xCore"};
-  std::string controller_version{"v2.1+"};
-  std::string preferred_link{"wired_direct"};
-  std::string clinical_mainline_mode{"cartesianImpedance"};
+  std::string robot_model{ROBOT_CORE_DEFAULT_ROBOT_MODEL};
+  std::string label{ROBOT_CORE_DEFAULT_ROBOT_LABEL};
+  std::string sdk_robot_class{ROBOT_CORE_DEFAULT_SDK_CLASS};
+  int axis_count{ROBOT_CORE_DEFAULT_AXIS_COUNT};
+  std::string controller_series{ROBOT_CORE_DEFAULT_CONTROLLER_FAMILY};
+  std::string controller_version{ROBOT_CORE_DEFAULT_CONTROLLER_VERSION};
+  std::string preferred_link{ROBOT_CORE_DEFAULT_PREFERRED_LINK};
+  std::string clinical_mainline_mode{ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE};
   std::vector<std::string> supported_rt_modes{"jointPosition", "cartesianPosition", "jointImpedance", "cartesianImpedance", "directTorque"};
   std::vector<std::string> clinical_allowed_modes{"MoveAbsJ", "MoveJ", "MoveL", "cartesianImpedance"};
   bool supports_xmate_model{true};
@@ -45,7 +73,7 @@ inline const RobotIdentityContract& resolveRobotIdentity(
     int axis_count) {
   constexpr double kPiOver2 = 1.57079632679;
   static const RobotIdentityContract xmate3{
-      "xmate3", "xMate3", "xMateRobot", 6, "xCore", "v2.1+", "wired_direct", "cartesianImpedance",
+      ROBOT_CORE_DEFAULT_ROBOT_MODEL, ROBOT_CORE_DEFAULT_ROBOT_LABEL, ROBOT_CORE_DEFAULT_SDK_CLASS, ROBOT_CORE_DEFAULT_AXIS_COUNT, ROBOT_CORE_DEFAULT_CONTROLLER_FAMILY, ROBOT_CORE_DEFAULT_CONTROLLER_VERSION, ROBOT_CORE_DEFAULT_PREFERRED_LINK, ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE,
       {"jointPosition", "cartesianPosition", "jointImpedance", "cartesianImpedance", "directTorque"},
       {"MoveAbsJ", "MoveJ", "MoveL", "cartesianImpedance"},
       true, true, true, true, true,
@@ -57,7 +85,7 @@ inline const RobotIdentityContract& resolveRobotIdentity(
   if ((!robot_model.empty() && robot_model != xmate3.robot_model) ||
       (!sdk_robot_class.empty() && sdk_robot_class != xmate3.sdk_robot_class) ||
       (axis_count > 0 && axis_count != xmate3.axis_count)) {
-    throw std::invalid_argument("xMateRobot-only mainline requires xmate3/xMateRobot/6");
+    throw std::invalid_argument(std::string("mainline identity requires ") + ROBOT_CORE_DEFAULT_ROBOT_MODEL + "/" + ROBOT_CORE_DEFAULT_SDK_CLASS + "/" + std::to_string(ROBOT_CORE_DEFAULT_AXIS_COUNT));
   }
   return xmate3;
 }

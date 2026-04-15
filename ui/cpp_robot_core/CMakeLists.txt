@@ -34,7 +34,34 @@ endif()
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 enable_testing()
+
+set(ROBOT_CORE_IDENTITY_REGISTRY ${CMAKE_CURRENT_SOURCE_DIR}/../configs/robot_identity_mainline.json)
+file(READ ${ROBOT_CORE_IDENTITY_REGISTRY} ROBOT_CORE_IDENTITY_REGISTRY_JSON)
+string(JSON ROBOT_CORE_MAINLINE_FAMILY_KEY GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} family_key)
+string(JSON ROBOT_CORE_MAINLINE_ROBOT_MODEL GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} robot_model)
+string(JSON ROBOT_CORE_MAINLINE_DISPLAY_NAME GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} display_name)
+string(JSON ROBOT_CORE_MAINLINE_SDK_CLASS GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} sdk_robot_class)
+string(JSON ROBOT_CORE_MAINLINE_AXIS_COUNT GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} axis_count)
+string(JSON ROBOT_CORE_MAINLINE_CONTROLLER_FAMILY GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} controller_family)
+string(JSON ROBOT_CORE_MAINLINE_CONTROLLER_VERSION GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} controller_version)
+string(JSON ROBOT_CORE_MAINLINE_PREFERRED_LINK GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} preferred_link)
+string(JSON ROBOT_CORE_MAINLINE_CLINICAL_MODE GET ${ROBOT_CORE_IDENTITY_REGISTRY_JSON} clinical_mainline_mode)
+
+set(RUNTIME_COMMAND_MANIFEST_JSON ${CMAKE_CURRENT_SOURCE_DIR}/../schemas/runtime_command_manifest.json)
+set(GENERATED_RUNTIME_COMMAND_MANIFEST_INC ${CMAKE_CURRENT_SOURCE_DIR}/include/robot_core/generated_command_manifest.inc)
+add_custom_command(
+  OUTPUT ${GENERATED_RUNTIME_COMMAND_MANIFEST_INC}
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/generate_runtime_command_artifacts.py
+  DEPENDS
+    ${RUNTIME_COMMAND_MANIFEST_JSON}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/generate_runtime_command_artifacts.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+  COMMENT "Generating shared runtime command artifacts"
+  VERBATIM
+)
+add_custom_target(generate_runtime_command_artifacts ALL DEPENDS ${GENERATED_RUNTIME_COMMAND_MANIFEST_INC})
 
 if(ROBOT_CORE_WITH_XCORE_SDK)
   find_package(VendoredRokaeSdk QUIET)
@@ -47,8 +74,16 @@ endif()
 add_library(robot_core_build_settings INTERFACE)
 target_compile_definitions(robot_core_build_settings INTERFACE
   ROBOT_CORE_FORCE_CONTROL_CONFIG_PATH="${CMAKE_SOURCE_DIR}/../configs/force_control.json"
-  ROBOT_CORE_DEFAULT_ROBOT_MODEL="xmate3"
-  ROBOT_CORE_DEFAULT_SDK_CLASS="xMateRobot"
+  ROBOT_CORE_IDENTITY_REGISTRY_PATH="${ROBOT_CORE_IDENTITY_REGISTRY}"
+  ROBOT_CORE_MAINLINE_FAMILY_KEY="${ROBOT_CORE_MAINLINE_FAMILY_KEY}"
+  ROBOT_CORE_DEFAULT_ROBOT_MODEL="${ROBOT_CORE_MAINLINE_ROBOT_MODEL}"
+  ROBOT_CORE_DEFAULT_ROBOT_LABEL="${ROBOT_CORE_MAINLINE_DISPLAY_NAME}"
+  ROBOT_CORE_DEFAULT_SDK_CLASS="${ROBOT_CORE_MAINLINE_SDK_CLASS}"
+  ROBOT_CORE_DEFAULT_AXIS_COUNT=${ROBOT_CORE_MAINLINE_AXIS_COUNT}
+  ROBOT_CORE_DEFAULT_CONTROLLER_FAMILY="${ROBOT_CORE_MAINLINE_CONTROLLER_FAMILY}"
+  ROBOT_CORE_DEFAULT_CONTROLLER_VERSION="${ROBOT_CORE_MAINLINE_CONTROLLER_VERSION}"
+  ROBOT_CORE_DEFAULT_PREFERRED_LINK="${ROBOT_CORE_MAINLINE_PREFERRED_LINK}"
+  ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE="${ROBOT_CORE_MAINLINE_CLINICAL_MODE}"
 )
 target_include_directories(robot_core_build_settings INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -73,7 +108,10 @@ endif()
 set(CORE_RUNTIME_SOURCES
   src/command_server.cpp
   src/command_registry.cpp
+  src/runtime_command_contracts.cpp
   src/core_runtime.cpp
+  src/core_runtime_dispatcher.cpp
+  src/core_runtime_contract_publisher.cpp
   src/core_runtime_power_validation.cpp
   src/core_runtime_session_execution.cpp
   src/core_runtime_contracts.cpp
@@ -114,7 +152,8 @@ set(CORE_RUNTIME_SOURCES
   src/pose_interpolator.cpp
 )
 
-add_library(spine_robot_core_runtime STATIC ${CORE_RUNTIME_SOURCES})
+add_library(spine_robot_core_runtime STATIC ${CORE_RUNTIME_SOURCES} ${GENERATED_RUNTIME_COMMAND_MANIFEST_INC})
+add_dependencies(spine_robot_core_runtime generate_runtime_command_artifacts)
 robot_core_apply_common_options(spine_robot_core_runtime)
 target_link_libraries(spine_robot_core_runtime
   PUBLIC
@@ -144,6 +183,7 @@ function(robot_core_add_cpp_test target_name source_file)
 endfunction()
 
 add_executable(spine_robot_core src/main_ubuntu_rt.cpp)
+add_dependencies(spine_robot_core generate_runtime_command_artifacts)
 robot_core_apply_common_options(spine_robot_core)
 target_link_libraries(spine_robot_core PRIVATE spine_robot_core_runtime)
 

@@ -1,4 +1,5 @@
 #include "robot_core/core_runtime.h"
+#include "robot_core/core_runtime_contract_publisher.h"
 
 #include <algorithm>
 #include <cmath>
@@ -193,6 +194,7 @@ std::string CoreRuntime::vendorBoundaryContractJsonLocked() const {
       field("binding_mode", quote(sdk_robot_.sdkBindingMode())),
       field("runtime_source", quote(sdk_robot_.runtimeSource())),
       field("single_control_source_required", boolLiteral(config_.requires_single_control_source)),
+      field("live_evidence_bundle_required", boolLiteral(true)),
       field("control_source_exclusive", boolLiteral(sdk_robot_.controlSourceExclusive())),
       field("fixed_period_enforced", boolLiteral(true)),
       field("network_healthy", boolLiteral(sdk_robot_.networkHealthy())),
@@ -203,7 +205,7 @@ std::string CoreRuntime::vendorBoundaryContractJsonLocked() const {
 }
 
 std::string CoreRuntime::capabilityContractJsonLocked() const {
-  const auto& identity = resolveRobotIdentity("xmate3", "xMateRobot", 6);
+  const auto& identity = resolveRobotIdentity(config_.robot_model, config_.sdk_robot_class, config_.axis_count);
   using namespace json;
   const bool live_binding = sdk_robot_.liveBindingEstablished();
   auto module_entry = [&](const std::string& module, bool enabled, const std::string& status, const std::string& purpose, bool vendor_supported = true, bool runtime_implemented = true, bool live_required = false) {
@@ -333,9 +335,11 @@ std::string CoreRuntime::rtKernelContractJsonLocked() const {
       field("fixed_period_enforced", boolLiteral(rt.fixed_period_enforced)),
       field("network_healthy", boolLiteral(rt.network_healthy)),
       field("overrun_count", std::to_string(rt.overrun_count)),
+      field("current_period_ms", formatDouble(rt.current_period_ms)),
       field("max_cycle_ms", formatDouble(rt.max_cycle_ms)),
       field("last_wake_jitter_ms", formatDouble(rt.last_wake_jitter_ms)),
       field("last_sensor_decision", quote(rt.last_sensor_decision)),
+      field("rt_quality_gate_passed", boolLiteral(rt_jitter_ok_)),
       field("jitter_budget_ms", formatDouble(rt.jitter_budget_ms)),
       field("freshness_budget_ms", std::to_string(config_.pressure_stale_ms)),
       field("reference_limits", object({field("max_cart_step_mm", formatDouble(2.5)), field("max_force_delta_n", formatDouble(1.0))})),
@@ -368,7 +372,7 @@ std::string CoreRuntime::sessionDriftContractJsonLocked() const {
   });
 }
 
-std::string CoreRuntime::controlGovernanceContractJsonLocked() const {
+std::string CoreRuntime::controlGovernanceContractJsonInternal() const {
   using namespace json;
   const bool session_locked = !session_id_.empty();
   const bool session_binding_valid = sessionFreezeConsistentLocked();
@@ -377,6 +381,7 @@ std::string CoreRuntime::controlGovernanceContractJsonLocked() const {
   const auto nrt_snapshot = nrt_motion_service_.snapshot();
   return object({
       field("single_control_source_required", boolLiteral(config_.requires_single_control_source)),
+      field("live_evidence_bundle_required", boolLiteral(true)),
       field("control_authority_expected_source", quote("cpp_robot_core")),
       field("write_surface", quote("core_runtime_only")),
       field("current_execution_state", quote(stateName(execution_state_))),
@@ -396,13 +401,14 @@ std::string CoreRuntime::controlGovernanceContractJsonLocked() const {
       field("lifecycle_state", quote(sdk_robot_.hardwareLifecycleState())),
       field("rt_loop_active", boolLiteral(rt_snapshot.loop_active)),
       field("rt_move_active", boolLiteral(rt_snapshot.move_active)),
+      field("rt_quality_gate_passed", boolLiteral(rt_jitter_ok_)),
       field("nrt_last_command", quote(nrt_snapshot.last_command)),
       field("required_capability_claims", capabilityClaimCatalogJson()),
       field("detail", quote("single control source contract requires session freeze + AUTO + powered + cartesianImpedance mainline with explicit capability claims"))
   });
 }
 
-std::string CoreRuntime::controllerEvidenceJsonLocked() const {
+std::string CoreRuntime::controllerEvidenceJsonInternal() const {
   using namespace json;
   const auto logs = sdk_robot_.controllerLogs();
   const auto cfg_logs = sdk_robot_.configurationLog();
@@ -511,7 +517,7 @@ std::string CoreRuntime::mainlineExecutorContractJsonLocked() const {
   });
 }
 
-std::string CoreRuntime::releaseContractJsonLocked() const {
+std::string CoreRuntime::releaseContractJsonInternal() const {
   using namespace json;
   const auto safety = evaluateSafetyLocked();
   const bool freeze_consistent = sessionFreezeConsistentLocked();
@@ -539,7 +545,7 @@ std::string CoreRuntime::releaseContractJsonLocked() const {
   });
 }
 
-std::string CoreRuntime::deploymentContractJsonLocked() const {
+std::string CoreRuntime::deploymentContractJsonInternal() const {
   using namespace json;
   const auto identity = resolveRobotIdentity(config_.robot_model, config_.sdk_robot_class, config_.axis_count);
   return object({
@@ -647,7 +653,7 @@ void CoreRuntime::clearInjectedFaultsLocked() {
 }
 
 
-std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
+std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
   using namespace json;
   std::vector<std::string> blockers;
   std::vector<std::string> warnings;
@@ -691,6 +697,7 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
       field("fc_frame_type", quote(config_.fc_frame_type)),
       field("preferred_link", quote(config_.preferred_link)),
       field("requires_single_control_source", boolLiteral(config_.requires_single_control_source)),
+      field("allow_contract_shell_writes", boolLiteral(config_.allow_contract_shell_writes)),
       field("rt_mode", quote(config_.rt_mode)),
       field("tool_name", quote(config_.tool_name)),
       field("tcp_name", quote(config_.tcp_name)),
@@ -714,6 +721,34 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
       field("scan_force_target_n", formatDouble(runtime_cfg.scan_force_target_n)),
       field("retract_timeout_ms", formatDouble(runtime_cfg.retract_timeout_ms))
   });
+  const auto write_capabilities = object({
+      field("hardware_lifecycle_write", object({
+          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes)),
+          field("reason", quote((sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes) ? std::string("") : std::string("live_binding_required"))),
+          field("source_of_truth", quote("cpp_robot_core"))
+      })),
+      field("nrt_motion_write", object({
+          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes)),
+          field("reason", quote((sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes) ? std::string("") : std::string("live_binding_required"))),
+          field("source_of_truth", quote("cpp_robot_core"))
+      })),
+      field("rt_motion_write", object({
+          field("allowed", boolLiteral(sdk_robot_.liveTakeoverReady() || config_.allow_contract_shell_writes)),
+          field("reason", quote((sdk_robot_.liveTakeoverReady() || config_.allow_contract_shell_writes) ? std::string("") : std::string("live_takeover_ready_required"))),
+          field("source_of_truth", quote("cpp_robot_core"))
+      })),
+      field("recovery_write", object({
+          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes)),
+          field("reason", quote((sdk_robot_.liveBindingEstablished() || config_.allow_contract_shell_writes) ? std::string("") : std::string("live_binding_required"))),
+          field("source_of_truth", quote("cpp_robot_core"))
+      })),
+      field("session_freeze_write", object({
+          field("allowed", boolLiteral(controller_online_)),
+          field("reason", quote(controller_online_ ? std::string("") : std::string("controller_not_connected"))),
+          field("source_of_truth", quote("cpp_robot_core"))
+      }))
+  });
+
   const auto control_authority = object({
       field("summary_state", quote(authority_state)),
       field("summary_label", quote(authority_state == "ready" ? std::string("runtime authority ready") : (authority_state == "blocked" ? std::string("runtime authority blocked") : std::string("runtime authority degraded")))),
@@ -769,6 +804,7 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const {
       field("authority_source", quote("cpp_robot_core")),
       field("protocol_version", std::to_string(kProtocolVersion)),
       field("control_authority", control_authority),
+      field("write_capabilities", write_capabilities),
       field("runtime_config_applied", applied_runtime_config),
       field("telemetry_authority", telemetry_authority),
       field("session_freeze", session_freeze),
@@ -824,5 +860,12 @@ std::string CoreRuntime::replyJson(const std::string& request_id, bool ok, const
       field("protocol_version", std::to_string(kProtocolVersion)),
   });
 }
+
+
+std::string CoreRuntime::controlGovernanceContractJsonLocked() const { return runtime_contract_publisher_->controlGovernanceContractJsonLocked(); }
+std::string CoreRuntime::controllerEvidenceJsonLocked() const { return runtime_contract_publisher_->controllerEvidenceJsonLocked(); }
+std::string CoreRuntime::releaseContractJsonLocked() const { return runtime_contract_publisher_->releaseContractJsonLocked(); }
+std::string CoreRuntime::deploymentContractJsonLocked() const { return runtime_contract_publisher_->deploymentContractJsonLocked(); }
+std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonLocked() const { return runtime_contract_publisher_->authoritativeRuntimeEnvelopeJsonLocked(); }
 
 }  // namespace robot_core

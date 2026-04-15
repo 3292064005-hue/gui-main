@@ -23,11 +23,14 @@ def test_sdk_robot_facade_reports_contract_shell_vs_live_binding() -> None:
 
 def test_sdk_robot_facade_controlled_ports_are_available_to_runtime_services() -> None:
     header = _read('cpp_robot_core/include/robot_core/sdk_robot_facade.h')
-    assert 'class LifecyclePort' in header
-    assert 'class QueryPort' in header
-    assert 'class NrtExecutionPort' in header
-    assert 'class RtControlPort' in header
-    assert 'class CollaborationPort' in header
+    for required in (
+        'using LifecyclePort = SdkRobotLifecyclePort;',
+        'using QueryPort = SdkRobotQueryPort;',
+        'using NrtExecutionPort = SdkRobotNrtExecutionPort;',
+        'using RtControlPort = SdkRobotRtControlPort;',
+        'using CollaborationPort = SdkRobotCollaborationPort;',
+    ):
+        assert required in header
 
     ports_source = _read('cpp_robot_core/src/sdk_robot_facade_ports.cpp')
     assert 'LifecyclePort& SdkRobotFacade::lifecyclePort()' in ports_source
@@ -68,3 +71,42 @@ def test_vendor_boundary_detail_does_not_overstate_non_live_readiness() -> None:
     source = _read('cpp_robot_core/src/core_runtime_contracts.cpp')
     assert 'real live binding/lifecycle readiness/exclusive-control evidence is not yet established' in source
     assert 'Vendor boundary owns SDK binding, lifecycle readiness, exclusive control and fixed-period RT semantics.' not in source
+
+
+def test_sdk_robot_facade_strict_live_write_gate_blocks_contract_shell_mutations() -> None:
+    header = _read('cpp_robot_core/include/robot_core/sdk_robot_facade.h')
+    lifecycle = _read('cpp_robot_core/src/sdk_robot_facade_lifecycle.cpp')
+    nrt = _read('cpp_robot_core/src/sdk_robot_facade_nrt.cpp')
+    rt = _read('cpp_robot_core/src/sdk_robot_facade_rt.cpp')
+    assert 'requireLiveWrite' in header
+    assert 'live_binding_required' in _read('cpp_robot_core/src/sdk_robot_facade.cpp')
+    for token in ('setPowerState', 'setOperateMode(auto)', 'setMotionControlMode(NrtCommand)', 'executeMoveAbsJ', 'beginRtMainline'):
+        assert token in lifecycle + nrt + rt
+
+
+
+def test_rt_purity_gate_requires_jitter_and_overrun_tokens() -> None:
+    source = _read('scripts/check_rt_purity_gate.py')
+    for token in (
+        'runtime_.recordRtLoopSample(sample.period_ms, sample.execution_ms, sample.wake_jitter_ms, sample.overrun);',
+        'rt_snapshot.overrun_count == 0',
+        'std::abs(rt_snapshot.last_wake_jitter_ms) <= rt_snapshot.jitter_budget_ms',
+        'field("overrun_count"',
+        'field("jitter_budget_ms"',
+        'field("current_period_ms"',
+        'field("rt_quality_gate_passed"',
+    ):
+        assert token in source
+
+
+def test_rt_quality_gate_requires_runtime_doctor_budget_blockers() -> None:
+    source = _read('scripts/check_rt_quality_gate.py')
+    for token in (
+        'rt_cycle_overrun_detected',
+        'rt_wake_jitter_budget_exceeded',
+        'rt_cycle_budget_exceeded',
+        'rt_quality_gate_failed',
+        'current_period_ms',
+        'rt_quality_gate_passed',
+    ):
+        assert token in source

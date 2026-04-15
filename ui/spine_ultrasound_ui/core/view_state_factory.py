@@ -7,12 +7,14 @@ from spine_ultrasound_ui.core.telemetry_store import TelemetryStore
 from spine_ultrasound_ui.core.workflow_state_machine import WorkflowContext, WorkflowStateMachine
 from spine_ultrasound_ui.models import RuntimeConfig, SystemState, UiViewState, WorkflowArtifacts
 from spine_ultrasound_ui.services.sdk_capability_service import SdkCapabilityService
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
 
 
 class ViewStateFactory:
-    def __init__(self, workflow: WorkflowStateMachine | None = None, sdk_service: SdkCapabilityService | None = None) -> None:
+    def __init__(self, workflow: WorkflowStateMachine | None = None, sdk_service: SdkCapabilityService | None = None, governance_projection: RuntimeGovernanceQuerySurface | None = None) -> None:
         self.workflow = workflow or WorkflowStateMachine()
         self.sdk_service = sdk_service or SdkCapabilityService()
+        self.governance_projection = governance_projection or RuntimeGovernanceQuerySurface()
 
     def build(
         self,
@@ -34,6 +36,11 @@ class ViewStateFactory:
             bridge_observability=bridge_observability,
             model_report=model_report,
             config_report=config_report,
+            governance_projection=self.governance_projection.build_projection(
+                backend_link=backend_link or {},
+                control_plane_snapshot=control_plane_snapshot or {},
+                model_report=model_report or {},
+            ),
         )
         context = WorkflowContext(
             core_state=SystemState(telemetry.core_state.execution_state),
@@ -96,9 +103,14 @@ class ViewStateFactory:
         bridge_observability: dict | None,
         model_report: dict | None,
         config_report: dict | None,
+        governance_projection: dict[str, Any],
     ) -> dict[str, Any]:
         if control_plane_snapshot:
-            return dict(control_plane_snapshot)
+            snapshot = dict(control_plane_snapshot)
+            snapshot.setdefault("authoritative_projection", dict(governance_projection))
+            snapshot.setdefault("ownership_state", dict(governance_projection.get("control_authority", snapshot.get("ownership_state", {}))))
+            snapshot.setdefault("model_precheck", dict(governance_projection.get("model_precheck", snapshot.get("model_precheck", {}))))
+            return snapshot
         backend_link = dict(backend_link or {})
         bridge_observability = dict(bridge_observability or {})
         model_report = dict(model_report or {})
@@ -111,9 +123,10 @@ class ViewStateFactory:
             "detail": backend_link.get("detail", "控制面状态未提供。"),
             "protocol_version": dict(control_plane.get("protocol_status", {})),
             "config_consistency": dict(control_plane.get("config_sync", {})),
-            "ownership_state": dict(control_plane.get("control_authority", {})),
+            "ownership_state": dict(governance_projection.get("control_authority", control_plane.get("control_authority", {}))),
             "bridge_observability_state": bridge_observability,
-            "model_precheck": model_report,
+            "model_precheck": dict(governance_projection.get("model_precheck", model_report)),
+            "authoritative_projection": dict(governance_projection),
             "config_baseline": config_report,
         }
 
@@ -168,12 +181,13 @@ class ViewStateFactory:
     def _governance_checks(self, control_plane: dict[str, Any]) -> list[dict[str, Any]]:
         if not control_plane:
             return [self._check("控制面快照可用", False, "尚未建立 control_plane_snapshot。")]
+        authoritative_projection = dict(control_plane.get("authoritative_projection", {}))
         sections = {
-            "模型前检通过": dict(control_plane.get("model_precheck", {})),
+            "模型前检通过": dict(authoritative_projection.get("model_precheck", control_plane.get("model_precheck", {}))),
             "前后端链路在线": {"summary_state": control_plane.get("summary_state", "unknown"), "detail": control_plane.get("detail", "控制面状态未提供。")},
             "前后端配置一致": dict(control_plane.get("config_consistency", {})),
             "控制面协议一致": dict(control_plane.get("protocol_version", {})),
-            "唯一控制权已锁定": dict(control_plane.get("ownership_state", {})),
+            "唯一控制权已锁定": dict(authoritative_projection.get("control_authority", control_plane.get("ownership_state", {}))),
             "桥接观测契约正常": dict(control_plane.get("bridge_observability_state", {})),
         }
         checks: list[dict[str, Any]] = []

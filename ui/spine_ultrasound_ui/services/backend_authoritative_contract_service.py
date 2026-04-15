@@ -2,10 +2,11 @@ from __future__ import annotations
 
 """Shared normalization for authoritative runtime/control-plane facts.
 
-This module centralizes extraction and normalization of the runtime-owned facts
-that higher Python layers are allowed to *consume* but not fabricate. The goal
-is to keep authority, final verdict, session freeze, and applied runtime config
-in a single reusable place across API, direct-core, and mock backends.
+This module centralizes extraction and normalization of runtime-owned facts.
+Canonical backend surfaces must only return authoritative envelopes that were
+published by the runtime itself. Compatibility/control-plane projections may
+still normalize additive fallback payloads, but they must never be presented as
+canonical authoritative truth.
 """
 
 from typing import Any, Mapping
@@ -39,6 +40,7 @@ class BackendAuthoritativeContractService:
         session_freeze: Mapping[str, Any] | None = None,
         final_verdict: Mapping[str, Any] | None = None,
         plan_digest: Mapping[str, Any] | None = None,
+        write_capabilities: Mapping[str, Any] | None = None,
         protocol_version: int | None = None,
         detail: str = "",
         authoritative_runtime_envelope_present: bool = False,
@@ -64,6 +66,7 @@ class BackendAuthoritativeContractService:
             A normalized authoritative envelope dictionary.
         """
         normalized_authority = self.normalize_control_authority(control_authority, authority_source=authority_source)
+        normalized_write_capabilities = self._normalize_write_capabilities(write_capabilities)
         applied_config = self._normalize_runtime_config_payload(runtime_config_applied)
         desired_config = self._normalize_runtime_config_payload(desired_runtime_config)
         freeze = self.normalize_session_freeze(session_freeze)
@@ -88,6 +91,7 @@ class BackendAuthoritativeContractService:
             "authority_source": authority_source,
             "protocol_version": self._coerce_int(protocol_version, self.DEFAULT_PROTOCOL_VERSION),
             "control_authority": normalized_authority,
+            "write_capabilities": normalized_write_capabilities,
             "runtime_config_applied": applied_config,
             "desired_runtime_config": desired_config,
             "session_freeze": freeze,
@@ -96,6 +100,97 @@ class BackendAuthoritativeContractService:
             "authoritative_runtime_envelope_present": bool(authoritative_runtime_envelope_present),
             "envelope_origin": envelope_origin,
             "synthesized": synthesized,
+        }
+
+    def normalize_authoritative_runtime_envelope(
+        self,
+        payload: Mapping[str, Any] | None,
+        *,
+        authority_source: str,
+        desired_runtime_config: Mapping[str, Any] | RuntimeConfig | None = None,
+        allow_direct_payload: bool = False,
+    ) -> dict[str, Any]:
+        """Normalize only runtime-published authoritative envelopes.
+
+        Args:
+            payload: Raw runtime/API payload.
+            authority_source: Source label to apply when the envelope omits one.
+            desired_runtime_config: Optional desired/local runtime config.
+            allow_direct_payload: Treat the top-level payload itself as the
+                authoritative envelope when it already exposes the full runtime
+                envelope shape (for example direct replies from
+                ``get_authoritative_runtime_envelope``).
+
+        Returns:
+            Normalized authoritative envelope when the runtime explicitly
+            published one; otherwise an empty dictionary.
+        """
+        authoritative, envelope_origin = self.extract_published_authoritative_runtime_envelope(
+            payload,
+            allow_direct_payload=allow_direct_payload,
+        )
+        if not authoritative:
+            return {}
+        return self.build(
+            authority_source=str(authoritative.get("authority_source") or authority_source),
+            control_authority=self._as_dict(authoritative.get("control_authority")),
+            runtime_config_applied=authoritative.get("runtime_config_applied") or authoritative.get("runtime_config"),
+            desired_runtime_config=desired_runtime_config,
+            session_freeze=authoritative.get("session_freeze"),
+            final_verdict=authoritative.get("final_verdict") or authoritative,
+            plan_digest=authoritative.get("plan_digest"),
+            write_capabilities=authoritative.get("write_capabilities"),
+            protocol_version=self._coerce_int(authoritative.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
+            detail=str(authoritative.get("detail") or ""),
+            authoritative_runtime_envelope_present=True,
+            envelope_origin=envelope_origin,
+        )
+
+    def extract_published_authoritative_runtime_envelope(
+        self,
+        payload: Mapping[str, Any] | None,
+        *,
+        allow_direct_payload: bool = False,
+    ) -> tuple[dict[str, Any], str]:
+        """Return the runtime-published authoritative envelope, if present."""
+        data = self._as_dict(payload)
+        authoritative = self._as_dict(data.get("authoritative_runtime_envelope"))
+        if authoritative:
+            return authoritative, "authoritative_runtime_envelope"
+        control_plane = self._extract_control_plane(data)
+        authoritative = self._as_dict(control_plane.get("authoritative_runtime_envelope"))
+        if authoritative:
+            return authoritative, "control_plane.authoritative_runtime_envelope"
+        if allow_direct_payload and self._looks_like_authoritative_runtime_envelope(data):
+            return data, "direct_authoritative_runtime_envelope"
+        return {}, ""
+
+    def build_unavailable_authoritative_runtime_envelope(
+        self,
+        *,
+        authority_source: str,
+        detail: str,
+        desired_runtime_config: Mapping[str, Any] | RuntimeConfig | None = None,
+        envelope_origin: str = "unavailable",
+        protocol_version: int | None = None,
+    ) -> dict[str, Any]:
+        """Build an explicit unavailable envelope without fabricating runtime facts."""
+        return {
+            "summary_state": "degraded",
+            "summary_label": "authoritative runtime envelope unavailable",
+            "detail": str(detail),
+            "authority_source": str(authority_source),
+            "protocol_version": self._coerce_int(protocol_version, self.DEFAULT_PROTOCOL_VERSION),
+            "control_authority": {},
+            "write_capabilities": {},
+            "runtime_config_applied": {},
+            "desired_runtime_config": self._normalize_runtime_config_payload(desired_runtime_config),
+            "session_freeze": {},
+            "plan_digest": {},
+            "final_verdict": {},
+            "authoritative_runtime_envelope_present": False,
+            "envelope_origin": str(envelope_origin),
+            "synthesized": False,
         }
 
     def normalize_payload(
@@ -128,6 +223,7 @@ class BackendAuthoritativeContractService:
                 session_freeze=authoritative.get("session_freeze"),
                 final_verdict=authoritative.get("final_verdict") or authoritative,
                 plan_digest=authoritative.get("plan_digest"),
+                write_capabilities=authoritative.get("write_capabilities"),
                 protocol_version=self._coerce_int(authoritative.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
                 detail=str(authoritative.get("detail") or ""),
                 authoritative_runtime_envelope_present=True,
@@ -144,6 +240,7 @@ class BackendAuthoritativeContractService:
                 session_freeze=authoritative.get("session_freeze"),
                 final_verdict=authoritative.get("final_verdict") or authoritative,
                 plan_digest=authoritative.get("plan_digest"),
+                write_capabilities=authoritative.get("write_capabilities"),
                 protocol_version=self._coerce_int(authoritative.get("protocol_version") or control_plane.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
                 detail=str(authoritative.get("detail") or control_plane.get("detail") or ""),
                 authoritative_runtime_envelope_present=True,
@@ -169,6 +266,7 @@ class BackendAuthoritativeContractService:
             session_freeze=data.get("session_freeze") or control_plane.get("session_freeze"),
             final_verdict=data.get("final_verdict") or control_plane.get("final_verdict") or data,
             plan_digest=data.get("plan_digest") or control_plane.get("plan_digest"),
+            write_capabilities=data.get("write_capabilities") or control_plane.get("write_capabilities"),
             protocol_version=self._coerce_int(data.get("protocol_version") or control_plane.get("protocol_version"), self.DEFAULT_PROTOCOL_VERSION),
             detail=str(data.get("detail") or control_plane.get("detail") or ""),
             authoritative_runtime_envelope_present=False,
@@ -316,6 +414,27 @@ class BackendAuthoritativeContractService:
         return dict(payload or {})
 
     @staticmethod
+    def _normalize_write_capabilities(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        """Normalize authoritative write-capability claims from runtime envelopes.
+
+        Each claim is reduced to an additive, machine-consumable structure so UI/API
+        surfaces can gate write actions without inferring backend state. Unknown
+        payload shapes collapse to an empty mapping.
+        """
+        data = dict(payload or {})
+        normalized: dict[str, Any] = {}
+        for claim, raw_state in data.items():
+            if not isinstance(claim, str):
+                continue
+            state = dict(raw_state or {}) if isinstance(raw_state, Mapping) else {}
+            normalized[claim] = {
+                "allowed": bool(state.get("allowed", False)),
+                "reason": str(state.get("reason", "")),
+                "source_of_truth": str(state.get("source_of_truth", "")),
+            }
+        return normalized
+
+    @staticmethod
     def _coerce_int(value: Any, default: int) -> int:
         try:
             if value is None or value == "":
@@ -323,6 +442,21 @@ class BackendAuthoritativeContractService:
             return int(value)
         except (TypeError, ValueError):
             return int(default)
+
+    @staticmethod
+    def _looks_like_authoritative_runtime_envelope(payload: Mapping[str, Any] | None) -> bool:
+        data = dict(payload or {})
+        if not data:
+            return False
+        authoritative_keys = (
+            "control_authority",
+            "runtime_config_applied",
+            "runtime_config",
+            "session_freeze",
+            "plan_digest",
+            "write_capabilities",
+        )
+        return any(key in data and data.get(key) not in (None, {}, []) for key in authoritative_keys)
 
     def _extract_control_plane(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         data = dict(payload or {})

@@ -4,16 +4,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from spine_ultrasound_ui.services.authoritative_artifact_reader import AuthoritativeArtifactReader
+from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.utils import now_text
 
 
 class AssessmentInputBuilder:
     """Assemble authoritative assessment inputs from reconstruction artifacts."""
 
-    def __init__(self, *, method_version: str = 'assessment_input_index_v2', artifact_reader: AuthoritativeArtifactReader | None = None) -> None:
+    def __init__(self, *, method_version: str = 'assessment_input_index_v2', artifact_reader: SessionProductsAuthoritySurface | None = None) -> None:
         self.method_version = method_version
-        self.artifact_reader = artifact_reader or AuthoritativeArtifactReader()
+        self.artifact_reader = artifact_reader or SessionProductsAuthoritySurface()
 
     def build(self, session_dir: Path) -> dict[str, Any]:
         """Build a normalized assessment input payload.

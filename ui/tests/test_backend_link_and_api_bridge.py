@@ -12,6 +12,14 @@ from spine_ultrasound_ui.services.backend_control_plane_service import BackendCo
 from spine_ultrasound_ui.services.backend_link_service import BackendLinkMetrics, BackendLinkService
 
 
+class _StubContainer:
+    def __init__(self, runtime_adapter: "_StubAdapter") -> None:
+        self.runtime_adapter = runtime_adapter
+        self.deployment_profile_service = None
+        self.command_guard_service = None
+
+
+
 class _StubAdapter:
     def __init__(self) -> None:
         self._runtime_config = {"pressure_target": 8.0}
@@ -85,8 +93,9 @@ class _StubAdapter:
 
 
 def _client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setattr(api_server, "adapter", _StubAdapter())
-    return TestClient(api_server.app)
+    runtime_container = _StubContainer(_StubAdapter())
+    app = api_server.create_app(runtime_container=runtime_container, allowed_origins=["http://localhost:3000"])
+    return TestClient(app)
 
 
 def test_backend_link_service_reports_ready_state() -> None:
@@ -318,3 +327,19 @@ def test_authoritative_contract_service_prefers_published_authoritative_envelope
     assert envelope['synthesized'] is False
     assert envelope['summary_state'] == 'ready'
     assert envelope['envelope_origin'] == 'authoritative_runtime_envelope'
+
+
+
+def test_robot_core_client_link_snapshot_keeps_authoritative_and_projected_verdicts_separate(tmp_path):
+    from spine_ultrasound_ui.services.robot_core_client import RobotCoreClientBackend
+    import spine_ultrasound_ui.services.robot_core_client as robot_core_client_module
+
+    robot_core_client_module.create_client_ssl_context = lambda cert_path=None: object()
+    backend = RobotCoreClientBackend(tmp_path)
+    backend._authoritative_envelope = {}
+    backend._last_final_verdict = {'accepted': True, 'source': 'projection'}
+    backend._refresh_authoritative_runtime_snapshot = lambda **kwargs: None
+    snapshot = backend.link_snapshot()
+    assert snapshot['authoritative_runtime_envelope'] == {}
+    assert snapshot['final_verdict'] == {}
+    assert snapshot['projected_final_verdict']['source'] == 'projection'

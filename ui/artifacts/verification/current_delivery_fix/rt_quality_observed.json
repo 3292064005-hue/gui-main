@@ -1,0 +1,56 @@
+{
+  "summary_state": "ready",
+  "summary_label": "rt kernel wrapped by official sdk lifecycle",
+  "detail": "Observed mock-runtime RT samples remain within the committed jitter/cycle budget envelope.",
+  "runtime_source": "mock_runtime_contract",
+  "nominal_loop_hz": 1000,
+  "read_update_write": [
+    "read_state",
+    "update_phase_policy",
+    "write_command"
+  ],
+  "phase": "idle",
+  "monitors": {
+    "reference_limiter": true,
+    "freshness_guard": true,
+    "jitter_monitor": true,
+    "contact_band_monitor": true,
+    "network_guard": true
+  },
+  "jitter_budget_ms": 0.25,
+  "current_period_ms": 1.0,
+  "freshness_budget_ms": 100,
+  "reference_limits": {
+    "max_cart_step_mm": 2.5,
+    "max_force_delta_n": 1.0
+  },
+  "fixed_period_enforced": true,
+  "network_healthy": true,
+  "overrun_count": 0,
+  "max_cycle_ms": 1.0,
+  "last_wake_jitter_ms": 0.05,
+  "rt_quality_gate_passed": true,
+  "last_sensor_decision": "fresh",
+  "degraded_without_sdk": true,
+  "loop_samples": [
+    {
+      "execution_ms": 0.94,
+      "wake_jitter_ms": 0.03,
+      "overrun": false
+    },
+    {
+      "execution_ms": 0.98,
+      "wake_jitter_ms": 0.04,
+      "overrun": false
+    },
+    {
+      "execution_ms": 1.0,
+      "wake_jitter_ms": 0.05,
+      "overrun": false
+    }
+  ],
+  "evidence_kind": "measured_runtime_observation",
+  "capture_source": "mock_core_runtime_live_export",
+  "sample_count": 3,
+  "quality_verdict": "pass"
+}

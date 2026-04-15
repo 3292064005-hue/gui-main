@@ -9,6 +9,19 @@
 #include <string>
 #include <vector>
 
+#ifndef ROBOT_CORE_DEFAULT_ROBOT_MODEL
+#define ROBOT_CORE_DEFAULT_ROBOT_MODEL "xmate3"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_SDK_CLASS
+#define ROBOT_CORE_DEFAULT_SDK_CLASS "xMateRobot"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_AXIS_COUNT
+#define ROBOT_CORE_DEFAULT_AXIS_COUNT 6
+#endif
+#ifndef ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE
+#define ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE "cartesianImpedance"
+#endif
+
 #include "robot_core/runtime_types.h"
 #include "robot_core/contact_control_contract.h"
 #include "robot_core/normal_axis_admittance_controller.h"
@@ -25,14 +38,15 @@ class RtMotionControlCobot;
 namespace robot_core {
 
 struct SdkRobotRuntimeConfig {
-  std::string robot_model{"xmate3"};
-  std::string sdk_robot_class{"xMateRobot"};
+  std::string robot_model{ROBOT_CORE_DEFAULT_ROBOT_MODEL};
+  std::string sdk_robot_class{ROBOT_CORE_DEFAULT_SDK_CLASS};
   std::string preferred_link{"wired_direct"};
   bool requires_single_control_source{true};
-  std::string clinical_mainline_mode{"cartesianImpedance"};
+  bool allow_contract_shell_writes{false};
+  std::string clinical_mainline_mode{ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE};
   std::string remote_ip{"192.168.0.160"};
   std::string local_ip{"192.168.0.100"};
-  int axis_count{6};
+  int axis_count{ROBOT_CORE_DEFAULT_AXIS_COUNT};
   int rt_network_tolerance_percent{15};
   double joint_filter_hz{40.0};
   double cart_filter_hz{30.0};
@@ -250,6 +264,119 @@ struct RtPhaseControlContract {
   ControlledRetractControlContract controlled_retract{};
 };
 
+
+class SdkRobotFacade;
+
+class SdkRobotLifecyclePort {
+public:
+  explicit SdkRobotLifecyclePort(SdkRobotFacade& owner);
+  bool connect(const std::string& remote_ip, const std::string& local_ip);
+  void disconnect();
+  bool setPower(bool on);
+  bool setAutoMode();
+  bool setManualMode();
+  bool ensureConnected(std::string* reason = nullptr);
+  bool ensurePoweredAuto(std::string* reason = nullptr);
+  bool ensureNrtMode(std::string* reason = nullptr);
+private:
+  SdkRobotFacade& owner_;
+};
+
+class SdkRobotQueryPort {
+public:
+  explicit SdkRobotQueryPort(SdkRobotFacade& owner);
+  SdkRobotRuntimeConfig runtimeConfig() const;
+  std::vector<std::string> controllerLogs() const;
+  std::vector<SdkRobotProjectInfo> rlProjects() const;
+  SdkRobotRlStatus rlStatus() const;
+  std::vector<SdkRobotPathInfo> pathLibrary() const;
+  SdkRobotDragState dragState() const;
+  std::map<std::string, bool> di() const;
+  std::map<std::string, bool> doState() const;
+  std::map<std::string, double> ai() const;
+  std::map<std::string, double> ao() const;
+  std::map<std::string, int> registers() const;
+  std::string runtimeSource() const;
+  bool sdkAvailable() const;
+  bool xmateModelAvailable() const;
+  bool controlSourceExclusive() const;
+  bool networkHealthy() const;
+  bool motionChannelReady() const;
+  bool stateChannelReady() const;
+  bool auxChannelReady() const;
+  int nominalRtLoopHz() const;
+  std::string activeRtPhase() const;
+  std::string activeNrtProfile() const;
+  int commandSequence() const;
+  std::string sdkBindingMode() const;
+  std::string hardwareLifecycleState() const;
+  bool liveBindingEstablished() const;
+  RtPhaseTelemetry phaseTelemetry() const;
+  bool liveTakeoverReady() const;
+private:
+  SdkRobotFacade& owner_;
+};
+
+class SdkRobotNrtExecutionPort {
+public:
+  explicit SdkRobotNrtExecutionPort(SdkRobotFacade& owner);
+  bool executeMoveAbsJ(const std::vector<double>& joints_rad, int speed_mm_s, int zone_mm, std::string* reason = nullptr);
+  bool executeMoveL(const std::vector<double>& tcp_xyzabc_m_rad, int speed_mm_s, int zone_mm, std::string* reason = nullptr);
+  bool stop(std::string* reason = nullptr);
+  bool beginProfile(const std::string& profile, const std::string& sdk_command, bool requires_auto_mode, std::string* reason = nullptr);
+  void finishProfile(const std::string& profile, bool success, const std::string& detail = "");
+private:
+  SdkRobotFacade& owner_;
+};
+
+class SdkRobotRtControlPort {
+public:
+  explicit SdkRobotRtControlPort(SdkRobotFacade& owner);
+  bool configureMainline(const SdkRobotRuntimeConfig& config);
+  bool ensureRtMode(std::string* reason = nullptr);
+  bool ensureController(std::string* reason = nullptr);
+  bool ensureStateStream(const std::vector<std::string>& fields, std::string* reason = nullptr);
+  bool applyConfig(const SdkRobotRuntimeConfig& config, std::string* reason = nullptr);
+  bool stop(std::string* reason = nullptr);
+  bool beginMainline(const std::string& phase, int nominal_loop_hz, std::string* reason = nullptr);
+  void updatePhase(const std::string& phase, const std::string& detail = "");
+  void finishMainline(const std::string& phase, const std::string& detail = "");
+  bool populateObservedState(RtObservedState& out, std::string* reason = nullptr);
+  RtPhaseStepResult stepSeekContact(const RtObservedState& state);
+  RtPhaseStepResult stepScanFollow(const RtObservedState& state);
+  RtPhaseStepResult stepPauseHold(const RtObservedState& state);
+  RtPhaseStepResult stepControlledRetract(const RtObservedState& state);
+  void resetPhaseIntegrators();
+  bool validateContract(std::string* reason = nullptr) const;
+  void setControlContract(const RtPhaseControlContract& contract);
+  SdkRobotRuntimeConfig runtimeConfig() const;
+  std::string activeRtPhase() const;
+  bool networkHealthy() const;
+  int nominalRtLoopHz() const;
+  bool liveBindingEstablished() const;
+  RtPhaseTelemetry phaseTelemetry() const;
+private:
+  SdkRobotFacade& owner_;
+};
+
+class SdkRobotCollaborationPort {
+public:
+  explicit SdkRobotCollaborationPort(SdkRobotFacade& owner);
+  bool runRlProject(const std::string& project, const std::string& task, std::string* reason = nullptr);
+  bool pauseRlProject(std::string* reason = nullptr);
+  bool enableDrag(const std::string& space, const std::string& type, std::string* reason = nullptr);
+  bool disableDrag(std::string* reason = nullptr);
+  bool replayPath(const std::string& name, double rate, std::string* reason = nullptr);
+  bool startRecordPath(int duration_s, std::string* reason = nullptr);
+  bool stopRecordPath(std::string* reason = nullptr);
+  bool cancelRecordPath(std::string* reason = nullptr);
+  bool saveRecordPath(const std::string& name, const std::string& save_as, std::string* reason = nullptr);
+  void setRlStatus(const std::string& project, const std::string& task, bool running);
+  void setDragState(bool enabled, const std::string& space, const std::string& type);
+private:
+  SdkRobotFacade& owner_;
+};
+
 /**
  * @brief xMateRobot-only official SDK façade.
  *
@@ -263,127 +390,14 @@ struct RtPhaseControlContract {
  * When hardware or network prerequisites are unavailable, the façade reports a
  * truthful degraded state instead of overstating device authority.
  */
+using LifecyclePort = SdkRobotLifecyclePort;
+using QueryPort = SdkRobotQueryPort;
+using NrtExecutionPort = SdkRobotNrtExecutionPort;
+using RtControlPort = SdkRobotRtControlPort;
+using CollaborationPort = SdkRobotCollaborationPort;
+
 class SdkRobotFacade {
 public:
-  class LifecyclePort {
-  public:
-    explicit LifecyclePort(SdkRobotFacade& owner) : owner_(owner) {}
-
-    bool connect(const std::string& remote_ip, const std::string& local_ip);
-    void disconnect();
-    bool setPower(bool on);
-    bool setAutoMode();
-    bool setManualMode();
-    bool ensureConnected(std::string* reason = nullptr);
-    bool ensurePoweredAuto(std::string* reason = nullptr);
-    bool ensureNrtMode(std::string* reason = nullptr);
-
-  private:
-    SdkRobotFacade& owner_;
-  };
-
-  class QueryPort {
-  public:
-    explicit QueryPort(SdkRobotFacade& owner) : owner_(owner) {}
-
-    SdkRobotRuntimeConfig runtimeConfig() const;
-    std::vector<std::string> controllerLogs() const;
-    std::vector<SdkRobotProjectInfo> rlProjects() const;
-    SdkRobotRlStatus rlStatus() const;
-    std::vector<SdkRobotPathInfo> pathLibrary() const;
-    SdkRobotDragState dragState() const;
-    std::map<std::string, bool> di() const;
-    std::map<std::string, bool> doState() const;
-    std::map<std::string, double> ai() const;
-    std::map<std::string, double> ao() const;
-    std::map<std::string, int> registers() const;
-    std::string runtimeSource() const;
-    bool sdkAvailable() const;
-    bool xmateModelAvailable() const;
-    bool controlSourceExclusive() const;
-    bool networkHealthy() const;
-    bool motionChannelReady() const;
-    bool stateChannelReady() const;
-    bool auxChannelReady() const;
-    int nominalRtLoopHz() const;
-    std::string activeRtPhase() const;
-    std::string activeNrtProfile() const;
-    int commandSequence() const;
-    std::string sdkBindingMode() const;
-    std::string hardwareLifecycleState() const;
-    bool liveBindingEstablished() const;
-    RtPhaseTelemetry phaseTelemetry() const;
-    bool liveTakeoverReady() const;
-
-  private:
-    SdkRobotFacade& owner_;
-  };
-
-  class NrtExecutionPort {
-  public:
-    explicit NrtExecutionPort(SdkRobotFacade& owner) : owner_(owner) {}
-
-    bool executeMoveAbsJ(const std::vector<double>& joints_rad, int speed_mm_s, int zone_mm, std::string* reason = nullptr);
-    bool executeMoveL(const std::vector<double>& tcp_xyzabc_m_rad, int speed_mm_s, int zone_mm, std::string* reason = nullptr);
-    bool stop(std::string* reason = nullptr);
-    bool beginProfile(const std::string& profile, const std::string& sdk_command, bool requires_auto_mode, std::string* reason = nullptr);
-    void finishProfile(const std::string& profile, bool success, const std::string& detail = "");
-
-  private:
-    SdkRobotFacade& owner_;
-  };
-
-  class RtControlPort {
-  public:
-    explicit RtControlPort(SdkRobotFacade& owner) : owner_(owner) {}
-
-    bool configureMainline(const SdkRobotRuntimeConfig& config);
-    bool ensureRtMode(std::string* reason = nullptr);
-    bool ensureController(std::string* reason = nullptr);
-    bool ensureStateStream(const std::vector<std::string>& fields, std::string* reason = nullptr);
-    bool applyConfig(const SdkRobotRuntimeConfig& config, std::string* reason = nullptr);
-    bool stop(std::string* reason = nullptr);
-    bool beginMainline(const std::string& phase, int nominal_loop_hz, std::string* reason = nullptr);
-    void updatePhase(const std::string& phase, const std::string& detail = "");
-    void finishMainline(const std::string& phase, const std::string& detail = "");
-    bool populateObservedState(RtObservedState& out, std::string* reason = nullptr);
-    RtPhaseStepResult stepSeekContact(const RtObservedState& state);
-    RtPhaseStepResult stepScanFollow(const RtObservedState& state);
-    RtPhaseStepResult stepPauseHold(const RtObservedState& state);
-    RtPhaseStepResult stepControlledRetract(const RtObservedState& state);
-    void resetPhaseIntegrators();
-    bool validateContract(std::string* reason = nullptr) const;
-    void setControlContract(const RtPhaseControlContract& contract);
-    SdkRobotRuntimeConfig runtimeConfig() const;
-    std::string activeRtPhase() const;
-    bool networkHealthy() const;
-    int nominalRtLoopHz() const;
-    bool liveBindingEstablished() const;
-    RtPhaseTelemetry phaseTelemetry() const;
-
-  private:
-    SdkRobotFacade& owner_;
-  };
-
-  class CollaborationPort {
-  public:
-    explicit CollaborationPort(SdkRobotFacade& owner) : owner_(owner) {}
-
-    bool runRlProject(const std::string& project, const std::string& task, std::string* reason = nullptr);
-    bool pauseRlProject(std::string* reason = nullptr);
-    bool enableDrag(const std::string& space, const std::string& type, std::string* reason = nullptr);
-    bool disableDrag(std::string* reason = nullptr);
-    bool replayPath(const std::string& name, double rate, std::string* reason = nullptr);
-    bool startRecordPath(int duration_s, std::string* reason = nullptr);
-    bool stopRecordPath(std::string* reason = nullptr);
-    bool cancelRecordPath(std::string* reason = nullptr);
-    bool saveRecordPath(const std::string& name, const std::string& save_as, std::string* reason = nullptr);
-    void setRlStatus(const std::string& project, const std::string& task, bool running);
-    void setDragState(bool enabled, const std::string& space, const std::string& type);
-
-  private:
-    SdkRobotFacade& owner_;
-  };
 
   SdkRobotFacade();
   ~SdkRobotFacade();
@@ -398,6 +412,7 @@ public:
   const RtControlPort& rtControlPort() const;
   CollaborationPort& collaborationPort();
   const CollaborationPort& collaborationPort() const;
+
 
   /**
    * @brief Connect the xMateRobot live binding.
@@ -494,7 +509,7 @@ public:
   bool validateRtControlContract(std::string* reason = nullptr) const;
   void setRtPhaseControlContract(const RtPhaseControlContract& contract);
 
-private:
+
   static std::vector<double> zeroVector(std::size_t count);
   static std::array<double, 16> defaultPoseMatrix();
   double measuredNormalForce(const RtObservedState& state) const;
@@ -512,6 +527,20 @@ private:
   void refreshPathLibrary();
   void refreshIoSnapshots();
   void setRtPhaseCode(const std::string& phase);
+  /**
+   * @brief Enforce that a hardware-mutating SDK call has a live binding.
+   * @param prefix Human-readable operation label written into controller logs on failure.
+   * @param reason Optional output string receiving the blocking reason.
+   * @return True when the façade currently owns a live binding or when contract-shell writes were explicitly enabled in the frozen runtime config.
+   * @throws No exceptions are thrown. Failure is reported through controller logs and the optional reason output.
+   * @boundary Prevents contract-shell/local-cache state mutation from masquerading as a real controller-side write.
+   */
+  bool requireLiveWrite(const std::string& prefix, std::string* reason = nullptr);
+  void finalizeNrtStopLocal(const std::string& detail = "");
+  void finalizeRtStopLocal(const std::string& detail = "");
+  bool beginRtMainlineInternal(const std::string& phase, int nominal_loop_hz, std::string* reason = nullptr);
+  void updateRtPhaseInternal(const std::string& phase, const std::string& detail = "");
+  void finishRtMainlineInternal(const std::string& phase, const std::string& detail = "");
   bool applyErrorCode(const std::string& prefix, const std::error_code& ec, std::string* reason = nullptr);
   void captureException(const std::string& prefix, const std::exception& ex, std::string* reason = nullptr);
   void captureFailure(const std::string& prefix, const std::string& detail, std::string* reason = nullptr);
@@ -593,11 +622,11 @@ private:
   std::map<std::string, int> registers_;
   std::shared_ptr<rokae::xMateRobot> robot_;
   std::shared_ptr<rokae::RtMotionControlCobot<6>> rt_controller_;
-  LifecyclePort lifecycle_port_;
-  QueryPort query_port_;
-  NrtExecutionPort nrt_execution_port_;
-  RtControlPort rt_control_port_;
-  CollaborationPort collaboration_port_;
+  std::unique_ptr<SdkRobotLifecyclePort> lifecycle_port_;
+  std::unique_ptr<SdkRobotQueryPort> query_port_;
+  std::unique_ptr<SdkRobotNrtExecutionPort> nrt_execution_port_;
+  std::unique_ptr<SdkRobotRtControlPort> rt_control_port_;
+  std::unique_ptr<SdkRobotCollaborationPort> collaboration_port_;
 };
 
 }  // namespace robot_core

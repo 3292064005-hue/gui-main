@@ -47,6 +47,9 @@ RtMotionService::RtMotionService(std::shared_ptr<rokae::xMateRobot> robot, SdkRo
       adaptive_timer_(std::make_unique<AdaptiveTimer>(1.0, 1.0, 70.0)) {
   snapshot_.degraded_without_sdk = (sdk_ == nullptr);
   snapshot_.nominal_loop_hz = 1000;
+  snapshot_.fixed_period_enforced = true;
+  snapshot_.jitter_monitor_enabled = true;
+  snapshot_.jitter_budget_ms = 0.2;
   snapshot_.contact_control_mode = "normal_axis_admittance";
 }
 

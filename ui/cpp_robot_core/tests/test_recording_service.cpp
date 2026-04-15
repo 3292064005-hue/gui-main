@@ -74,6 +74,11 @@ int main() {
   const auto contact_state_path = root / "raw" / "core" / "contact_state.jsonl";
   const auto scan_progress_path = root / "raw" / "core" / "scan_progress.jsonl";
   const auto alarm_path = root / "raw" / "core" / "alarm_event.jsonl";
+  const auto timeline_path = root / "raw" / "core" / "event_timeline.jsonl";
+  const auto manifest_path = root / "raw" / "core" / "recording_manifest.json";
+  const auto replay_index_path = root / "derived" / "core" / "telemetry_replay_index.json";
+  const auto alarm_index_path = root / "derived" / "core" / "alarm_review_index.json";
+  const auto audit_index_path = root / "derived" / "core" / "audit_timeline_index.json";
 
   if (!require(fs::exists(robot_state_path), "robot state log should exist after closeSession")) {
     return 1;
@@ -87,6 +92,21 @@ int main() {
   if (!require(fs::exists(alarm_path), "alarm log should exist after closeSession")) {
     return 1;
   }
+  if (!require(fs::exists(timeline_path), "event timeline should exist after closeSession")) {
+    return 1;
+  }
+  if (!require(fs::exists(manifest_path), "recording manifest should exist after openSession")) {
+    return 1;
+  }
+  if (!require(fs::exists(replay_index_path), "telemetry replay index should exist after closeSession")) {
+    return 1;
+  }
+  if (!require(fs::exists(alarm_index_path), "alarm review index should exist after closeSession")) {
+    return 1;
+  }
+  if (!require(fs::exists(audit_index_path), "audit timeline index should exist after closeSession")) {
+    return 1;
+  }
   if (!require(countLines(robot_state_path) == 1, "robot state log should contain one flushed sample")) {
     return 1;
   }
@@ -97,6 +117,9 @@ int main() {
     return 1;
   }
   if (!require(countLines(alarm_path) == 1, "alarm log should contain one flushed event")) {
+    return 1;
+  }
+  if (!require(countLines(timeline_path) == 4, "event timeline should contain all four flushed samples")) {
     return 1;
   }
 

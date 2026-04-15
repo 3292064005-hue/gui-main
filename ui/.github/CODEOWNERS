@@ -1,9 +1,11 @@
-# Runtime/core ownership
-/cpp_robot_core/ @runtime-core-owners
-/spine_ultrasound_ui/services/ @python-runtime-owners
-/spine_ultrasound_ui/core/ @workflow-owners
-/scripts/ @build-and-release-owners
-/docs/ @architecture-owners
-/schemas/ @schema-owners
-/.github/workflows/ @build-and-release-owners
-/.github/CODEOWNERS @architecture-owners
+# Canonical mainline ownership map
+* @runtime-architecture
+
+/.github/CODEOWNERS @runtime-architecture
+/cpp_robot_core/ @runtime-core
+/spine_ultrasound_ui/services/ @backend-surface
+/spine_ultrasound_ui/core/ @ui-workflow
+/scripts/ @repo-gates
+/docs/ @architecture-docs
+/configs/ @runtime-config
+/schemas/ @contracts

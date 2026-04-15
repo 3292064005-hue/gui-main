@@ -6,12 +6,14 @@ from typing import Any
 from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.core.session_service import SessionService
 from spine_ultrasound_ui.models import RuntimeConfig, WorkflowArtifacts
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
 from spine_ultrasound_ui.utils import now_text
 
 class SessionFacade:
-    def __init__(self, session_service: SessionService, exp_manager: ExperimentManager) -> None:
+    def __init__(self, session_service: SessionService, exp_manager: ExperimentManager, governance_projection: RuntimeGovernanceQuerySurface | None = None) -> None:
         self.session_service = session_service
         self.exp_manager = exp_manager
+        self.governance_projection = governance_projection or RuntimeGovernanceQuerySurface()
 
     def create_experiment(self, config: RuntimeConfig, *, note: str = ""):
         return self.session_service.create_experiment(config, note=note)
@@ -20,6 +22,12 @@ class SessionFacade:
         self.session_service.reset()
 
     def build_summary_payload(self, *, workflow_artifacts: WorkflowArtifacts, experiment, telemetry, config: RuntimeConfig, preview_scan_plan, execution_scan_plan, model_report: dict[str, Any], sdk_runtime: dict[str, Any], backend_link: dict[str, Any], bridge_observability: dict[str, Any], localization_result, deployment_profile: dict[str, Any], control_plane_snapshot: dict[str, Any]) -> dict[str, Any]:
+        governance_projection = self.governance_projection.build_projection(
+            backend_link=backend_link,
+            control_plane_snapshot=control_plane_snapshot,
+            model_report=model_report,
+            sdk_runtime=sdk_runtime,
+        )
         return {
             "saved_at": now_text(),
             "core_state": telemetry.core_state.execution_state,
@@ -51,7 +59,9 @@ class SessionFacade:
             "planning": {"preview": preview_scan_plan.to_dict() if preview_scan_plan is not None else {}, "execution": execution_scan_plan.to_dict() if execution_scan_plan is not None else {}, "model_report": dict(model_report)},
             "sdk_runtime": dict(sdk_runtime),
             "backend_link": dict(backend_link),
-            "control_authority": dict(backend_link.get("control_plane", {}).get("control_authority", {})),
+            "control_authority": dict(governance_projection.get("control_authority", backend_link.get("control_plane", {}).get("control_authority", {}))),
+            "final_verdict": dict(governance_projection.get("final_verdict", {})),
+            "authoritative_projection": dict(governance_projection),
             "bridge_observability": dict(bridge_observability),
             "deployment_profile": dict(deployment_profile),
             "control_plane_snapshot": dict(control_plane_snapshot),

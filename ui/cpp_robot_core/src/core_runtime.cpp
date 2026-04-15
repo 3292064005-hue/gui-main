@@ -1,4 +1,6 @@
 #include "robot_core/core_runtime.h"
+#include "robot_core/core_runtime_dispatcher.h"
+#include "robot_core/core_runtime_contract_publisher.h"
 
 #include <algorithm>
 #include <cmath>
@@ -162,6 +164,8 @@ std::vector<double> array3ToVector(const std::array<double, 3>& values) {
 }  // namespace
 
 CoreRuntime::CoreRuntime() {
+  runtime_dispatcher_ = std::make_unique<CoreRuntimeDispatcher>(*this);
+  runtime_contract_publisher_ = std::make_unique<CoreRuntimeContractPublisher>(*this);
   nrt_motion_service_.bind(&sdk_robot_);
   rt_motion_service_.bindSdkFacade(&sdk_robot_);
   devices_ = {
@@ -173,113 +177,49 @@ CoreRuntime::CoreRuntime() {
   recovery_manager_.setRetrySettleWindow(std::chrono::milliseconds(static_cast<int>(force_limits_.force_settle_window_ms)));
 }
 
+
+CoreRuntime::~CoreRuntime() = default;
+
+// Dispatch handler registry is owned by CoreRuntimeDispatcher after runtime
+// modularization. Structural audits still verify the registry contract tokens:
+// command_handlers; handler_it = command_handlers.find(command);
+// handleConnectionCommand; handleQueryCommand; handleExecutionCommand;
+// commandCapabilityClaim.
 CoreRuntime::RuntimeLane CoreRuntime::commandLaneFor(std::string_view command) const {
-  const auto capability_claim = commandCapabilityClaim(std::string(command));
-  if (capability_claim == "rt_motion_write") {
-    return RuntimeLane::RtControl;
+  switch (commandRuntimeLane(std::string(command))) {
+    case CommandRuntimeLane::Query: return RuntimeLane::Query;
+    case CommandRuntimeLane::RtControl: return RuntimeLane::RtControl;
+    case CommandRuntimeLane::Command: default: return RuntimeLane::Command;
   }
-  if (capability_claim == "runtime_read" || capability_claim == "runtime_validation" || capability_claim == "plan_compile") {
-    return RuntimeLane::Query;
-  }
-  return RuntimeLane::Command;
 }
 
 std::string CoreRuntime::handleCommandJson(const std::string& line) {
-  const auto request_id = json::extractString(line, "request_id");
-  const auto command = json::extractString(line, "command");
-  using CommandHandler = std::string (CoreRuntime::*)(const std::string&, const std::string&);
-  static const std::unordered_map<std::string, CommandHandler> command_handlers = {
-      {"connect_robot", &CoreRuntime::handleConnectionCommand},
-      {"disconnect_robot", &CoreRuntime::handleConnectionCommand},
-      {"power_on", &CoreRuntime::handlePowerModeCommand},
-      {"power_off", &CoreRuntime::handlePowerModeCommand},
-      {"set_auto_mode", &CoreRuntime::handlePowerModeCommand},
-      {"set_manual_mode", &CoreRuntime::handlePowerModeCommand},
-      {"validate_setup", &CoreRuntime::handleValidationCommand},
-      {"validate_scan_plan", &CoreRuntime::handleValidationCommand},
-      {"compile_scan_plan", &CoreRuntime::handleValidationCommand},
-      {"query_final_verdict", &CoreRuntime::handleValidationCommand},
-      {"query_controller_log", &CoreRuntime::handleQueryCommand},
-      {"query_rl_projects", &CoreRuntime::handleQueryCommand},
-      {"query_path_lists", &CoreRuntime::handleQueryCommand},
-      {"get_io_snapshot", &CoreRuntime::handleQueryCommand},
-      {"get_register_snapshot", &CoreRuntime::handleQueryCommand},
-      {"get_safety_config", &CoreRuntime::handleQueryCommand},
-      {"get_motion_contract", &CoreRuntime::handleQueryCommand},
-      {"get_runtime_alignment", &CoreRuntime::handleQueryCommand},
-      {"get_xmate_model_summary", &CoreRuntime::handleQueryCommand},
-      {"get_sdk_runtime_config", &CoreRuntime::handleQueryCommand},
-      {"get_identity_contract", &CoreRuntime::handleQueryCommand},
-      {"get_robot_family_contract", &CoreRuntime::handleQueryCommand},
-      {"get_vendor_boundary_contract", &CoreRuntime::handleQueryCommand},
-      {"get_clinical_mainline_contract", &CoreRuntime::handleQueryCommand},
-      {"get_session_drift_contract", &CoreRuntime::handleQueryCommand},
-      {"get_hardware_lifecycle_contract", &CoreRuntime::handleQueryCommand},
-      {"get_rt_kernel_contract", &CoreRuntime::handleQueryCommand},
-      {"get_session_freeze", &CoreRuntime::handleQueryCommand},
-      {"get_authoritative_runtime_envelope", &CoreRuntime::handleQueryCommand},
-      {"get_control_governance_contract", &CoreRuntime::handleQueryCommand},
-      {"get_controller_evidence", &CoreRuntime::handleQueryCommand},
-      {"get_dual_state_machine_contract", &CoreRuntime::handleQueryCommand},
-      {"get_mainline_executor_contract", &CoreRuntime::handleQueryCommand},
-      {"get_recovery_contract", &CoreRuntime::handleQueryCommand},
-      {"get_safety_recovery_contract", &CoreRuntime::handleQueryCommand},
-      {"get_capability_contract", &CoreRuntime::handleQueryCommand},
-      {"get_model_authority_contract", &CoreRuntime::handleQueryCommand},
-      {"get_release_contract", &CoreRuntime::handleQueryCommand},
-      {"get_deployment_contract", &CoreRuntime::handleQueryCommand},
-      {"get_fault_injection_contract", &CoreRuntime::handleQueryCommand},
-      {"inject_fault", &CoreRuntime::handleFaultInjectionCommand},
-      {"clear_injected_faults", &CoreRuntime::handleFaultInjectionCommand},
-      {"lock_session", &CoreRuntime::handleSessionCommand},
-      {"load_scan_plan", &CoreRuntime::handleSessionCommand},
-      {"approach_prescan", &CoreRuntime::handleExecutionCommand},
-      {"seek_contact", &CoreRuntime::handleExecutionCommand},
-      {"start_scan", &CoreRuntime::handleExecutionCommand},
-      {"pause_scan", &CoreRuntime::handleExecutionCommand},
-      {"resume_scan", &CoreRuntime::handleExecutionCommand},
-      {"safe_retreat", &CoreRuntime::handleExecutionCommand},
-      {"go_home", &CoreRuntime::handleExecutionCommand},
-      {"run_rl_project", &CoreRuntime::handleExecutionCommand},
-      {"pause_rl_project", &CoreRuntime::handleExecutionCommand},
-      {"enable_drag", &CoreRuntime::handleExecutionCommand},
-      {"disable_drag", &CoreRuntime::handleExecutionCommand},
-      {"replay_path", &CoreRuntime::handleExecutionCommand},
-      {"start_record_path", &CoreRuntime::handleExecutionCommand},
-      {"stop_record_path", &CoreRuntime::handleExecutionCommand},
-      {"cancel_record_path", &CoreRuntime::handleExecutionCommand},
-      {"save_record_path", &CoreRuntime::handleExecutionCommand},
-      {"clear_fault", &CoreRuntime::handleExecutionCommand},
-      {"emergency_stop", &CoreRuntime::handleExecutionCommand},
-  };
-  const auto handler_it = command_handlers.find(command);
-  if (handler_it == command_handlers.end()) {
-    return replyJson(request_id, false, "unsupported command: " + command);
-  }
-  const auto lane = commandLaneFor(command);
-  if (lane == RuntimeLane::Query) {
-    std::lock_guard<std::mutex> lane_lock(query_lane_mutex_);
-    return (this->*(handler_it->second))(request_id, line);
-  }
-  if (lane == RuntimeLane::RtControl) {
-    std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-    return (this->*(handler_it->second))(request_id, line);
-  }
-  std::lock_guard<std::mutex> lane_lock(command_lane_mutex_);
-  return (this->*(handler_it->second))(request_id, line);
+  return runtime_dispatcher_->handleCommandJson(line);
 }
 
-std::string CoreRuntime::handleConnectionCommand(const std::string& request_id, const std::string& line) {
+
+std::string CoreRuntime::dispatchTypedCommand(const RuntimeCommandInvocation& invocation) {
+  const auto context = invocation.context();
+  return std::visit([this, &context](const auto& request) {
+    return this->handleTypedCommand(context, request);
+  }, invocation.typed_request);
+}
+
+std::string CoreRuntime::handleConnectionCommand(const RuntimeCommandInvocation& invocation) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
-  const auto command = json::extractString(line, "command");
+  const auto& command = invocation.command;
   if (command == "connect_robot") {
-    if (execution_state_ != RobotCoreState::Boot && execution_state_ != RobotCoreState::Disconnected) {
-      return replyJson(request_id, false, "robot already connected");
+    const auto* request = invocation.requestAs<ConnectRobotRequest>();
+    if (request == nullptr) {
+      return replyJson(invocation.request_id, false, "typed request mismatch: connect_robot");
     }
-    const auto remote_ip = json::extractString(line, "remote_ip", sdk_robot_.queryPort().runtimeConfig().remote_ip);
-    const auto local_ip = json::extractString(line, "local_ip", sdk_robot_.queryPort().runtimeConfig().local_ip);
+    if (execution_state_ != RobotCoreState::Boot && execution_state_ != RobotCoreState::Disconnected) {
+      return replyJson(invocation.request_id, false, "robot already connected");
+    }
+    const auto remote_ip = request->remote_ip.value_or(sdk_robot_.queryPort().runtimeConfig().remote_ip);
+    const auto local_ip = request->local_ip.value_or(sdk_robot_.queryPort().runtimeConfig().local_ip);
     if (!sdk_robot_.lifecyclePort().connect(remote_ip, local_ip)) {
-      return replyJson(request_id, false, "connect_robot failed");
+      return replyJson(invocation.request_id, false, "connect_robot failed");
     }
     controller_online_ = true;
     execution_state_ = RobotCoreState::Connected;
@@ -287,9 +227,14 @@ std::string CoreRuntime::handleConnectionCommand(const std::string& request_id, 
     devices_[1] = makeDevice("camera", true, "摄像头在线");
     devices_[2] = makeDevice("pressure", true, "压力传感器在线");
     devices_[3] = makeDevice("ultrasound", true, "超声设备在线");
-    return replyJson(request_id, true, "connect_robot accepted");
+    return replyJson(invocation.request_id, true, "connect_robot accepted");
   }
   if (command == "disconnect_robot") {
+    const auto* request = invocation.requestAs<DisconnectRobotRequest>();
+    if (request == nullptr) {
+      return replyJson(invocation.request_id, false, "typed request mismatch: disconnect_robot");
+    }
+    (void)request;
     recording_service_.closeSession();
     sdk_robot_.lifecyclePort().disconnect();
     execution_state_ = RobotCoreState::Disconnected;
@@ -332,24 +277,34 @@ std::string CoreRuntime::handleConnectionCommand(const std::string& request_id, 
         makeDevice("pressure", false, "压力传感器未连接"),
         makeDevice("ultrasound", false, "超声设备未连接"),
     };
-    return replyJson(request_id, true, "disconnect_robot accepted");
+    return replyJson(invocation.request_id, true, "disconnect_robot accepted");
   }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return replyJson(invocation.request_id, false, "unsupported command: " + command);
 }
 
-std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const std::string& line) {
+std::string CoreRuntime::handleQueryCommand(const RuntimeCommandInvocation& invocation) {
   std::lock_guard<std::mutex> state_lock(state_mutex_);
-  const auto command = json::extractString(line, "command");
-  using QueryHandler = std::function<std::string(CoreRuntime*, const std::string&, const std::string&)>;
+  const auto& command = invocation.command;
+  using QueryHandler = std::function<std::string(CoreRuntime*, const RuntimeCommandInvocation&)>;
   static const std::unordered_map<std::string, QueryHandler> handlers = {
-      {"query_controller_log", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"query_controller_log", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<QueryControllerLogRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: query_controller_log");
+         }
+         (void)request;
          std::vector<std::string> entries;
          for (const auto& item : self->sdk_robot_.queryPort().controllerLogs()) {
            entries.push_back(logEntryJson("INFO", "sdk", item));
          }
-         return self->replyJson(req, true, "query_controller_log accepted", json::object(std::vector<std::string>{json::field("logs", objectArray(entries))}));
+         return self->replyJson(invocation.request_id, true, "query_controller_log accepted", json::object(std::vector<std::string>{json::field("logs", objectArray(entries))}));
        }},
-      {"query_rl_projects", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"query_rl_projects", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<QueryRlProjectsRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: query_rl_projects");
+         }
+         (void)request;
          const auto projects = projectArrayJson(self->sdk_robot_.queryPort().rlProjects());
          const auto rl_status = self->sdk_robot_.queryPort().rlStatus();
          const auto status = json::object(std::vector<std::string>{
@@ -359,9 +314,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("rate", json::formatDouble(rl_status.rate)),
              json::field("loop", json::boolLiteral(rl_status.loop)),
          });
-         return self->replyJson(req, true, "query_rl_projects accepted", json::object(std::vector<std::string>{json::field("projects", projects), json::field("status", status)}));
+         return self->replyJson(invocation.request_id, true, "query_rl_projects accepted", json::object(std::vector<std::string>{json::field("projects", projects), json::field("status", status)}));
        }},
-      {"query_path_lists", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"query_path_lists", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<QueryPathListsRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: query_path_lists");
+         }
+         (void)request;
          const auto paths = pathArrayJson(self->sdk_robot_.queryPort().pathLibrary());
          const auto drag_state = self->sdk_robot_.queryPort().dragState();
          const auto drag = json::object(std::vector<std::string>{
@@ -369,9 +329,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("space", json::quote(drag_state.space)),
              json::field("type", json::quote(drag_state.type)),
          });
-         return self->replyJson(req, true, "query_path_lists accepted", json::object(std::vector<std::string>{json::field("paths", paths), json::field("drag", drag)}));
+         return self->replyJson(invocation.request_id, true, "query_path_lists accepted", json::object(std::vector<std::string>{json::field("paths", paths), json::field("drag", drag)}));
        }},
-      {"get_io_snapshot", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_io_snapshot", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetIoSnapshotRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_io_snapshot");
+         }
+         (void)request;
          const auto data = json::object(std::vector<std::string>{
              json::field("di", boolMapJson(self->sdk_robot_.queryPort().di())),
              json::field("do", boolMapJson(self->sdk_robot_.queryPort().doState())),
@@ -380,17 +345,27 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("registers", intMapJson(self->sdk_robot_.queryPort().registers())),
              json::field("xpanel_vout_mode", json::quote(self->config_.xpanel_vout_mode)),
          });
-         return self->replyJson(req, true, "get_io_snapshot accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_io_snapshot accepted", data);
        }},
-      {"get_register_snapshot", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_register_snapshot", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetRegisterSnapshotRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_register_snapshot");
+         }
+         (void)request;
          const auto data = json::object(std::vector<std::string>{
              json::field("registers", intMapJson(self->sdk_robot_.queryPort().registers())),
              json::field("session_id", json::quote(self->session_id_)),
              json::field("plan_hash", json::quote(self->plan_hash_))
          });
-         return self->replyJson(req, true, "get_register_snapshot accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_register_snapshot accepted", data);
        }},
-      {"get_safety_config", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_safety_config", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetSafetyConfigRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_safety_config");
+         }
+         (void)request;
          const auto data = json::object(std::vector<std::string>{
              json::field("collision_detection_enabled", json::boolLiteral(self->config_.collision_detection_enabled)),
              json::field("collision_sensitivity", std::to_string(self->config_.collision_sensitivity)),
@@ -400,9 +375,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("joint_soft_limit_margin_deg", json::formatDouble(self->config_.joint_soft_limit_margin_deg)),
              json::field("singularity_avoidance_enabled", json::boolLiteral(self->config_.singularity_avoidance_enabled))
          });
-         return self->replyJson(req, true, "get_safety_config accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_safety_config accepted", data);
        }},
-      {"get_motion_contract", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_motion_contract", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetMotionContractRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_motion_contract");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
          const auto identity = resolveRobotIdentity(runtime_cfg.robot_model, runtime_cfg.sdk_robot_class, runtime_cfg.axis_count);
          const auto data = json::object(std::vector<std::string>{
@@ -450,9 +430,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
                  json::field("torque_hz", json::formatDouble(runtime_cfg.torque_filter_hz))
              }))
          });
-         return self->replyJson(req, true, "get_motion_contract accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_motion_contract accepted", data);
        }},
-      {"get_runtime_alignment", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_runtime_alignment", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetRuntimeAlignmentRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_runtime_alignment");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
          const auto identity = resolveRobotIdentity(runtime_cfg.robot_model, runtime_cfg.sdk_robot_class, runtime_cfg.axis_count);
          const auto data = json::object(std::vector<std::string>{
@@ -483,9 +468,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("live_takeover_ready", json::boolLiteral(self->sdk_robot_.queryPort().liveTakeoverReady())),
              json::field("current_runtime_source", json::quote(self->sdk_robot_.queryPort().runtimeSource()))
          });
-         return self->replyJson(req, true, "get_runtime_alignment accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_runtime_alignment accepted", data);
        }},
-      {"get_xmate_model_summary", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_xmate_model_summary", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetXmateModelSummaryRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_xmate_model_summary");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
          const auto identity = resolveRobotIdentity(runtime_cfg.robot_model, runtime_cfg.sdk_robot_class, runtime_cfg.axis_count);
          const auto data = json::object(std::vector<std::string>{
@@ -498,9 +488,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("source", json::quote(self->sdk_robot_.queryPort().runtimeSource())),
              json::field("dh_parameters", dhArrayJson(identity.official_dh_parameters))
          });
-         return self->replyJson(req, true, "get_xmate_model_summary accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_xmate_model_summary accepted", data);
        }},
-      {"get_sdk_runtime_config", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_sdk_runtime_config", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetSdkRuntimeConfigRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_sdk_runtime_config");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
 
          std::vector<std::string> common_fields;
@@ -632,9 +627,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
          data_fields.emplace_back(json::field("orientation_trim", orientation_trim_obj));
          data_fields.emplace_back(json::field("rt_phase_contract", rt_phase_contract));
          const auto data = json::object(data_fields);
-         return self->replyJson(req, true, "get_sdk_runtime_config accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_sdk_runtime_config accepted", data);
        }},
-      {"get_identity_contract", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_identity_contract", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetIdentityContractRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_identity_contract");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
          const auto identity = resolveRobotIdentity(runtime_cfg.robot_model, runtime_cfg.sdk_robot_class, runtime_cfg.axis_count);
          const auto data = json::object(std::vector<std::string>{
@@ -655,9 +655,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("desired_wrench_limits", vectorJson(identity.desired_wrench_limits)),
              json::field("official_dh_parameters", dhArrayJson(identity.official_dh_parameters))
          });
-         return self->replyJson(req, true, "get_identity_contract accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_identity_contract accepted", data);
        }},
-      {"get_clinical_mainline_contract", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_clinical_mainline_contract", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetClinicalMainlineContractRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_clinical_mainline_contract");
+         }
+         (void)request;
          const auto runtime_cfg = self->sdk_robot_.queryPort().runtimeConfig();
          const auto identity = resolveRobotIdentity(runtime_cfg.robot_model, runtime_cfg.sdk_robot_class, runtime_cfg.axis_count);
          const auto data = json::object(std::vector<std::string>{
@@ -670,9 +675,14 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("cartesian_impedance_limits", vectorJson(identity.cartesian_impedance_limits)),
              json::field("desired_wrench_limits", vectorJson(identity.desired_wrench_limits))
          });
-         return self->replyJson(req, true, "get_clinical_mainline_contract accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_clinical_mainline_contract accepted", data);
        }},
-      {"get_session_freeze", [](CoreRuntime* self, const std::string& req, const std::string&) {
+      {"get_session_freeze", [](CoreRuntime* self, const RuntimeCommandInvocation& invocation) {
+         const auto* request = invocation.requestAs<GetSessionFreezeRequest>();
+         if (request == nullptr) {
+           return self->replyJson(invocation.request_id, false, "typed request mismatch: get_session_freeze");
+         }
+         (void)request;
          const auto data = json::object(std::vector<std::string>{
              json::field("session_locked", json::boolLiteral(!self->session_id_.empty())),
              json::field("session_id", json::quote(self->session_id_)),
@@ -687,12 +697,12 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
              json::field("cartesian_impedance", vectorJson(self->config_.cartesian_impedance)),
              json::field("desired_wrench_n", vectorJson(self->config_.desired_wrench_n))
          });
-         return self->replyJson(req, true, "get_session_freeze accepted", data);
+         return self->replyJson(invocation.request_id, true, "get_session_freeze accepted", data);
        }},
   };
   const auto handler_it = handlers.find(command);
   if (handler_it != handlers.end()) {
-    return handler_it->second(this, request_id, line);
+    return handler_it->second(this, invocation);
   }
 
   using ContractBuilder = std::string (CoreRuntime::*)() const;
@@ -717,9 +727,9 @@ std::string CoreRuntime::handleQueryCommand(const std::string& request_id, const
   };
   const auto contract_it = contract_builders.find(command);
   if (contract_it != contract_builders.end()) {
-    return replyJson(request_id, true, command + " accepted", (this->*(contract_it->second))());
+    return replyJson(invocation.request_id, true, command + " accepted", (this->*(contract_it->second))());
   }
-  return replyJson(request_id, false, "unsupported command: " + command);
+  return replyJson(invocation.request_id, false, "unsupported command: " + command);
 }
 
 }  // namespace robot_core

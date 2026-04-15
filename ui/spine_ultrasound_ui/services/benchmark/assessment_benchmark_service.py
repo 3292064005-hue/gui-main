@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from spine_ultrasound_ui.services.authoritative_artifact_reader import AuthoritativeArtifactReader
+from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.utils import now_text
 
 
@@ -18,8 +18,8 @@ class AssessmentBenchmarkService:
     regresses.
     """
 
-    def __init__(self, artifact_reader: AuthoritativeArtifactReader | None = None) -> None:
-        self._artifact_reader = artifact_reader or AuthoritativeArtifactReader()
+    def __init__(self, artifact_reader: SessionProductsAuthoritySurface | None = None) -> None:
+        self._artifact_reader = artifact_reader or SessionProductsAuthoritySurface()
 
     def evaluate_many(self, case_specs: list[dict[str, Any]]) -> dict[str, Any]:
         """Evaluate multiple benchmark cases.

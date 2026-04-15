@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List
 
+from spine_ultrasound_ui.utils.mainline_identity_defaults import MAINLINE_IDENTITY_DEFAULTS
 from spine_ultrasound_ui.utils.sdk_unit_contract import build_sdk_boundary_contract
 
 
@@ -107,11 +108,12 @@ class RuntimeConfig:
     contact_control: ContactControlConfig = field(default_factory=ContactControlConfig)
     force_estimator: ForceEstimatorConfig = field(default_factory=ForceEstimatorConfig)
     orientation_trim: OrientationTrimConfig = field(default_factory=OrientationTrimConfig)
-    robot_model: str = "xmate3"
-    axis_count: int = 6
-    sdk_robot_class: str = "xMateRobot"
-    preferred_link: str = "wired_direct"
+    robot_model: str = MAINLINE_IDENTITY_DEFAULTS.robot_model
+    axis_count: int = MAINLINE_IDENTITY_DEFAULTS.axis_count
+    sdk_robot_class: str = MAINLINE_IDENTITY_DEFAULTS.sdk_robot_class
+    preferred_link: str = MAINLINE_IDENTITY_DEFAULTS.preferred_link
     requires_single_control_source: bool = True
+    allow_contract_shell_writes: bool = False
     build_id: str = "dev"
     software_version: str = "0.3.0"
     camera_guidance_input_mode: str = "synthetic"

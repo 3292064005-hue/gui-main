@@ -328,7 +328,9 @@ def test_acceptance_summary_script_writes_machine_readable_summary(tmp_path: Pat
     payload = json.loads(summary.read_text(encoding='utf-8'))
     assert payload['schema_version'] == 'acceptance.summary.v2'
     assert payload['verification_snapshot']['reported_tiers'] == {}
-    assert payload['profiles'] == ['mock', 'hil']
+    assert payload['profiles'] == []
+    assert payload['requested_profiles'] == ['mock', 'hil']
+    assert payload['acceptance_scope']['profile_gate_proof'] is False
 
 
 def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_path: Path) -> None:
@@ -382,6 +384,9 @@ def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_p
     assert payload['build_evidence_report'] == 'build_evidence_report.json'
     assert payload['verification_snapshot']['verification_boundary'] == 'environment_blocked'
     assert payload['verification_snapshot']['build_evidence_mode'] == 'syntax_only_fallback'
+    assert payload['profiles'] == ['mock']
+    assert payload['requested_profiles'] == ['mock']
+    assert payload['acceptance_scope']['validated_profiles'] == ['mock']
 
 
 
@@ -440,6 +445,8 @@ def test_write_acceptance_summary_uses_portable_relative_paths(tmp_path: Path) -
     assert payload['verification_snapshot']['build_evidence_mode'] == ''
     assert payload['installed_binaries'] == ['../build/mock/spine_robot_core']
     assert payload['verification_snapshot']['verification_boundary'] == ''
+    assert payload['profiles'] == []
+    assert payload['requested_profiles'] == ['mock']
 
 
 def test_write_verification_report_uses_portable_relative_manifest_path(tmp_path: Path) -> None:

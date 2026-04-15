@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from spine_ultrasound_ui.models import RuntimeConfig
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
 
 
 class MainlineRuntimeDoctorService:
@@ -13,6 +14,9 @@ class MainlineRuntimeDoctorService:
     is internally aligned: single control source, session freeze, motion/runtime
     contract, model authority, and deployment constraints.
     """
+
+    def __init__(self, governance_projection: RuntimeGovernanceQuerySurface | None = None) -> None:
+        self._governance_projection = governance_projection or RuntimeGovernanceQuerySurface()
 
     def inspect(
         self,
@@ -31,6 +35,12 @@ class MainlineRuntimeDoctorService:
         blockers: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
         sections: dict[str, Any] = {}
+        governance_projection = self._governance_projection.build_projection(
+            backend_link=backend_link,
+            control_plane_snapshot=backend_link.get("control_plane", {}).get("control_plane_snapshot", {}),
+            model_report=model_report,
+            sdk_runtime=sdk_runtime,
+        )
 
         def push(target: list[dict[str, Any]], section: str, name: str, detail: str) -> None:
             target.append({"section": section, "name": name, "detail": detail})
@@ -64,7 +74,7 @@ class MainlineRuntimeDoctorService:
             push(blockers, "clinical_mainline", "rt_mode_mismatch", f"runtime rt_mode={actual_rt_mode}, expected={expected_rt_mode}")
 
         if bool(control.get("single_control_source_required", config.requires_single_control_source)):
-            ownership = dict(backend_link.get("control_plane", {})).get("control_authority", {}) or {}
+            ownership = dict(governance_projection.get("control_authority", {}))
             ownership_state = str(ownership.get("summary_state", ""))
             if ownership_state == "blocked":
                 push(blockers, "control_governance", "control_authority_conflict", str(ownership.get("detail", "控制权冲突")))
@@ -80,9 +90,10 @@ class MainlineRuntimeDoctorService:
         if session_locked and not bool(control.get("runtime_config_bound", False)):
             push(warnings, "session_freeze", "runtime_config_unbound", "运行时配置尚未形成冻结绑定。")
 
-        final_verdict = dict(model_report.get("final_verdict", {}))
-        verdict_kind = str(model_report.get("verdict_kind", ""))
-        authority_source = str(model_report.get("authority_source", ""))
+        final_verdict = dict(governance_projection.get("final_verdict", {}))
+        model_projection = dict(governance_projection.get("model_precheck", model_report))
+        verdict_kind = str(model_projection.get("verdict_kind", ""))
+        authority_source = str(governance_projection.get("authority_source", model_projection.get("authority_source", "")))
         explicit_authoritative = final_verdict.get("authoritative")
         verdict_authoritative = bool(explicit_authoritative) if explicit_authoritative is not None else (verdict_kind == "final" or authority_source == "cpp_robot_core")
         verdict_unavailable = (verdict_kind == "unavailable" or authority_source == "verdict_unavailable") or (bool(final_verdict) and not verdict_authoritative and explicit_authoritative is False)
@@ -200,20 +211,58 @@ class MainlineRuntimeDoctorService:
                 push(blockers, "hardware_lifecycle", "network_unhealthy", "硬件生命周期报告网络不健康；禁止进入主线执行。")
 
         if rt_kernel:
+            loop_samples = list(rt_kernel.get("loop_samples", []) or [])
+            if loop_samples:
+                sample_overrun = False
+                sample_last_wake_jitter_ms = 0.0
+                sample_max_cycle_ms = 0.0
+                for sample in loop_samples:
+                    if not isinstance(sample, dict):
+                        continue
+                    execution_ms = float(sample.get("execution_ms", sample.get("cycle_ms", 0.0)) or 0.0)
+                    wake_jitter_ms = float(sample.get("wake_jitter_ms", 0.0) or 0.0)
+                    overrun = bool(sample.get("overrun", False))
+                    sample_overrun = sample_overrun or overrun
+                    sample_last_wake_jitter_ms = wake_jitter_ms
+                    sample_max_cycle_ms = max(sample_max_cycle_ms, execution_ms)
+                rt_kernel.setdefault("sample_count", len(loop_samples))
+                rt_kernel["overrun_count"] = max(int(rt_kernel.get("overrun_count", 0) or 0), 1 if sample_overrun else 0)
+                rt_kernel["last_wake_jitter_ms"] = max(abs(float(rt_kernel.get("last_wake_jitter_ms", 0.0) or 0.0)), abs(sample_last_wake_jitter_ms))
+                rt_kernel["max_cycle_ms"] = max(float(rt_kernel.get("max_cycle_ms", 0.0) or 0.0), sample_max_cycle_ms)
+                current_period_ms = float(rt_kernel.get("current_period_ms", 0.0) or 0.0)
+                jitter_budget_ms = float(rt_kernel.get("jitter_budget_ms", 0.0) or 0.0)
+                if current_period_ms > 0.0 and jitter_budget_ms > 0.0:
+                    sample_gate_ok = (not sample_overrun) and abs(sample_last_wake_jitter_ms) <= jitter_budget_ms and sample_max_cycle_ms <= (current_period_ms + jitter_budget_ms)
+                    rt_kernel["rt_quality_gate_passed"] = bool(rt_kernel.get("rt_quality_gate_passed", True)) and sample_gate_ok
             if bool(rt_kernel.get("monitors", {}).get("reference_limiter")) is False:
                 push(blockers, "rt_kernel", "reference_limiter_missing", "RT kernel 缺少 reference limiter。")
             if bool(rt_kernel.get("monitors", {}).get("freshness_guard")) is False:
                 push(blockers, "rt_kernel", "freshness_guard_missing", "RT kernel 缺少 freshness guard。")
             if bool(rt_kernel.get("monitors", {}).get("jitter_monitor")) is False:
-                push(warnings, "rt_kernel", "jitter_monitor_missing", "RT kernel 未声明 jitter monitor。")
+                push(blockers, "rt_kernel", "jitter_monitor_missing", "RT kernel 未声明 jitter monitor。")
             if bool(rt_kernel.get("monitors", {}).get("network_guard", rt_kernel.get("network_guard_enabled", False))) is False:
                 push(blockers, "rt_kernel", "network_guard_missing", "RT kernel 缺少 network guard。")
             if bool(rt_kernel.get("fixed_period_enforced", False)) is False:
                 push(blockers, "rt_kernel", "fixed_period_not_enforced", "RT kernel 未声明固定周期执行；不满足 1kHz 主线约束。")
             if bool(rt_kernel.get("network_healthy", True)) is False:
                 push(blockers, "rt_kernel", "rt_network_unhealthy", "RT kernel 报告网络不健康；禁止继续接触/扫查主线。")
-            if int(rt_kernel.get("overrun_count", 0) or 0) > 0:
-                push(warnings, "rt_kernel", "rt_cycle_overrun_detected", f"RT kernel 观测到 overrun_count={int(rt_kernel.get('overrun_count', 0) or 0)}。")
+            overrun_count = int(rt_kernel.get("overrun_count", 0) or 0)
+            jitter_budget_ms = float(rt_kernel.get("jitter_budget_ms", 0.0) or 0.0)
+            current_period_ms = float(rt_kernel.get("current_period_ms", 1000.0 / float(rt_kernel.get("nominal_loop_hz", 1000) or 1000)) or 0.0)
+            max_cycle_ms = float(rt_kernel.get("max_cycle_ms", 0.0) or 0.0)
+            last_wake_jitter_ms = abs(float(rt_kernel.get("last_wake_jitter_ms", 0.0) or 0.0))
+            cycle_budget_ms = current_period_ms + jitter_budget_ms
+            rt_quality_gate_passed = bool(rt_kernel.get("rt_quality_gate_passed", overrun_count == 0 and last_wake_jitter_ms <= jitter_budget_ms and max_cycle_ms <= cycle_budget_ms))
+            if jitter_budget_ms <= 0.0:
+                push(blockers, "rt_kernel", "rt_jitter_budget_missing", "RT kernel 未导出有效 jitter_budget_ms。")
+            if overrun_count > 0:
+                push(blockers, "rt_kernel", "rt_cycle_overrun_detected", f"RT kernel 观测到 overrun_count={overrun_count}。")
+            if jitter_budget_ms > 0.0 and last_wake_jitter_ms > jitter_budget_ms:
+                push(blockers, "rt_kernel", "rt_wake_jitter_budget_exceeded", f"RT kernel wake jitter {last_wake_jitter_ms:.3f}ms 超过 budget {jitter_budget_ms:.3f}ms。")
+            if jitter_budget_ms > 0.0 and max_cycle_ms > cycle_budget_ms:
+                push(blockers, "rt_kernel", "rt_cycle_budget_exceeded", f"RT kernel max_cycle_ms={max_cycle_ms:.3f} 超过允许上限 {cycle_budget_ms:.3f}ms。")
+            if not rt_quality_gate_passed:
+                push(blockers, "rt_kernel", "rt_quality_gate_failed", "RT kernel 质量门禁未通过；禁止进入接触/扫查主线。")
             if str(rt_kernel.get("summary_state", "ready")) in {"warning", "degraded"}:
                 push(warnings, "rt_kernel", "rt_kernel_warning", str(rt_kernel.get("detail", "rt kernel warning")))
 

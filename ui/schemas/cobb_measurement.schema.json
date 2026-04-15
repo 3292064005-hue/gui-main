@@ -121,6 +121,9 @@
     },
     "profile_load_error": {
       "type": "string"
+    },
+    "authority_metadata": {
+      "$ref": "session/authority_metadata_v1.schema.json"
     }
   },
   "additionalProperties": true

@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from spine_ultrasound_ui.services.backend_projection_cache import BackendProjectionCache
+from spine_ultrasound_ui.services.runtime_governance_query_surface import RuntimeGovernanceQuerySurface
 
 
 class ControlPlaneSnapshotService:
     def __init__(self) -> None:
         self._projection_cache = BackendProjectionCache()
+        self._governance_projection = RuntimeGovernanceQuerySurface()
 
     def _update_partition(self, name: str, payload: dict[str, Any]) -> None:
         self._projection_cache.update_partition(name, payload)
@@ -37,7 +39,16 @@ class ControlPlaneSnapshotService:
         evidence_seal = dict(evidence_seal or {})
         runtime_doctor = dict(runtime_doctor or {})
         backend_control_plane = dict(backend_link.get("control_plane", {}))
-        control_authority = dict(control_authority or backend_control_plane.get("control_authority", {}))
+        governance_projection = self._governance_projection.build_projection(
+            backend_link=backend_link,
+            control_plane_snapshot=backend_control_plane.get("control_plane_snapshot", {}),
+            model_report=model_report,
+            sdk_runtime={"release_contract": backend_control_plane.get("release_contract", {}), "mainline_runtime_doctor": runtime_doctor},
+        )
+        governance_control_authority = dict(governance_projection.get("control_authority", {}) or {})
+        requested_control_authority = dict(control_authority or {})
+        backend_control_authority = dict(backend_control_plane.get("control_authority", {}) or {})
+        control_authority = dict(governance_control_authority or backend_control_authority or requested_control_authority)
 
         blockers: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
@@ -49,6 +60,17 @@ class ControlPlaneSnapshotService:
                 payload = dict(item)
                 payload.setdefault("section", section)
                 target.append(payload)
+
+        if requested_control_authority and governance_control_authority and requested_control_authority != governance_control_authority:
+            warnings.append({
+                "section": "control_authority",
+                "name": "non_authoritative_control_authority_ignored",
+                "detail": "外部注入的 control_authority 与 authoritative projection 不一致，已忽略非权威覆盖。",
+            })
+            operator_hints.append({
+                "level": "warning",
+                "message": "control_authority 已强制以 authoritative projection 为准；外部覆盖不会生效。",
+            })
 
         for name, summary in (
             ("backend_link", backend_link),
@@ -120,7 +142,8 @@ class ControlPlaneSnapshotService:
             "release_mode": {"name": resolved_release_mode},
             "runtime_doctor": dict(runtime_doctor),
             "sdk_alignment": sdk_alignment,
-            "model_precheck": model_report,
+            "model_precheck": dict(governance_projection.get("model_precheck", model_report)),
+            "authoritative_projection": dict(governance_projection),
             "config_baseline": config_report,
         }
 
@@ -202,6 +225,7 @@ class ControlPlaneSnapshotService:
             "evidence_seal_state": evidence_seal_state,
             "release_mode": {"name": resolved_release_mode},
             "runtime_doctor": dict(runtime_doctor),
+            "authoritative_projection": dict(governance_projection),
             "projection_revision": projection_snapshot["revision"],
             "projection_partitions": projection_snapshot["partitions"],
             "sections": {
@@ -210,7 +234,7 @@ class ControlPlaneSnapshotService:
                 "bridge_observability": {"summary_state": bridge_observability.get("summary_state", "unknown"), "summary_label": bridge_observability.get("summary_label", "bridge observability")},
                 "config": {"summary_state": config_report.get("summary_state", "unknown"), "summary_label": config_report.get("summary_label", "config baseline")},
                 "sdk_alignment": {"summary_state": sdk_alignment.get("summary_state", "unknown"), "summary_label": sdk_alignment.get("summary_label", "sdk alignment")},
-                "model": {"summary_state": model_report.get("summary_state", "unknown"), "summary_label": model_report.get("summary_label", "model precheck")},
+                "model": {"summary_state": dict(governance_projection.get("model_precheck", model_report)).get("summary_state", "unknown"), "summary_label": dict(governance_projection.get("model_precheck", model_report)).get("summary_label", "model precheck")},
                 "deployment_profile": dict(deployment_profile),
                 "runtime_doctor": {"summary_state": runtime_doctor.get("summary_state", "unknown"), "summary_label": runtime_doctor.get("summary_label", "runtime doctor")},
             },

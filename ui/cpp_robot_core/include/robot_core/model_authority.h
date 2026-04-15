@@ -5,6 +5,13 @@
 
 #include "robot_core/runtime_types.h"
 
+#ifndef ROBOT_CORE_MAINLINE_FAMILY_KEY
+#define ROBOT_CORE_MAINLINE_FAMILY_KEY "xmate3_cobot_6"
+#endif
+#ifndef ROBOT_CORE_DEFAULT_ROBOT_LABEL
+#define ROBOT_CORE_DEFAULT_ROBOT_LABEL "xMate3"
+#endif
+
 namespace robot_core {
 
 class SdkRobotFacade;
@@ -12,10 +19,10 @@ class SdkRobotFacade;
 struct ModelAuthoritySnapshot {
   std::string authority_source{"cpp_robot_core"};
   std::string runtime_source{"simulated_contract"};
-  std::string family_key{"xmate3_cobot_6"};
-  std::string family_label{"xMate collaborative 6-axis"};
-  std::string robot_model{"xmate3"};
-  std::string sdk_robot_class{"xMateRobot"};
+  std::string family_key{ROBOT_CORE_MAINLINE_FAMILY_KEY};
+  std::string family_label{ROBOT_CORE_DEFAULT_ROBOT_LABEL " collaborative 6-axis"};
+  std::string robot_model{ROBOT_CORE_DEFAULT_ROBOT_MODEL};
+  std::string sdk_robot_class{ROBOT_CORE_DEFAULT_SDK_CLASS};
   bool planner_supported{true};
   bool xmate_model_supported{true};
   bool authoritative_precheck{false};

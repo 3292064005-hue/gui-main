@@ -32,6 +32,12 @@ if find "${REPO_ROOT}" -path "${REPO_ROOT}/.git" -prune -o -type f -name '*.ps1'
   fail "PowerShell assets are not allowed in the Ubuntu 22.04 mainline"
 fi
 
+for path in tests/test_api_contract.py tests/test_api_security.py tests/test_control_plane.py tests/test_headless_runtime.py tests/test_profile_policy.py tests/test_release_gate.py tests/test_replay_determinism.py tests/test_spawned_core_integration.py; do
+  if [ -e "${path}" ]; then
+    fail "legacy archive wrapper must not remain in top-level tests surface: ${path}"
+  fi
+done
+
 if find "${REPO_ROOT}" -maxdepth 1 -type f -name 'test_*.py' | grep -q .; then
   fail "root-level experimental test_*.py scripts are not allowed in the mainline"
 fi

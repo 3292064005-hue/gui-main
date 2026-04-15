@@ -60,3 +60,61 @@ def test_live_profile_allows_core_backend_when_runtime_doctor_has_no_blockers() 
 
     _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
     assert reply is None
+
+
+def test_authoritative_write_capability_blocks_command_before_profile_fallback() -> None:
+    service = CommandGuardService(
+        control_authority=_Authority(),
+        current_session_id=lambda: 'S1',
+        deployment_profile_snapshot=lambda: {
+            'name': 'research',
+            'requires_live_sdk': True,
+            'review_only': False,
+            'allows_write_commands': True,
+            'allowed_write_roles': ['operator'],
+        },
+        backend_mode_snapshot=lambda: 'core',
+        control_plane_snapshot=lambda: {
+            'authoritative_runtime_envelope': {
+                'write_capabilities': {
+                    'rt_motion_write': {'allowed': False, 'reason': 'live_takeover_ready_required', 'source_of_truth': 'cpp_robot_core'},
+                },
+            },
+            'runtime_doctor': {'summary_state': 'ready', 'summary_label': '运行主线已收敛', 'detail': 'ready'},
+            'blockers': [],
+        },
+    )
+
+    _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    assert reply is not None
+    assert reply.ok is False
+    assert reply.data['required_claim'] == 'rt_motion_write'
+    assert reply.data['capability_state']['reason'] == 'live_takeover_ready_required'
+
+
+def test_root_level_write_capabilities_are_honored() -> None:
+    service = CommandGuardService(
+        control_authority=_Authority(),
+        current_session_id=lambda: 'S1',
+        deployment_profile_snapshot=lambda: {
+            'name': 'research',
+            'requires_live_sdk': True,
+            'review_only': False,
+            'allows_write_commands': True,
+            'allowed_write_roles': ['operator'],
+        },
+        backend_mode_snapshot=lambda: 'core',
+        control_plane_snapshot=lambda: {
+            'write_capabilities': {
+                'rt_motion_write': {'allowed': False, 'reason': 'root_level_gate', 'source_of_truth': 'cpp_robot_core'},
+            },
+            'runtime_doctor': {'summary_state': 'ready', 'summary_label': '运行主线已收敛', 'detail': 'ready'},
+            'blockers': [],
+        },
+    )
+
+    _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    assert reply is not None
+    assert reply.ok is False
+    assert reply.data['required_claim'] == 'rt_motion_write'
+    assert reply.data['capability_state']['reason'] == 'root_level_gate'

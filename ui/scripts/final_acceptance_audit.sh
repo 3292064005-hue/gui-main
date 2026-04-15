@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 INCLUDE_ARCHIVE_COMPAT="${INCLUDE_ARCHIVE_COMPAT:-0}"
 LIVE_EVIDENCE_BUNDLE="${LIVE_EVIDENCE_BUNDLE:-}"
@@ -59,6 +60,7 @@ bash scripts/check_repo_hygiene.sh
 section "Repository convergence audit"
 "$PYTHON_BIN" scripts/strict_convergence_audit.py
 section "Protocol asset alignment"
+"$PYTHON_BIN" scripts/generate_runtime_command_artifacts.py
 "$PYTHON_BIN" scripts/check_protocol_sync.py
 section "Robot identity registry"
 "$PYTHON_BIN" scripts/check_robot_identity_registry.py
@@ -70,6 +72,9 @@ section "Repository gate registry"
 "$PYTHON_BIN" scripts/check_repository_gates.py
 section "Architecture fitness"
 "$PYTHON_BIN" scripts/check_architecture_fitness.py
+section "RT quality gates"
+"$PYTHON_BIN" scripts/check_rt_purity_gate.py
+"$PYTHON_BIN" scripts/check_rt_quality_gate.py
 section "Verification boundary"
 "$PYTHON_BIN" scripts/check_verification_boundary.py
 section "P2 acceptance artifact generation"
@@ -84,9 +89,9 @@ run_pytest_batch() {
   section "Critical regression suite: ${label}"
   "$PYTHON_BIN" scripts/run_pytest_mainline.py -q "$@"
 }
-run_pytest_batch control-plane   tests/test_api_contract.py tests/test_api_security.py tests/test_control_plane.py tests/test_control_ownership.py   tests/test_runtime_verdict.py tests/test_headless_runtime.py
-run_pytest_batch release-state   tests/test_release_gate.py tests/test_replay_determinism.py tests/test_profile_policy.py tests/test_spawned_core_integration.py
-run_pytest_batch sdk-and-doctor   tests/test_vendor_sdk_and_identity.py tests/test_sdk_runtime_assets_and_model_precheck.py tests/test_mainline_runtime_doctor.py
+run_pytest_batch control-plane   tests/test_runtime_refactor_guards.py tests/test_backend_link_and_api_bridge.py tests/test_api_bridge_verdict_service.py tests/test_control_ownership.py   tests/test_runtime_verdict.py tests/test_headless_adapter_surface_refactor.py
+run_pytest_batch release-state   tests/test_runtime_verdict_authority_contract.py tests/test_control_authority_claims.py tests/test_guidance_freeze_contracts.py tests/test_runtime_mode_policy.py
+run_pytest_batch sdk-and-doctor   tests/test_vendor_sdk_and_identity.py tests/test_sdk_runtime_assets_and_model_precheck.py tests/test_mainline_runtime_doctor.py tests/test_architecture_fitness.py
 run_pytest_batch xmate-mainline   tests/test_xmate_mainline.py
 if [[ "$INCLUDE_ARCHIVE_COMPAT" == "1" ]]; then
   section "Archive compatibility suite"

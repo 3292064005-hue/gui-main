@@ -128,3 +128,36 @@ def test_overview_presenter_accepts_windows_without_legacy_summary_labels(tmp_pa
     assert window.overview_page.recommended_label.text().startswith("建议下一步：")
     assert "流程就绪度" in window.overview_page.readiness_label.text()
     assert window.overview_page.overview_text.html
+
+
+def test_status_context_prefers_governance_projection_over_payload_control_authority(tmp_path) -> None:
+    backend = MockBackend(Path(tmp_path))
+    controller = AppController(Path(tmp_path), backend)
+    window = _FakeWindow()
+
+    payload = controller.control_plane_reader.build_status_payload(
+        telemetry=controller.telemetry,
+        config=controller.config,
+        workflow_artifacts=controller.workflow_artifacts,
+        current_experiment=controller.session_service.current_experiment,
+    )
+    payload['control_authority'] = {'summary_state': 'blocked', 'summary_label': 'payload override', 'detail': 'should not win'}
+    payload.setdefault('backend_link', {}).setdefault('control_plane', {})['authoritative_runtime_envelope'] = {
+        'authority_source': 'cpp_robot_core',
+        'control_authority': {
+            'summary_state': 'ready',
+            'summary_label': '控制权已锁定',
+            'detail': 'runtime owner',
+            'owner': {'actor_id': 'runtime', 'workspace': 'core', 'role': 'runtime', 'session_id': 'S1'},
+        },
+        'final_verdict': {
+            'accepted': True,
+            'reason': 'validated',
+            'policy_state': 'ready',
+            'source': 'cpp_robot_core',
+        },
+    }
+
+    ctx = build_status_context(window, payload)
+    assert ctx.control_authority['summary_state'] == 'ready'
+    assert ctx.control_authority['summary_label'] == '控制权已锁定'

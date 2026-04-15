@@ -415,3 +415,33 @@ def test_readme_documents_runtime_policy_backed_headless_resolution() -> None:
     readme = _read('README.md')
     assert 'runtime_mode_policy' in readme
     assert 'start_headless.sh' in readme
+
+
+def test_verify_and_acceptance_critical_regression_batches_do_not_use_archive_wrapper_tests() -> None:
+    verify_script = _read('scripts/verify_mainline.sh')
+    acceptance_script = _read('scripts/final_acceptance_audit.sh')
+    for disallowed in [
+        'tests/test_api_contract.py',
+        'tests/test_api_security.py',
+        'tests/test_control_plane.py',
+        'tests/test_headless_runtime.py',
+        'tests/test_profile_policy.py',
+        'tests/test_release_gate.py',
+        'tests/test_replay_determinism.py',
+        'tests/test_spawned_core_integration.py',
+    ]:
+        assert disallowed not in verify_script
+        assert disallowed not in acceptance_script
+        assert not Path(disallowed).exists()
+    for required in [
+        'tests/test_runtime_refactor_guards.py',
+        'tests/test_backend_link_and_api_bridge.py',
+        'tests/test_api_bridge_verdict_service.py',
+        'tests/test_headless_adapter_surface_refactor.py',
+        'tests/test_runtime_verdict_authority_contract.py',
+        'tests/test_control_authority_claims.py',
+        'tests/test_guidance_freeze_contracts.py',
+        'tests/test_architecture_fitness.py',
+    ]:
+        assert required in verify_script
+        assert required in acceptance_script

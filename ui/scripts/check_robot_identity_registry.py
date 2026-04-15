@@ -11,6 +11,8 @@ from typing import Any
 sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 REGISTRY_PATH = ROOT / "configs" / "robot_identity_mainline.json"
 TEXT_TARGETS = {
     "README.md": ("robot_model", "sdk_robot_class", "axis_count", "preferred_link", "clinical_mainline_mode"),
@@ -132,20 +134,21 @@ def _regex_expect(text: str, path: str, pattern: str, expected: str, failures: l
 def _expect_cpp_struct_defaults(registry: dict[str, Any], failures: list[str]) -> None:
     contract_path = 'cpp_robot_core/include/robot_core/robot_identity_contract.h'
     contract_text = (ROOT / contract_path).read_text(encoding='utf-8')
-    _regex_expect(contract_text, contract_path, r'std::string\s+robot_model\{"([^"]+)"\}', str(registry['robot_model']), failures)
-    _regex_expect(contract_text, contract_path, r'std::string\s+sdk_robot_class\{"([^"]+)"\}', str(registry['sdk_robot_class']), failures)
-    _regex_expect(contract_text, contract_path, r'int\s+axis_count\{(\d+)\}', str(registry['axis_count']), failures)
-    _regex_expect(contract_text, contract_path, r'std::string\s+preferred_link\{"([^"]+)"\}', str(registry['preferred_link']), failures)
-    _regex_expect(contract_text, contract_path, r'std::string\s+clinical_mainline_mode\{"([^"]+)"\}', str(registry['clinical_mainline_mode']), failures)
+    for token in ("ROBOT_CORE_DEFAULT_ROBOT_MODEL", "ROBOT_CORE_DEFAULT_SDK_CLASS", "ROBOT_CORE_DEFAULT_AXIS_COUNT", "ROBOT_CORE_DEFAULT_PREFERRED_LINK", "ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE"):
+        if token not in contract_text:
+            failures.append(f"{contract_path} missing macro token {token}")
 
     family_path = 'cpp_robot_core/include/robot_core/robot_family_descriptor.h'
     family_text = (ROOT / family_path).read_text(encoding='utf-8')
-    _regex_expect(family_text, family_path, r'std::string\s+family_key\{"([^"]+)"\}', str(registry['family_key']), failures)
-    _regex_expect(family_text, family_path, r'std::string\s+robot_model\{"([^"]+)"\}', str(registry['robot_model']), failures)
-    _regex_expect(family_text, family_path, r'std::string\s+sdk_robot_class\{"([^"]+)"\}', str(registry['sdk_robot_class']), failures)
-    _regex_expect(family_text, family_path, r'int\s+axis_count\{(\d+)\}', str(registry['axis_count']), failures)
-    _regex_expect(family_text, family_path, r'std::string\s+preferred_link\{"([^"]+)"\}', str(registry['preferred_link']), failures)
-    _regex_expect(family_text, family_path, r'std::string\s+clinical_rt_mode\{"([^"]+)"\}', str(registry['clinical_mainline_mode']), failures)
+    for token in ("ROBOT_CORE_MAINLINE_FAMILY_KEY", "ROBOT_CORE_DEFAULT_ROBOT_MODEL", "ROBOT_CORE_DEFAULT_SDK_CLASS", "ROBOT_CORE_DEFAULT_AXIS_COUNT", "ROBOT_CORE_DEFAULT_PREFERRED_LINK", "ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE"):
+        if token not in family_text:
+            failures.append(f"{family_path} missing macro token {token}")
+
+    cmake_path = 'cpp_robot_core/CMakeLists.txt'
+    cmake_text = (ROOT / cmake_path).read_text(encoding='utf-8')
+    for token in ('ROBOT_CORE_IDENTITY_REGISTRY', 'ROBOT_CORE_MAINLINE_ROBOT_MODEL', 'ROBOT_CORE_MAINLINE_SDK_CLASS', 'ROBOT_CORE_MAINLINE_AXIS_COUNT', 'ROBOT_CORE_MAINLINE_PREFERRED_LINK', 'ROBOT_CORE_MAINLINE_CLINICAL_MODE'):
+        if token not in cmake_text:
+            failures.append(f"{cmake_path} missing registry loading token {token}")
 
 
 def main() -> int:

@@ -489,11 +489,17 @@ class SessionService:
         """
         if self.command_journal is None:
             return
+        reply_data = dict(reply.get("data", {}))
+        canonical = str(reply_data.get("canonical_command") or command)
         self.command_journal.append_event(
             {
                 "ts_ns": reply.get("ts_ns", 0),
                 "source": source,
-                "command": command,
+                "requested_command": command,
+                "command": canonical,
+                "canonical_command": canonical,
+                "alias_kind": str(reply_data.get("alias_kind", "canonical")),
+                "deprecated_alias": bool(reply_data.get("deprecated_alias", False)),
                 "workflow_step": workflow_step,
                 "auto_action": auto_action,
                 "payload_summary": summarize_command_payload(payload),

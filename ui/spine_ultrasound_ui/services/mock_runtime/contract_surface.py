@@ -172,6 +172,7 @@ class MockRuntimeContractSurfaceMixin:
                     'network_guard': True,
                 },
                 'jitter_budget_ms': jitter_budget_ms,
+                'current_period_ms': round(1000.0 / float(rt_executor.get('nominal_loop_hz', 1000) or 1000), 3),
                 'freshness_budget_ms': freshness_budget_ms,
                 'reference_limits': {
                     'max_cart_step_mm': 2.5,
@@ -181,7 +182,15 @@ class MockRuntimeContractSurfaceMixin:
                 'network_healthy': bool(self.controller_online),
                 'overrun_count': 0 if self.rt_jitter_ok else 1,
                 'max_cycle_ms': round(1.0 if self.rt_jitter_ok else 1.6, 3),
+                'last_wake_jitter_ms': round(0.05 if self.rt_jitter_ok else 0.45, 3),
+                'rt_quality_gate_passed': bool(self.rt_jitter_ok),
                 'last_sensor_decision': 'fresh' if self.pressure_fresh and self.robot_state_fresh else ('stale' if self.controller_online else 'unavailable'),
+                'sample_count': 3,
+                'loop_samples': [
+                    {'execution_ms': round(0.94 if self.rt_jitter_ok else 1.05, 3), 'wake_jitter_ms': round(0.03 if self.rt_jitter_ok else 0.08, 3), 'overrun': False},
+                    {'execution_ms': round(0.98 if self.rt_jitter_ok else 1.32, 3), 'wake_jitter_ms': round(0.04 if self.rt_jitter_ok else 0.42, 3), 'overrun': bool(not self.rt_jitter_ok)},
+                    {'execution_ms': round(1.0 if self.rt_jitter_ok else 1.41, 3), 'wake_jitter_ms': round(0.05 if self.rt_jitter_ok else 0.46, 3), 'overrun': bool(not self.rt_jitter_ok)},
+                ],
                 'degraded_without_sdk': True,
             }
 
@@ -427,6 +436,8 @@ class MockRuntimeContractSurfaceMixin:
                 'overrun_count': 0 if self.rt_jitter_ok else 1,
                 'last_sensor_decision': 'fresh' if self.pressure_fresh and self.robot_state_fresh else ('stale' if self.controller_online else 'unavailable'),
                 'max_cycle_ms': round(1.0 if self.rt_jitter_ok else 1.6, 3),
+                'last_wake_jitter_ms': round(0.05 if self.rt_jitter_ok else 0.45, 3),
+                'rt_quality_gate_passed': bool(self.rt_jitter_ok),
                 'delegation_policy': 'official_sdk_rt_loop_only',
             }
             nrt_executor = {

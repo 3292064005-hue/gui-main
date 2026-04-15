@@ -7,6 +7,57 @@ namespace robot_core {
 
 using namespace sdk_robot_facade_internal;
 
+class RtControlAdapter {
+public:
+  explicit RtControlAdapter(SdkRobotFacade& owner) : owner_(owner) {}
+
+  bool stop(std::string* reason) {
+    bool live_ok = true;
+    std::string local_reason;
+    if (!owner_.connected_) {
+      owner_.finalizeRtStopLocal("controller_not_connected");
+      if (reason != nullptr) *reason = "controller_not_connected";
+      return false;
+    }
+    if (!owner_.liveBindingEstablished() && !owner_.runtimeConfig().allow_contract_shell_writes) {
+      live_ok = false;
+      local_reason = "live_binding_required";
+      if (reason != nullptr) *reason = local_reason;
+    }
+#ifdef ROBOT_CORE_WITH_XCORE_SDK
+    if (live_ok && owner_.live_binding_established_ && owner_.rt_controller_ != nullptr) {
+      try {
+        try { owner_.rt_controller_->stopLoop(); } catch (...) {}
+        try { owner_.rt_controller_->stopMove(); } catch (...) {}
+        try { owner_.robot_->stopReceiveRobotState(); } catch (...) {}
+      } catch (const std::exception& ex) {
+        live_ok = false;
+        local_reason = ex.what();
+        if (reason != nullptr) *reason = local_reason;
+      }
+    }
+#endif
+    owner_.finalizeRtStopLocal(local_reason);
+    if (!local_reason.empty()) owner_.captureFailure("stopRt", local_reason);
+    return live_ok;
+  }
+
+  bool beginMainline(const std::string& phase, int nominal_loop_hz, std::string* reason) {
+    return owner_.beginRtMainlineInternal(phase, nominal_loop_hz, reason);
+  }
+
+  void updatePhase(const std::string& phase, const std::string& detail) {
+    owner_.updateRtPhaseInternal(phase, detail);
+  }
+
+  void finishMainline(const std::string& phase, const std::string& detail) {
+    owner_.finishRtMainlineInternal(phase, detail);
+  }
+
+private:
+  SdkRobotFacade& owner_;
+};
+
 std::array<double, 16> SdkRobotFacade::defaultPoseMatrix() {
   return identityPoseMatrix();
 }
@@ -451,7 +502,7 @@ RtPhaseStepResult SdkRobotFacade::stepControlledRetract(const RtObservedState& s
   return result;
 }
 
-bool SdkRobotFacade::beginRtMainline(const std::string& phase, int nominal_loop_hz, std::string* reason) {
+bool SdkRobotFacade::beginRtMainlineInternal(const std::string& phase, int nominal_loop_hz, std::string* reason) {
   const int phase_loop_hz = nominal_loop_hz > 0 ? nominal_loop_hz : nominal_rt_loop_hz_;
   if (!ensurePoweredAuto(reason)) return false;
   if (!ensureRtController(reason)) return false;
@@ -496,6 +547,7 @@ bool SdkRobotFacade::beginRtMainline(const std::string& phase, int nominal_loop_
   rt_phase_contract_.controlled_retract.retract_travel_mm = rt_config_.retract_travel_mm;
   configureContactControllersFromRuntimeConfig();
   if (!validateRtControlContract(reason)) return false;
+  if (!requireLiveWrite("beginRtMainline", reason)) return false;
   std::vector<std::string> rt_fields = {"q_m", "dq_m", "tau_m", "pos_m", "tau_ext_base"};
   if (!ensureRtStateStream(rt_fields, reason)) return false;
   if (!applyRtConfig(rt_config_, reason)) return false;
@@ -623,15 +675,15 @@ bool SdkRobotFacade::beginRtMainline(const std::string& phase, int nominal_loop_
   return true;
 }
 
-void SdkRobotFacade::updateRtPhase(const std::string& phase, const std::string& detail) {
+void SdkRobotFacade::updateRtPhaseInternal(const std::string& phase, const std::string& detail) {
   active_rt_phase_ = phase;
   setRtPhaseCode(phase);
   appendLog("updateRtPhase(phase=" + phase + (detail.empty() ? "" : ",detail=" + detail) + ")");
 }
 
-void SdkRobotFacade::finishRtMainline(const std::string& phase, const std::string& detail) {
+void SdkRobotFacade::finishRtMainlineInternal(const std::string& phase, const std::string& detail) {
   std::string ignored;
-  stopRt(&ignored);
+  RtControlAdapter(*this).stop(&ignored);
   if (active_rt_phase_ == phase) active_rt_phase_ = "idle";
   binding_detail_ = "rt_finished";
   appendLog("finishRtMainline(phase=" + phase + (detail.empty() ? "" : ",detail=" + detail) + ")");
@@ -639,5 +691,9 @@ void SdkRobotFacade::finishRtMainline(const std::string& phase, const std::strin
 }
 
 
+bool SdkRobotFacade::stopRt(std::string* reason) { return RtControlAdapter(*this).stop(reason); }
+bool SdkRobotFacade::beginRtMainline(const std::string& phase, int nominal_loop_hz, std::string* reason) { return RtControlAdapter(*this).beginMainline(phase, nominal_loop_hz, reason); }
+void SdkRobotFacade::updateRtPhase(const std::string& phase, const std::string& detail) { RtControlAdapter(*this).updatePhase(phase, detail); }
+void SdkRobotFacade::finishRtMainline(const std::string& phase, const std::string& detail) { RtControlAdapter(*this).finishMainline(phase, detail); }
 
 }  // namespace robot_core

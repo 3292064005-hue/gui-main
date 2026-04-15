@@ -61,10 +61,10 @@ class ClinicalConfigService:
             pressure_target=float(pressure_policy.get("target_n", config.pressure_target)),
             pressure_upper=float(pressure_policy.get("warning_n", config.pressure_upper)),
             pressure_lower=max(1.0, float(pressure_policy.get("target_n", config.pressure_target)) - float(pressure_policy.get("settle_band_n", 1.0))),
-            scan_speed_mm_s=float(self.profile.sweep_policy.get("scan_speed_mm_s", config.scan_speed_mm_s)),
-            contact_seek_speed_mm_s=float(self.profile.sweep_policy.get("contact_seek_speed_mm_s", config.contact_seek_speed_mm_s)),
-            retreat_speed_mm_s=float(self.profile.sweep_policy.get("retreat_speed_mm_s", config.retreat_speed_mm_s)),
-            image_quality_threshold=float(self.profile.sweep_policy.get("rescan_quality_threshold", config.image_quality_threshold)),
+            scan_speed_mm_s=self._preserve_positive_scalar(config.scan_speed_mm_s, float(self.profile.sweep_policy.get("scan_speed_mm_s", config.scan_speed_mm_s))),
+            contact_seek_speed_mm_s=self._preserve_positive_scalar(config.contact_seek_speed_mm_s, float(self.profile.sweep_policy.get("contact_seek_speed_mm_s", config.contact_seek_speed_mm_s))),
+            retreat_speed_mm_s=self._preserve_positive_scalar(config.retreat_speed_mm_s, float(self.profile.sweep_policy.get("retreat_speed_mm_s", config.retreat_speed_mm_s))),
+            image_quality_threshold=self._preserve_bounded_scalar(config.image_quality_threshold, float(self.profile.sweep_policy.get("rescan_quality_threshold", config.image_quality_threshold)), lower=0.0, upper=1.0),
             rt_stale_state_timeout_ms=self.profile.rt_stale_state_timeout_ms,
             rt_phase_transition_debounce_cycles=self.profile.rt_phase_transition_debounce_cycles,
             rt_max_cart_step_mm=self.profile.rt_max_cart_step_mm,
@@ -301,6 +301,21 @@ class ClinicalConfigService:
     @staticmethod
     def _check(name: str, ok: bool, severity: str, detail_ok: str, detail_bad: str) -> dict[str, Any]:
         return {"name": name, "ok": bool(ok), "severity": severity, "detail": detail_ok if ok else detail_bad}
+
+
+    @staticmethod
+    def _preserve_positive_scalar(value: float, fallback: float) -> float:
+        candidate = float(value)
+        if candidate > 0:
+            return candidate
+        return float(fallback)
+
+    @staticmethod
+    def _preserve_bounded_scalar(value: float, fallback: float, *, lower: float, upper: float) -> float:
+        candidate = float(value)
+        if lower <= candidate <= upper:
+            return candidate
+        return max(lower, min(float(fallback), upper))
 
     @staticmethod
     def _valid_ip(value: str) -> bool:

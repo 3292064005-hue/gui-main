@@ -68,11 +68,11 @@ class MockBackend(QObject, BackendBase):
         self._recent_commands.append({"command": command, "ok": bool(reply.ok), "message": str(reply.message)})
         self._recent_commands = self._recent_commands[-12:]
         self.log_generated.emit("INFO" if reply.ok else "ERROR", f"[mock_core] {command}: {reply.message}")
-        authoritative = self._authoritative_service.normalize_payload(
+        authoritative = self._authoritative_service.normalize_authoritative_runtime_envelope(
             reply.data,
             authority_source="mock_runtime",
             desired_runtime_config=self.config,
-            fallback_control_authority=self._local_control_authority(),
+            allow_direct_payload=True,
         )
         if authoritative:
             self._authoritative_envelope = authoritative
@@ -123,9 +123,22 @@ class MockBackend(QObject, BackendBase):
             "blockers": [],
             "warnings": [],
             "control_plane": control_plane,
+            "authoritative_runtime_envelope": authoritative,
+            "control_authority": dict(authoritative.get("control_authority", {})),
+            "final_verdict": dict(authoritative.get("final_verdict", {})),
             "projection_revision": projection_snapshot["revision"],
             "projection_partitions": projection_snapshot["partitions"],
         }
+
+    def resolve_authoritative_runtime_envelope(self) -> dict[str, Any]:
+        """Return the canonical authoritative runtime envelope for read consumers."""
+        if not self._authoritative_envelope:
+            self._authoritative_envelope = self._build_authoritative_envelope()
+        return dict(self._authoritative_envelope)
+
+    def resolve_control_authority(self) -> dict[str, Any]:
+        """Return the canonical control-authority snapshot for read consumers."""
+        return dict(self.resolve_authoritative_runtime_envelope().get("control_authority", {}))
 
     def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict:
         """Resolve the authoritative final verdict through the canonical backend API."""
@@ -194,9 +207,9 @@ class MockBackend(QObject, BackendBase):
         if final_verdict:
             payload = dict(payload)
             payload["final_verdict"] = final_verdict
-        return self._authoritative_service.normalize_payload(
+        return self._authoritative_service.normalize_authoritative_runtime_envelope(
             payload,
             authority_source="mock_runtime",
             desired_runtime_config=self.config,
-            fallback_control_authority=self._local_control_authority(),
+            allow_direct_payload=True,
         )

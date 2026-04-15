@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from .force_control_config import load_force_control_config
 from .runtime_command_catalog import COMMANDS, COMMAND_SPECS, is_write_command
+from .runtime_command_contracts import export_contract_document
 from .runtime_payload_validator import validate_command_payload
 
 PROTOCOL_VERSION = 1
@@ -122,6 +123,7 @@ def protocol_schema() -> dict[str, Any]:
             "fields": ["ok", "message", "request_id", "data", "protocol_version"],
         },
         "commands": deepcopy(COMMAND_SPECS),
+        "command_contracts": export_contract_document(),
         "telemetry_topics": deepcopy(TELEMETRY_TOPIC_SCHEMAS),
         "force_control": load_force_control_config(),
     }

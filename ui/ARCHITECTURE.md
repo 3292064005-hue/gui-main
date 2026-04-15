@@ -10,6 +10,8 @@
 - `cpp_robot_core` is the single execution-state authority.
 - `SdkRobotFacade` is the live-binding authority for the official SDK and is frozen to the xMate3 / xMateRobot / 6-axis mainline.
 - Session manifest is the single source of truth for replay/export inputs.
+- Runtime command metadata is defined once in `schemas/runtime_command_manifest.json`; Python catalog and C++ registry are generated/validated from that manifest.
+- FastAPI composition is app-state scoped through `ApiRuntimeContainer`; module-level singleton fallback is not part of the mainline runtime model.
 
 ## Identity contract
 - `robot_model = xmate3`
@@ -173,3 +175,52 @@ Heavyweight dependencies remain outside the desktop runtime; runtime code only c
 ## Session intelligence read policy
 
 Session-intelligence artifacts (lineage, resume, release, governance, evidence seal, and related products) are now governed by a **materialized-only read policy**. `SessionFinalizeService` / `SessionService.refresh_session_intelligence()` is the sole supported materialization phase. Read surfaces may report `not_materialized` or `legacy_fallback_only`, but they must not regenerate session-intelligence artifacts as a side effect.
+
+
+## Canonical backend authority surface
+
+Runtime-owned governance facts are read through explicit backend methods instead of scraping nested control-plane projections. The canonical read surface is:
+
+- `resolve_authoritative_runtime_envelope()`
+- `resolve_control_authority()`
+- `resolve_final_verdict(..., read_only=...)`
+
+API/headless/core/mock backends all implement the same surface. Canonical methods are strict: they may return runtime-published facts or explicit unavailable/degraded payloads, but they must not synthesize stronger authority/envelope/verdict truth from Python-side control-plane caches. The system API exposes matching read endpoints, and backend link snapshots now copy the runtime-owned envelope/authority/verdict to the top level so UI consumers can avoid re-interpreting nested compatibility payloads.
+
+## Typed runtime command contracts
+
+`schemas/runtime_command_manifest.json` remains the single source of truth. In addition to the existing Python catalog and generated C++ registry include, the repository now exports a typed contract document to `spine_ultrasound_ui/contracts/generated/runtime_command_contracts.json`.
+
+The typed contract surface is consumed by:
+
+- `runtime_payload_validator.py`
+- `ipc_protocol.protocol_schema()`
+- repository gates (`check_protocol_sync.py`)
+
+This keeps payload validation, protocol export, and generated artifacts aligned without duplicating manual command-field tables.
+
+
+
+## Runtime command typed contracts
+
+`schemas/runtime_command_manifest.json` now drives three generated surfaces:
+
+- Python typed contract document: `spine_ultrasound_ui/contracts/generated/runtime_command_contracts.json`
+- C++ command registry include: `cpp_robot_core/include/robot_core/generated_command_manifest.inc`
+- C++ typed request/response/guard include: `cpp_robot_core/include/robot_core/generated_runtime_command_contracts.inc`
+
+The C++ dispatcher validates payloads against the generated typed request contract before handler dispatch, validates guard contracts (lane + allowed runtime states) before invoking the handler, and validates the typed reply-envelope contract before returning a response. Response contracts and guard contracts are therefore enforced instead of remaining generation-only metadata, while Python, protocol export, and C++ stay aligned on one manifest-backed source of truth.
+
+## RT purity gate
+
+`python scripts/check_rt_purity_gate.py` is part of `scripts/verify_mainline.sh`.
+
+The gate scans RT-sensitive C++ sources and rejects forbidden hot-path work such as:
+
+- JSON construction/parsing
+- filesystem writes or recorder appends
+- console logging/formatting
+- heap-style dynamic allocation on RT-sensitive paths
+- RT-adjacent command/telemetry loop regressions in `command_server.cpp` and `telemetry_publisher.cpp`
+
+This gate is static proof only. It does not replace HIL/live-controller timing validation.

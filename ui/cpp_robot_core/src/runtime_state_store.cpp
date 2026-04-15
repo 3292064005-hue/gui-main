@@ -132,19 +132,23 @@ TelemetrySnapshot CoreRuntime::takeTelemetrySnapshot() {
 }
 
 void CoreRuntime::rtStep() {
-  std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
-  phase_ += 0.03;
-  ++frame_id_;
-  RtObservedState observed{};
-  std::string observed_reason;
-  sdk_robot_.rtControlPort().populateObservedState(observed, &observed_reason);
-  const auto phase_telemetry = sdk_robot_.queryPort().phaseTelemetry();
-  updateQualityLocked(observed, phase_telemetry);
-  updateKinematicsLocked();
-  updateContactAndProgressLocked(observed);
-  refreshDeviceHealthLocked(json::nowNs(), observed);
-  recordStreamsLocked();
+  PendingRecordBundle record_bundle{};
+  {
+    std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
+    std::lock_guard<std::mutex> state_lock(state_mutex_);
+    phase_ += 0.03;
+    ++frame_id_;
+    RtObservedState observed{};
+    std::string observed_reason;
+    sdk_robot_.rtControlPort().populateObservedState(observed, &observed_reason);
+    const auto phase_telemetry = sdk_robot_.queryPort().phaseTelemetry();
+    updateQualityLocked(observed, phase_telemetry);
+    updateKinematicsLocked();
+    updateContactAndProgressLocked(observed);
+    refreshDeviceHealthLocked(json::nowNs(), observed);
+    record_bundle = buildRecordBundleLocked();
+  }
+  flushRecordBundle(record_bundle);
 }
 
 void CoreRuntime::recordRtLoopSample(double scheduled_period_ms, double execution_ms, double wake_jitter_ms, bool overrun) {
@@ -540,13 +544,26 @@ ScanProgress CoreRuntime::buildScanProgressLocked() const {
   return progress;
 }
 
-void CoreRuntime::recordStreamsLocked() {
+CoreRuntime::PendingRecordBundle CoreRuntime::buildRecordBundleLocked() const {
+  PendingRecordBundle bundle{};
   if (!recording_service_.active()) {
+    return bundle;
+  }
+  bundle.enabled = true;
+  bundle.robot_state = robot_state_hub_.latest();
+  bundle.contact_state = contact_state_;
+  bundle.core_state = buildCoreSnapshotLocked();
+  bundle.scan_progress = buildScanProgressLocked();
+  return bundle;
+}
+
+void CoreRuntime::flushRecordBundle(const PendingRecordBundle& bundle) {
+  if (!bundle.enabled) {
     return;
   }
-  recording_service_.recordRobotState(robot_state_hub_.latest());
-  recording_service_.recordContactState(contact_state_);
-  recording_service_.recordScanProgress(buildCoreSnapshotLocked(), buildScanProgressLocked());
+  recording_service_.recordRobotState(bundle.robot_state);
+  recording_service_.recordContactState(bundle.contact_state);
+  recording_service_.recordScanProgress(bundle.core_state, bundle.scan_progress);
 }
 
 }  // namespace robot_core
