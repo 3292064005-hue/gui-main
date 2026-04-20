@@ -10,7 +10,7 @@
     "release_state": "research_validated",
     "clinical_claim": "non_clinical_research_only",
     "input_contract": "raw_ultrasound_frame_sequence",
-    "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+    "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
     "trainer_backend": "numpy_baseline",
     "task_name": "frame_anatomy_keypoint_export",
     "training_metrics": {
@@ -18,7 +18,7 @@
       "avg_pair_separation_px": 25.0,
       "avg_confidence": 1.0
     },
-    "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+    "package_dir": "models/frame_anatomy_keypoint",
     "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
   },
   "details": [
@@ -57,7 +57,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -65,7 +65,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }
@@ -105,7 +105,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -113,7 +113,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }
@@ -153,7 +153,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -161,7 +161,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }
@@ -201,7 +201,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -209,7 +209,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }
@@ -249,7 +249,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -257,7 +257,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }
@@ -297,7 +297,7 @@
           "release_state": "research_validated",
           "clinical_claim": "non_clinical_research_only",
           "input_contract": "raw_ultrasound_frame_sequence",
-          "runtime_model_path": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/frame_anatomy_keypoint_weights.npz",
+          "runtime_model_path": "frame_anatomy_keypoint_weights.npz",
           "trainer_backend": "numpy_baseline",
           "task_name": "frame_anatomy_keypoint_export",
           "training_metrics": {
@@ -305,7 +305,7 @@
             "avg_pair_separation_px": 25.0,
             "avg_confidence": 1.0
           },
-          "package_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint",
+          "package_dir": "models/frame_anatomy_keypoint",
           "package_hash": "d74690da192da84e9b6f0211c325a3c3e3445ffcf3aa931cde4243103953cbcc"
         }
       }

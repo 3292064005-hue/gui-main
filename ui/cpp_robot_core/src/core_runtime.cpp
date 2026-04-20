@@ -46,11 +46,15 @@ std::string stateName(RobotCoreState state) {
   return "BOOT";
 }
 
-DeviceHealth makeDevice(const std::string& name, bool online, const std::string& detail) {
+DeviceHealth makeDevice(const std::string& name, bool connected, const std::string& detail, bool authoritative = false, bool streaming = false, bool present = false) {
   DeviceHealth device;
   device.device_name = name;
-  device.online = online;
-  device.fresh = online;
+  device.present = present || connected;
+  device.connected = connected;
+  device.streaming = streaming;
+  device.online = connected;
+  device.fresh = connected || streaming;
+  device.authoritative = authoritative;
   device.detail = detail;
   return device;
 }
@@ -170,9 +174,9 @@ CoreRuntime::CoreRuntime() {
   rt_motion_service_.bindSdkFacade(&sdk_robot_);
   devices_ = {
       makeDevice("robot", false, "机械臂控制器未连接"),
-      makeDevice("camera", false, "摄像头未连接"),
-      makeDevice("pressure", false, "压力传感器未连接"),
-      makeDevice("ultrasound", false, "超声设备未连接"),
+      makeDevice("camera", false, "摄像头未探测", false, false, true),
+      makeDevice("pressure", false, "压力传感器未探测", false, false, true),
+      makeDevice("ultrasound", false, "超声设备未探测", false, false, true),
   };
   recovery_manager_.setRetrySettleWindow(std::chrono::milliseconds(static_cast<int>(force_limits_.force_settle_window_ms)));
 }
@@ -223,10 +227,10 @@ std::string CoreRuntime::handleConnectionCommand(const RuntimeCommandInvocation&
     }
     controller_online_ = true;
     execution_state_ = RobotCoreState::Connected;
-    devices_[0] = makeDevice("robot", true, std::string("robot_core 已连接 / source=") + sdk_robot_.queryPort().runtimeSource());
-    devices_[1] = makeDevice("camera", true, "摄像头在线");
-    devices_[2] = makeDevice("pressure", true, "压力传感器在线");
-    devices_[3] = makeDevice("ultrasound", true, "超声设备在线");
+    devices_[0] = makeDevice("robot", true, std::string("robot_core 已连接 / source=") + sdk_robot_.queryPort().runtimeSource(), sdk_robot_.queryPort().liveBindingEstablished());
+    devices_[1] = makeDevice("camera", false, "未建立 authoritative camera stream；UI 已显式降级", false, false, true);
+    devices_[2] = makeDevice("pressure", false, "等待 pressure probe/heartbeat 建立", false, false, true);
+    devices_[3] = makeDevice("ultrasound", false, "未建立 authoritative ultrasound stream；UI 已显式降级", false, false, true);
     return replyJson(invocation.request_id, true, "connect_robot accepted");
   }
   if (command == "disconnect_robot") {
@@ -248,12 +252,14 @@ std::string CoreRuntime::handleConnectionCommand(const RuntimeCommandInvocation&
     robot_state_fresh_ = false;
     rt_jitter_ok_ = true;
     fault_code_.clear();
+    authority_lease_ = RuntimeAuthorityLease{};
     session_id_.clear();
     session_dir_.clear();
     plan_id_.clear();
     plan_hash_.clear();
     locked_scan_plan_hash_.clear();
     plan_loaded_ = false;
+    clearExecutionPlanRuntimeLocked();
     total_points_ = 0;
     total_segments_ = 0;
     path_index_ = 0;
@@ -273,9 +279,9 @@ std::string CoreRuntime::handleConnectionCommand(const RuntimeCommandInvocation&
     injected_faults_.clear();
     devices_ = {
         makeDevice("robot", false, "机械臂控制器未连接"),
-        makeDevice("camera", false, "摄像头未连接"),
-        makeDevice("pressure", false, "压力传感器未连接"),
-        makeDevice("ultrasound", false, "超声设备未连接"),
+        makeDevice("camera", false, "摄像头未探测", false, false, true),
+        makeDevice("pressure", false, "压力传感器未探测", false, false, true),
+        makeDevice("ultrasound", false, "超声设备未探测", false, false, true),
     };
     return replyJson(invocation.request_id, true, "disconnect_robot accepted");
   }
@@ -621,6 +627,8 @@ std::string CoreRuntime::handleQueryCommand(const RuntimeCommandInvocation& invo
          data_fields.emplace_back(json::field("ui_length_unit", json::quote(runtime_cfg.ui_length_unit)));
          data_fields.emplace_back(json::field("sdk_length_unit", json::quote(runtime_cfg.sdk_length_unit)));
          data_fields.emplace_back(json::field("boundary_normalized", json::boolLiteral(runtime_cfg.boundary_normalized)));
+         data_fields.emplace_back(json::field("runtime_config_contract_digest", json::quote(self->config_.runtime_config_contract_digest)));
+         data_fields.emplace_back(json::field("runtime_config_schema_version", json::quote(self->config_.runtime_config_schema_version)));
          data_fields.emplace_back(json::field("load_inertia", vectorJson(array6ToVector(runtime_cfg.load_inertia))));
          data_fields.emplace_back(json::field("contact_control", contact_control_obj));
          data_fields.emplace_back(json::field("force_estimator", force_estimator_obj));
@@ -668,7 +676,7 @@ std::string CoreRuntime::handleQueryCommand(const RuntimeCommandInvocation& invo
          const auto data = json::object(std::vector<std::string>{
              json::field("robot_model", json::quote(identity.robot_model)),
              json::field("clinical_mainline_mode", json::quote(identity.clinical_mainline_mode)),
-             json::field("required_sequence", json::stringArray({"connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_scan", "safe_retreat"})),
+             json::field("required_sequence", json::stringArray({"connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "safe_retreat"})),
              json::field("single_control_source_required", json::boolLiteral(identity.requires_single_control_source)),
              json::field("preferred_link", json::quote(identity.preferred_link)),
              json::field("rt_loop_hz", std::to_string(1000)),
@@ -695,7 +703,16 @@ std::string CoreRuntime::handleQueryCommand(const RuntimeCommandInvocation& invo
              json::field("load_kg", json::formatDouble(self->config_.load_kg)),
              json::field("rt_mode", json::quote(self->config_.rt_mode)),
              json::field("cartesian_impedance", vectorJson(self->config_.cartesian_impedance)),
-             json::field("desired_wrench_n", vectorJson(self->config_.desired_wrench_n))
+             json::field("desired_wrench_n", vectorJson(self->config_.desired_wrench_n)),
+             json::field("freeze_consistent", json::boolLiteral(self->sessionFreezeConsistentLocked())),
+             json::field("strict_runtime_freeze_gate", json::quote(self->strict_runtime_freeze_gate_)),
+             json::field("session_freeze_policy", json::quote(self->frozen_session_freeze_policy_json_)),
+             json::field("frozen_execution_critical_fields", json::stringArray(self->frozen_execution_critical_fields_)),
+             json::field("frozen_evidence_only_fields", json::stringArray(self->frozen_evidence_only_fields_)),
+             json::field("recheck_on_start_procedure", json::boolLiteral(self->frozen_recheck_on_start_procedure_)),
+             json::field("live_binding_established", json::boolLiteral(self->sdk_robot_.queryPort().liveBindingEstablished())),
+             json::field("control_source_exclusive", json::boolLiteral(self->sdk_robot_.queryPort().controlSourceExclusive())),
+             json::field("network_healthy", json::boolLiteral(self->sdk_robot_.queryPort().networkHealthy()))
          });
          return self->replyJson(invocation.request_id, true, "get_session_freeze accepted", data);
        }},

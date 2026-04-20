@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "repo_truth_ledger_v1",
+  "type": "object",
+  "required": [
+    "ledger_kind",
+    "session_id",
+    "session_dir",
+    "profile",
+    "build_id",
+    "build_hash",
+    "protocol_version",
+    "scan_plan_hash",
+    "runtime_config",
+    "runtime_config_contract",
+    "runtime_config_digest",
+    "robot_family_descriptor",
+    "sdk_model_switches",
+    "verification_scope",
+    "ledger_hash"
+  ],
+  "properties": {
+    "ledger_kind": {"const": "repo_truth_ledger"},
+    "session_id": {"type": "string"},
+    "session_dir": {"type": "string"},
+    "profile": {"type": "object"},
+    "build_id": {"type": "string"},
+    "build_hash": {"type": "string"},
+    "protocol_version": {"type": "integer"},
+    "scan_plan_hash": {"type": "string"},
+    "runtime_config": {"type": "object"},
+    "runtime_config_contract": {"type": "object"},
+    "runtime_config_digest": {"type": "string"},
+    "runtime_config_schema_version": {"type": "string"},
+    "robot_family_descriptor": {"type": "object"},
+    "sdk_model_switches": {"type": "object"},
+    "verification_scope": {"type": "object"},
+    "ledger_hash": {"type": "string"}
+  },
+  "additionalProperties": true
+}

@@ -7,6 +7,10 @@ int main() {
   robot_core::RtMotionService service(nullptr, nullptr);
   service.recordLoopSample(2.0, 0.45, 0.12, false);
   service.stop();
+  const auto retract_without_sdk = service.controlledRetract();
+  assert(retract_without_sdk.status == robot_core::RtControlledRetractStatus::StartRejected);
+  assert(!retract_without_sdk.canProceedToNrtRetreat());
+  assert(retract_without_sdk.reason == "no_sdk_facade");
   const auto snapshot = service.snapshot();
   assert(snapshot.current_period_ms == 2.0);
   assert(snapshot.max_cycle_ms >= 0.45);

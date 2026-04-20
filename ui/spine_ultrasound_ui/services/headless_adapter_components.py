@@ -4,9 +4,12 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from spine_ultrasound_ui.models import RuntimeConfig
+
 from spine_ultrasound_ui.services.backend_control_plane_service import BackendControlPlaneService
 from spine_ultrasound_ui.services.command_state_policy import CommandStatePolicyService
 from spine_ultrasound_ui.services.control_authority_service import ControlAuthorityService
+from spine_ultrasound_ui.services.runtime_authority_proxy_service import RuntimeAuthorityProxyService
 from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
 from spine_ultrasound_ui.services.event_bus import EventBus
 from spine_ultrasound_ui.services.headless_control_plane_aggregator import HeadlessControlPlaneAggregator
@@ -81,10 +84,19 @@ def build_host_services(host: Any) -> None:
     )
     host.session_intelligence = SessionIntelligenceService()
     host.evidence_seal_service = SessionEvidenceSealService()
-    host.control_authority = ControlAuthorityService(
-        strict_mode=host.settings.strict_control_authority,
-        auto_issue_implicit_lease=host.settings.implicit_control_lease,
-    )
+    if host.settings.mode == "core":
+        host.control_authority = RuntimeAuthorityProxyService(
+            dispatch=lambda command, payload: host.command_service._dispatch.dispatch(command, payload),
+            deployment_profile_snapshot=lambda: host.deployment_profile_service.build_snapshot(RuntimeConfig.from_dict(host.runtime_config_snapshot_data or {})),
+            current_session_id=lambda: host._current_session_id,
+            strict_mode=host.settings.strict_control_authority,
+            auto_issue_implicit_lease=host.settings.implicit_control_lease,
+        )
+    else:
+        host.control_authority = ControlAuthorityService(
+            strict_mode=host.settings.strict_control_authority,
+            auto_issue_implicit_lease=host.settings.implicit_control_lease,
+        )
     host.runtime_config_snapshot_data = {}
     host.session_context = HeadlessSessionContext()
     host.runtime_introspection = HeadlessRuntimeIntrospection(host)

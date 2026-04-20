@@ -32,13 +32,13 @@ class RoleMatrix:
     """
 
     COMMAND_GROUPS: dict[str, set[str]] = {
-        "control": {"connect_robot", "disconnect_robot", "power_on", "power_off", "set_auto_mode", "set_manual_mode", "validate_setup", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_scan", "go_home", "run_rl_project", "pause_rl_project", "enable_drag", "disable_drag", "replay_path", "start_record_path", "stop_record_path", "cancel_record_path", "save_record_path", "compile_scan_plan", "validate_scan_plan"},
+        "control": {"connect_robot", "disconnect_robot", "power_on", "power_off", "set_auto_mode", "set_manual_mode", "validate_setup", "acquire_control_lease", "renew_control_lease", "release_control_lease", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "start_scan", "go_home", "run_rl_project", "pause_rl_project", "enable_drag", "disable_drag", "replay_path", "start_record_path", "stop_record_path", "cancel_record_path", "save_record_path", "compile_scan_plan", "validate_scan_plan"},
         "recovery": {"pause_scan", "resume_scan", "safe_retreat", "clear_fault", "emergency_stop", "inject_fault", "clear_injected_faults"},
         "review": set(),
         "export": set(),
     }
     CLAIM_GROUPS: dict[str, set[str]] = {
-        "control": {"hardware_lifecycle_write", "runtime_validation", "plan_compile", "session_freeze_write", "nrt_motion_write", "rt_motion_write"},
+        "control": {"control_authority_write", "hardware_lifecycle_write", "runtime_validation", "plan_compile", "session_freeze_write", "nrt_motion_write", "rt_motion_write"},
         "recovery": {"recovery_write", "fault_injection_write"},
         "review": {"plan_compile"},
         "export": set(),

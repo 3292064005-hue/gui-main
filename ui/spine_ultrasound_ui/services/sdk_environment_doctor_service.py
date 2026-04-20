@@ -18,6 +18,7 @@ from spine_ultrasound_ui.services.runtime_version_policy import (
     check_ubuntu_2204,
 )
 from spine_ultrasound_ui.services.sdk_vendor_locator import SdkVendorLayout, SdkVendorLocator
+from spine_ultrasound_ui.services.runtime_source_policy_service import RuntimeSourcePolicyService
 
 
 @dataclass
@@ -118,6 +119,7 @@ class SdkEnvironmentDoctorService:
         checks.extend(self._sdk_mount_checks())
         checks.extend(self._tls_checks())
         checks.extend(self._network_checks(config))
+        checks.extend(self._source_policy_checks(config))
 
         blockers = [item.to_dict() for item in checks if item.severity == "blocker" and not item.ok]
         warnings = [item.to_dict() for item in checks if item.severity == "warning" and not item.ok]
@@ -236,6 +238,34 @@ class SdkEnvironmentDoctorService:
         return [
             self._check("TLS runtime 目录", runtime_dir.exists(), "blocker", self._display_path(runtime_dir)),
             self._check("TLS 证书材料", bool(material), "warning", f"{self._display_path(runtime_dir)} / {len(material)} files"),
+        ]
+
+
+    def _source_policy_checks(self, config: RuntimeConfig) -> list[DoctorCheck]:
+        policy = RuntimeSourcePolicyService().build_snapshot(config=config)
+        detail = (
+            f"profile={policy.deployment_profile}, camera={policy.camera_source_tier}, "
+            f"force={policy.force_source_tier}, shell={policy.shell_write_tier}"
+        )
+        return [
+            self._check(
+                "运行源分层策略",
+                not bool(policy.blockers),
+                "blocker" if policy.deployment_profile in {"research", "clinical"} else "warning",
+                detail if not policy.blockers else detail + " / " + "; ".join(policy.blockers),
+            ),
+            self._check(
+                "锁定会话数据源",
+                bool(policy.session_lock_ready),
+                "blocker" if policy.deployment_profile in {"lab", "research", "clinical"} else "warning",
+                detail if policy.session_lock_ready else detail + " / session_lock blocked",
+            ),
+            self._check(
+                "执行面写控制权",
+                bool(policy.execution_write_ready),
+                "blocker" if policy.deployment_profile in {"research", "clinical"} else "warning",
+                detail if policy.execution_write_ready else detail + " / execution_write blocked",
+            ),
         ]
 
     def _network_checks(self, config: RuntimeConfig) -> list[DoctorCheck]:

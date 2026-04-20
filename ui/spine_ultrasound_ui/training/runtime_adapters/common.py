@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from spine_ultrasound_ui.training.specs.common import load_structured_config
+from spine_ultrasound_ui.runtime.model_bundle_contract import load_model_bundle_manifest
 
 
 def resolve_model_package(target: str | Path) -> dict[str, Any]:
@@ -41,9 +42,12 @@ def resolve_model_package(target: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(package_dir)
     meta_path = package_dir / 'model_meta.json'
     parameter_path = package_dir / 'parameters.json'
+    bundle_manifest_path = package_dir / 'bundle_manifest.json'
     if not meta_path.exists() or not parameter_path.exists():
         raise ValueError(f'invalid model package: {package_dir}')
     meta = json.loads(meta_path.read_text(encoding='utf-8'))
+    if bundle_manifest_path.exists():
+        meta['bundle_manifest'] = load_model_bundle_manifest(package_dir)
     parameters = json.loads(parameter_path.read_text(encoding='utf-8'))
 
     runtime_model_hint = str(meta.get('runtime_model_path', '') or config_payload.get('runtime_model_path', '') or '')

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "live_truth_ledger_v1",
+  "type": "object",
+  "required": [
+    "ledger_kind",
+    "session_id",
+    "session_dir",
+    "build_id",
+    "profile",
+    "robot_family_descriptor",
+    "status",
+    "required_evidence",
+    "controller_log_summary",
+    "phase_transition_trace",
+    "rt_jitter_or_packet_loss_snapshot",
+    "final_verdict_trace",
+    "latest_observation",
+    "ledger_hash"
+  ],
+  "properties": {
+    "ledger_kind": {"const": "live_truth_ledger"},
+    "session_id": {"type": "string"},
+    "session_dir": {"type": "string"},
+    "build_id": {"type": "string"},
+    "profile": {"type": "object"},
+    "robot_family_descriptor": {"type": "object"},
+    "status": {"type": "string"},
+    "required_evidence": {"type": "array", "items": {"type": "string"}},
+    "controller_log_summary": {"type": "object"},
+    "phase_transition_trace": {"type": "object"},
+    "rt_jitter_or_packet_loss_snapshot": {"type": "object"},
+    "final_verdict_trace": {"type": "object"},
+    "latest_observation": {"type": "object"},
+    "ledger_hash": {"type": "string"}
+  },
+  "additionalProperties": true
+}

@@ -145,6 +145,10 @@ void CoreRuntime::rtStep() {
     updateQualityLocked(observed, phase_telemetry);
     updateKinematicsLocked();
     updateContactAndProgressLocked(observed);
+    if (scan_procedure_active_ && execution_state_ == RobotCoreState::Scanning && sdk_robot_.activeRtPhase() == "idle") {
+      std::string transition_reason;
+      advancePlanSegmentLocked(&transition_reason);
+    }
     refreshDeviceHealthLocked(json::nowNs(), observed);
     record_bundle = buildRecordBundleLocked();
   }
@@ -234,11 +238,18 @@ void CoreRuntime::watchdogStep() {
     queueAlarmLocked("RECOVERABLE_FAULT", "contact", "压力超上限，已进入保持状态", "scan_monitor", "", "hold");
   }
   if (decision == SafetyDecision::ControlledRetract && execution_state_ != RobotCoreState::Estop) {
-    rt_motion_service_.controlledRetract();
-    recovery_manager_.controlledRetract();
+    const auto rt_retract = rt_motion_service_.controlledRetract();
     sdk_robot_.setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-    execution_state_ = RobotCoreState::Retreating;
-    queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "力控进入受控退让", "force_monitor", "", "controlled_retract");
+    if (rt_retract.canProceedToNrtRetreat()) {
+      recovery_manager_.controlledRetract();
+      execution_state_ = RobotCoreState::Retreating;
+      queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "力控进入受控退让", "force_monitor", rt_retract.reason, "controlled_retract");
+    } else {
+      recovery_manager_.cancelRetry();
+      execution_state_ = RobotCoreState::Fault;
+      fault_code_ = "CONTROLLED_RETRACT_INCOMPLETE";
+      queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "RT受控回撤未完成，已阻断后续恢复链", "force_monitor", rt_retract.reason, "controlled_retract_incomplete");
+    }
   }
   if (decision == SafetyDecision::EstopLatch && execution_state_ != RobotCoreState::Estop) {
     recovery_manager_.latchEstop();
@@ -288,6 +299,7 @@ void CoreRuntime::updateQualityLocked(const RtObservedState& observed, const RtP
 void CoreRuntime::updateContactAndProgressLocked(const RtObservedState& observed) {
   const bool allow_simulated_pressure = simulatedTelemetryAllowedLocked();
   const bool pressure_available = observed.pressure_valid;
+  const auto phase_telemetry = sdk_robot_.queryPort().phaseTelemetry();
   const std::string pressure_source = allow_simulated_pressure && !pressure_available ? "mock_profile_simulated" : pressureSourceName(observed);
   const auto assign_contact_metadata = [&](bool authoritative) {
     contact_state_.pressure_source = pressure_source;
@@ -360,8 +372,16 @@ void CoreRuntime::updateContactAndProgressLocked(const RtObservedState& observed
     contact_state_.mode = "STABLE_CONTACT";
     contact_state_.confidence = pressure_available ? 0.83 : 0.58;
     contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = "START_SCAN";
+    contact_state_.recommended_action = scan_procedure_active_ ? "RUNTIME_START_SCAN" : "START_SCAN";
     assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
+    if (scan_procedure_active_) {
+      std::string reason;
+      if (!startPlanDrivenScanLocked(&reason)) {
+        contact_state_.recommended_action = "PAUSE_AND_HOLD";
+        execution_state_ = RobotCoreState::PausedHold;
+        state_reason_ = reason.empty() ? "scan_start_blocked" : reason;
+      }
+    }
     return;
   }
 
@@ -375,34 +395,16 @@ void CoreRuntime::updateContactAndProgressLocked(const RtObservedState& observed
       assign_contact_metadata(false);
       return;
     }
-    if (frame_id_ % 25 == 0) {
-      ++path_index_;
-    }
-    if (total_points_ > 0) {
-      progress_pct_ = std::min(100.0, 100.0 * static_cast<double>(path_index_) / static_cast<double>(total_points_));
-      active_waypoint_index_ = std::min(total_points_, path_index_);
-    }
-    if (total_segments_ > 0) {
-      const int points_per_segment = std::max(total_points_ / total_segments_, 1);
-      active_segment_ = std::min(total_segments_, std::max(1, path_index_ / points_per_segment + 1));
-    }
-    sdk_robot_.updateSessionRegisters(active_segment_, frame_id_);
     pressure_current_ = pressure_available ? observed.pressure_force_n : (config_.pressure_target + 0.08 * std::sin(phase_));
     if (injected_faults_.count("overpressure") > 0) {
       pressure_current_ = std::max(config_.pressure_upper + 0.5, force_limits_.max_z_force_n + 0.5);
     }
+    updatePlanProgressLocked(observed, phase_telemetry);
     contact_state_.mode = "STABLE_CONTACT";
     contact_state_.confidence = pressure_available ? 0.87 : 0.61;
     contact_state_.pressure_current = pressure_current_;
     contact_state_.recommended_action = "SCAN";
     assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
-    if (progress_pct_ >= 100.0) {
-      sdk_robot_.setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-      execution_state_ = RobotCoreState::ScanComplete;
-      contact_state_.mode = "NO_CONTACT";
-      contact_state_.recommended_action = "POSTPROCESS";
-      contact_state_.contact_stable = false;
-    }
     return;
   }
 
@@ -451,28 +453,46 @@ void CoreRuntime::updateContactAndProgressLocked(const RtObservedState& observed
 void CoreRuntime::refreshDeviceHealthLocked(int64_t ts_ns, const RtObservedState& observed) {
   pressure_fresh_ = observed.pressure_valid && observed.pressure_age_ms <= static_cast<double>(config_.pressure_stale_ms);
   robot_state_fresh_ = observed.valid && !observed.stale;
+  const bool live_runtime = sdk_robot_.liveBindingEstablished();
   for (auto& device : devices_) {
     if (device.device_name == "pressure") {
-      device.fresh = device.online && pressure_fresh_;
-      device.last_ts_ns = pressure_fresh_ ? ts_ns : 0;
-      if (device.online && !pressure_fresh_) {
-        device.detail = "压力信号不可用或已过期";
-      }
+      device.present = true;
+      device.connected = pressure_fresh_ || observed.pressure_valid;
+      device.streaming = observed.pressure_valid;
+      device.online = device.connected;
+      device.authoritative = live_runtime && observed.pressure_valid;
+      device.fresh = observed.pressure_valid && pressure_fresh_;
+      device.last_ts_ns = device.fresh ? ts_ns : 0;
+      device.detail = device.connected ? (device.fresh ? "压力传感已接入并新鲜" : "压力通道已接入但数据过期") : "压力传感未建立 authoritative stream";
       continue;
     }
     if (device.device_name == "robot") {
-      device.fresh = device.online && robot_state_fresh_;
-      device.last_ts_ns = robot_state_fresh_ ? ts_ns : 0;
-      if (device.online && !robot_state_fresh_) {
-        device.detail = "机器人状态镜像未收到可信更新";
-      }
+      device.present = true;
+      device.connected = controller_online_;
+      device.streaming = observed.valid;
+      device.online = device.connected;
+      device.authoritative = live_runtime;
+      device.fresh = device.connected && robot_state_fresh_;
+      device.last_ts_ns = device.fresh ? ts_ns : 0;
       if (execution_state_ == RobotCoreState::Fault || execution_state_ == RobotCoreState::Estop) {
         device.detail = "机器人控制器处于故障或急停状态";
+      } else if (device.connected && !device.fresh) {
+        device.detail = "机器人状态镜像未收到可信更新";
+      } else if (device.connected) {
+        device.detail = live_runtime ? "live robot binding active" : "contract-shell connected without live authoritative binding";
       }
       continue;
     }
-    device.fresh = device.online;
-    device.last_ts_ns = device.online ? ts_ns : 0;
+    device.present = true;
+    device.connected = false;
+    device.streaming = false;
+    device.online = false;
+    device.authoritative = false;
+    device.fresh = false;
+    device.last_ts_ns = 0;
+    if (device.detail.empty()) {
+      device.detail = std::string("未建立 authoritative ") + device.device_name + " stream";
+    }
   }
 }
 
@@ -538,9 +558,14 @@ CoreStateSnapshot CoreRuntime::buildCoreSnapshotLocked() const {
 ScanProgress CoreRuntime::buildScanProgressLocked() const {
   ScanProgress progress;
   progress.active_segment = active_segment_;
+  progress.active_waypoint_index = active_waypoint_index_;
+  progress.completed_waypoints = execution_plan_runtime_.completed_waypoints;
+  progress.total_waypoints = execution_plan_runtime_.total_waypoints;
+  progress.remaining_waypoints = std::max(0, progress.total_waypoints - progress.completed_waypoints);
   progress.path_index = path_index_;
   progress.overall_progress = progress_pct_;
   progress.frame_id = frame_id_;
+  progress.checkpoint_tag = execution_plan_runtime_.active_checkpoint_tag;
   return progress;
 }
 

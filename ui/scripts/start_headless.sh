@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Official Ubuntu 22.04 headless launcher.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
-
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-: "${SPINE_DEPLOYMENT_PROFILE:=dev}"
-if [[ -z "${SPINE_HEADLESS_BACKEND:-}" ]]; then
-  SPINE_HEADLESS_BACKEND="$($PYTHON_BIN scripts/resolve_headless_backend.py | $PYTHON_BIN -c 'import json,sys; print(json.load(sys.stdin)["mode"])')"
-fi
-export SPINE_DEPLOYMENT_PROFILE
-export SPINE_HEADLESS_BACKEND
-
-"$PYTHON_BIN" -m uvicorn spine_ultrasound_ui.api_server:app --host 0.0.0.0 --port 8000
+export SPINE_MAINLINE_SURFACE=headless
+export ROBOT_CORE_PROFILE="${ROBOT_CORE_PROFILE:-mock}"
+RESOLVED_BACKEND_JSON="$(python3 "$ROOT_DIR/scripts/resolve_headless_backend.py")"
+DEFAULT_HEADLESS_BACKEND="$(printf '%s' "$RESOLVED_BACKEND_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("resolved_mode", "core"))')"
+EXPLICIT_HEADLESS_BACKEND="${SPINE_HEADLESS_BACKEND:-}"
+export SPINE_MAINLINE_BACKEND="${SPINE_MAINLINE_BACKEND:-${EXPLICIT_HEADLESS_BACKEND:-$DEFAULT_HEADLESS_BACKEND}}"
+exec python3 "$ROOT_DIR/scripts/start_mainline.py" --surface headless --profile "$ROBOT_CORE_PROFILE" --backend "$SPINE_MAINLINE_BACKEND" "$@"

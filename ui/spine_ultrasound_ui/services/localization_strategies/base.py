@@ -6,6 +6,7 @@ from typing import Any
 
 from spine_ultrasound_ui.models import CapabilityStatus, ExperimentRecord, ImplementationState, RuntimeConfig
 from spine_ultrasound_ui.services.perception import GuidanceRuntimeService
+from spine_ultrasound_ui.services.runtime_source_policy_service import RuntimeSourcePolicyService
 from spine_ultrasound_ui.services.planning.types import LocalizationResult
 
 
@@ -62,6 +63,11 @@ class GuidanceLocalizationStrategy:
                 detected by downstream services.
         """
         normalized_roster = self._normalize_device_roster(device_roster)
+        RuntimeSourcePolicyService().validate_guidance_preview(
+            config=config,
+            source_type=self.contract.source_type,
+            provider_mode=str(getattr(config, "camera_guidance_input_mode", "")),
+        )
         bundle = self.runtime.build(
             experiment_id=experiment.exp_id,
             config=config,

@@ -23,12 +23,6 @@ class BackendAuthoritativeContractService:
     """
 
     DEFAULT_PROTOCOL_VERSION = 1
-    FALLBACK_OWNER = {
-        "actor_id": "runtime-authority",
-        "workspace": "runtime",
-        "role": "runtime",
-        "session_id": "",
-    }
 
     def build(
         self,
@@ -279,26 +273,28 @@ class BackendAuthoritativeContractService:
         *,
         authority_source: str,
     ) -> dict[str, Any]:
-        """Normalize control-authority shape while preserving compatibility."""
+        """Normalize control-authority payloads without fabricating owners.
+
+        Boundary behavior:
+            - Empty payloads stay empty so unavailable authority snapshots do not
+              silently grow synthetic owners or lease ids.
+            - When runtime-published owner/lease data exists it is preserved and
+              only additive defaults such as provenance/source are filled in.
+        """
         data = self._as_dict(payload)
-        owner = self._as_dict(data.get("owner")) or dict(self.FALLBACK_OWNER)
-        owner.setdefault("actor_id", self.FALLBACK_OWNER["actor_id"])
-        owner.setdefault("workspace", self.FALLBACK_OWNER["workspace"])
-        owner.setdefault("role", self.FALLBACK_OWNER["role"])
-        owner.setdefault("session_id", "")
+        if not data:
+            return {}
+        owner = self._as_dict(data.get("owner"))
+        if owner:
+            owner.setdefault("actor_id", str(owner.get("actor_id", "")))
+            owner.setdefault("workspace", str(owner.get("workspace", "")))
+            owner.setdefault("role", str(owner.get("role", "")))
+            owner.setdefault("session_id", str(owner.get("session_id", "")))
         active_lease = self._as_dict(data.get("active_lease"))
-        if not active_lease:
-            active_lease = {
-                "lease_id": "",
-                "actor_id": owner.get("actor_id", ""),
-                "workspace": owner.get("workspace", ""),
-                "role": owner.get("role", ""),
-                "session_id": owner.get("session_id", ""),
-                "expires_in_s": 0,
-                "source": authority_source,
-            }
         owner_provenance = self._as_dict(data.get("owner_provenance"))
         owner_provenance.setdefault("source", authority_source)
+        workspace_binding = str(data.get("workspace_binding", active_lease.get("workspace") or owner.get("workspace", "")))
+        session_binding = str(data.get("session_binding", active_lease.get("session_id") or owner.get("session_id", "")))
         return {
             "summary_state": str(data.get("summary_state", "degraded" if not payload else "ready")),
             "summary_label": str(data.get("summary_label", "控制权快照")),
@@ -306,8 +302,8 @@ class BackendAuthoritativeContractService:
             "owner": owner,
             "active_lease": active_lease,
             "owner_provenance": owner_provenance,
-            "workspace_binding": str(data.get("workspace_binding", owner.get("workspace", ""))),
-            "session_binding": str(data.get("session_binding", owner.get("session_id", ""))),
+            "workspace_binding": workspace_binding,
+            "session_binding": session_binding,
             "conflict_reason": str(data.get("conflict_reason", "")),
             "authority_source": authority_source,
             "blockers": list(data.get("blockers", [])) if isinstance(data.get("blockers"), list) else [],
@@ -485,8 +481,9 @@ class BackendAuthoritativeContractService:
     @staticmethod
     def _default_detail(authority_source: str, control_authority: Mapping[str, Any], *, synthesized: bool, envelope_origin: str) -> str:
         owner = dict(control_authority.get("owner", {}))
-        actor = owner.get("actor_id", "runtime-authority")
-        workspace = owner.get("workspace", "runtime")
+        actor = str(owner.get("actor_id", ""))
+        workspace = str(owner.get("workspace", ""))
+        owner_token = f" owner={actor}@{workspace}" if actor or workspace else " owner=<unbound>"
         if synthesized:
-            return f"authority_source={authority_source} owner={actor}@{workspace} synthesized_from={envelope_origin}; authoritative_runtime_envelope missing"
-        return f"authority_source={authority_source} owner={actor}@{workspace} envelope_origin={envelope_origin}"
+            return f"authority_source={authority_source}{owner_token} synthesized_from={envelope_origin}; authoritative_runtime_envelope missing"
+        return f"authority_source={authority_source}{owner_token} envelope_origin={envelope_origin}"

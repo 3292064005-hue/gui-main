@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Model Bundle Manifest v1",
+  "type": "object",
+  "required": [
+    "bundle_id",
+    "bundle_version",
+    "runtime_profile",
+    "artifacts",
+    "compatibility",
+    "metrics"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_name": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "weights_path",
+        "entrypoint"
+      ],
+      "properties": {
+        "weights_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entrypoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameter_path": {
+          "type": "string"
+        },
+        "meta_path": {
+          "type": "string"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": [
+        "robot_models",
+        "runtime_modes"
+      ],
+      "properties": {
+        "robot_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime_modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "preprocess": {
+      "type": "object"
+    },
+    "postprocess": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    }
+  }
+}

@@ -49,8 +49,12 @@ std::string deviceMapJson(const std::vector<DeviceHealth>& devices) {
         field(
             device.device_name,
             object({
-                field("connected", boolLiteral(device.online)),
-                field("health", quote(device.online ? (device.fresh ? "online" : "stale") : "offline")),
+                field("present", boolLiteral(device.present)),
+                field("connected", boolLiteral(device.connected)),
+                field("streaming", boolLiteral(device.streaming)),
+                field("online", boolLiteral(device.online)),
+                field("authoritative", boolLiteral(device.authoritative)),
+                field("health", quote(device.connected ? (device.fresh ? "online" : "stale") : "offline")),
                 field("detail", quote(device.detail)),
                 field("fresh", boolLiteral(device.fresh)),
                 field("last_ts_ns", std::to_string(device.last_ts_ns)),
@@ -134,9 +138,14 @@ std::vector<std::string> TelemetryPublisher::buildLines(const TelemetrySnapshot&
       "scan_progress",
       object({
           field("active_segment", std::to_string(snapshot.scan_progress.active_segment)),
+          field("active_waypoint_index", std::to_string(snapshot.scan_progress.active_waypoint_index)),
+          field("completed_waypoints", std::to_string(snapshot.scan_progress.completed_waypoints)),
+          field("remaining_waypoints", std::to_string(snapshot.scan_progress.remaining_waypoints)),
+          field("total_waypoints", std::to_string(snapshot.scan_progress.total_waypoints)),
           field("path_index", std::to_string(snapshot.scan_progress.path_index)),
           field("overall_progress", formatDouble(snapshot.scan_progress.overall_progress)),
           field("frame_id", std::to_string(snapshot.scan_progress.frame_id)),
+          field("checkpoint_tag", quote(snapshot.scan_progress.checkpoint_tag)),
       })));
   lines.push_back(envelope("device_health", deviceMapJson(snapshot.devices)));
   lines.push_back(envelope(
@@ -255,9 +264,14 @@ std::vector<spine_core::TelemetryEnvelope> TelemetryPublisher::buildProtobufMess
       ts,
       object({
           field("active_segment", std::to_string(snapshot.scan_progress.active_segment)),
+          field("active_waypoint_index", std::to_string(snapshot.scan_progress.active_waypoint_index)),
+          field("completed_waypoints", std::to_string(snapshot.scan_progress.completed_waypoints)),
+          field("remaining_waypoints", std::to_string(snapshot.scan_progress.remaining_waypoints)),
+          field("total_waypoints", std::to_string(snapshot.scan_progress.total_waypoints)),
           field("path_index", std::to_string(snapshot.scan_progress.path_index)),
           field("overall_progress", formatDouble(snapshot.scan_progress.overall_progress)),
           field("frame_id", std::to_string(snapshot.scan_progress.frame_id)),
+          field("checkpoint_tag", quote(snapshot.scan_progress.checkpoint_tag)),
       })));
 
   messages.push_back(makeTelemetryEnvelope("device_health", ts, deviceMapJson(snapshot.devices)));

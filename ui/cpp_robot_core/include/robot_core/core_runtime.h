@@ -32,6 +32,21 @@ class CoreRuntime;
 class CoreRuntimeDispatcher;
 class CoreRuntimeContractPublisher;
 
+struct RuntimeAuthorityLease {
+  bool active{false};
+  std::string lease_id;
+  std::string actor_id;
+  std::string workspace;
+  std::string role;
+  std::string session_id;
+  std::string source;
+  std::string intent_reason;
+  std::string deployment_profile;
+  int64_t acquired_ts_ns{0};
+  int64_t refreshed_ts_ns{0};
+  std::set<std::string> granted_claims{};
+};
+
 class CoreRuntime {
 public:
   enum class RuntimeLane {
@@ -150,8 +165,70 @@ private:
   void flushRecordBundle(const PendingRecordBundle& bundle);
   void applyConfigSnapshotLocked(const std::string& config_snapshot_json);
   void loadPlanLocked(const std::string& scan_plan_json, const std::string& scan_plan_hash = "");
+  /**
+   * @brief Clear the canonical execution-plan runtime mirror.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Resets plan-owned segment/waypoint execution state and detaches planned-segment bindings from the SDK/NRT shells.
+   */
+  void clearExecutionPlanRuntimeLocked();
+  /**
+   * @brief Freeze a parsed scan plan into the canonical runtime execution graph.
+   * @param plan Validated scan plan payload.
+   * @param error Optional output receiving the blocking reason when freezing fails.
+   * @return True when the execution runtime mirror was rebuilt successfully.
+   * @throws No exceptions are thrown.
+   * @boundary Builds per-segment waypoint caches and cumulative path lengths used by RT execution/progress telemetry.
+   */
+  bool rebuildExecutionPlanRuntimeLocked(const ScanPlan& plan, std::string* error = nullptr);
+  /**
+   * @brief Bind the currently active execution-plan segment into SDK/NRT execution shells.
+   * @param reason Optional output receiving the blocking reason when configuration fails.
+   * @return True when the active segment was configured successfully.
+   * @throws No exceptions are thrown.
+   * @boundary Updates segment-scoped plan ownership without mutating unrelated runtime/session state.
+   */
+  bool configureActiveSegmentLocked(std::string* reason = nullptr);
+  /**
+   * @brief Start RT scan-follow against the currently active frozen plan segment.
+   * @param reason Optional output receiving the blocking reason when execution cannot start.
+   * @return True when RT scan-follow entered the scanning state.
+   * @throws No exceptions are thrown.
+   * @boundary Owns the runtime transition from stable-contact into segment-driven RT execution.
+   */
+  bool startPlanDrivenScanLocked(std::string* reason = nullptr);
+  /**
+   * @brief Advance to the next frozen plan segment or complete the scan when exhausted.
+   * @param reason Optional output receiving the blocking reason when advancement fails.
+   * @return True when the next segment (or completion state) was activated successfully.
+   * @throws No exceptions are thrown.
+   * @boundary Maintains canonical segment ownership and completion semantics inside the runtime kernel.
+   */
+  bool advancePlanSegmentLocked(std::string* reason = nullptr);
+  /**
+   * @brief Project RT phase telemetry back onto canonical segment/waypoint progress state.
+   * @param observed Current RT observation sample.
+   * @param phase_telemetry Current RT phase telemetry emitted by the SDK façade.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Converts low-level RT motion progress into plan-authored segment/waypoint telemetry for UI/recorder consumers.
+   */
+  void updatePlanProgressLocked(const RtObservedState& observed, const RtPhaseTelemetry& phase_telemetry);
   FinalVerdict compileScanPlanVerdictLocked(const std::string& config_snapshot_json, const std::string& scan_plan_json, const std::string& scan_plan_hash = "");
+  // Runtime-owned authority helpers. These methods are the final write-command
+  // arbiter on the core path and must only be called with state_mutex_ held.
+  bool authorizeInvocationLocked(const RuntimeCommandInvocation& invocation, std::string* error);
+  bool roleCanClaimLocked(const std::string& role, const std::string& claim) const;
+  std::vector<std::string> allowedClaimsForRoleLocked(const std::string& role) const;
+  std::string makeRuntimeLeaseIdLocked(const RuntimeCommandContext& context) const;
+  void bindAuthoritySessionLocked(const std::string& session_id);
+  void clearAuthoritySessionBindingLocked();
+  std::string controlAuthorityJsonLocked() const;
   void appendMainlineContractIssuesLocked(std::vector<std::string>* blockers, std::vector<std::string>* warnings) const;
+  void captureSessionFreezeInputsLocked(const LockSessionRequest& request);
+  void clearSessionFreezeInputsLocked();
+  void appendSessionFreezeGateIssuesLocked(std::vector<std::string>* blockers, std::vector<std::string>* warnings, bool recheck_live_state) const;
+  bool sessionFreezeGateEnforcedLocked() const;
   bool sessionFreezeConsistentLocked() const;
   std::string capabilityContractJsonLocked() const;
   std::string robotFamilyContractJsonLocked() const;
@@ -202,6 +279,14 @@ private:
   std::string plan_id_;
   std::string plan_hash_;
   std::string locked_scan_plan_hash_;
+  std::string strict_runtime_freeze_gate_{"enforce"};
+  std::string frozen_device_roster_json_;
+  std::string frozen_safety_thresholds_json_;
+  std::string frozen_device_health_snapshot_json_;
+  std::string frozen_session_freeze_policy_json_;
+  std::vector<std::string> frozen_execution_critical_fields_{};
+  std::vector<std::string> frozen_evidence_only_fields_{};
+  bool frozen_recheck_on_start_procedure_{true};
   bool plan_loaded_{false};
   int total_points_{0};
   int total_segments_{0};
@@ -224,8 +309,11 @@ private:
   bool quality_available_{false};
   bool quality_authoritative_{false};
   ContactTelemetry contact_state_{};
+  RuntimeAuthorityLease authority_lease_{};
   FinalVerdict last_final_verdict_{};
   std::vector<DeviceHealth> devices_{};
+  ExecutionPlanRuntime execution_plan_runtime_{};
+  bool scan_procedure_active_{false};
   std::vector<AlarmEvent> pending_alarms_{};
   RobotStateHub robot_state_hub_{};
   RecordingService recording_service_{};

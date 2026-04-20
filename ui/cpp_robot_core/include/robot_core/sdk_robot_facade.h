@@ -453,6 +453,22 @@ public:
   bool cancelRecordPath(std::string* reason = nullptr);
   bool saveRecordPath(const std::string& name, const std::string& save_as, std::string* reason = nullptr);
 
+  struct AuthoritativeKinematicsCheckResult {
+    bool available{false};
+    bool passed{true};
+    std::string reason;
+    std::vector<std::string> warnings;
+  };
+
+  /**
+   * @brief Run authoritative xMateModel feasibility checks for a frozen scan plan.
+   * @param plan Canonical scan plan to validate.
+   * @return Availability/result bundle for the model-backed feasibility pass.
+   * @throws No exceptions are propagated to callers; SDK/model failures are captured in the result.
+   * @boundary Uses official xCore SDK model methods only when a live xMate binding is established.
+   */
+  AuthoritativeKinematicsCheckResult validatePlanAuthoritativeKinematics(const ScanPlan& plan) const;
+
   bool connected() const;
   bool powered() const;
   bool automaticMode() const;
@@ -508,6 +524,33 @@ public:
   void resetRtPhaseIntegrators();
   bool validateRtControlContract(std::string* reason = nullptr) const;
   void setRtPhaseControlContract(const RtPhaseControlContract& contract);
+  /**
+   * @brief Bind a plan-authored scan segment into the SDK façade RT/NRT execution cache.
+   * @param segment Canonical frozen scan segment.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Exposes plan-driven waypoint geometry to RT scan-follow without letting UI/Python own execution state.
+   */
+  void setPlannedSegment(const ScanSegment& segment);
+  /**
+   * @brief Clear the currently bound planned segment from the SDK façade cache.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Removes plan-driven RT/NRT geometry when no active execution segment is owned by runtime.
+   */
+  void clearPlannedSegment();
+  /**
+   * @brief Return the id of the currently bound planned segment.
+   * @return Planned segment id or zero when no segment is bound.
+   * @throws No exceptions are thrown.
+   */
+  int plannedSegmentId() const;
+  /**
+   * @brief Return the waypoint count of the currently bound planned segment.
+   * @return Number of plan-authored waypoints cached inside the façade.
+   * @throws No exceptions are thrown.
+   */
+  std::size_t plannedWaypointCount() const;
 
 
   static std::vector<double> zeroVector(std::size_t count);
@@ -600,6 +643,15 @@ public:
   NormalAxisAdmittanceController normal_admittance_controller_{};
   TangentialScanController tangential_scan_controller_{};
   OrientationTrimController orientation_trim_controller_{};
+  struct PlannedSegmentRuntime {
+    bool configured{false};
+    int segment_id{0};
+    std::vector<ScanWaypoint> waypoints;
+    std::vector<double> cumulative_lengths_m;
+    double total_length_m{0.0};
+    std::string transition_policy{"serpentine"};
+    double target_force_n{0.0};
+  } planned_segment_{};
   RtPhaseTelemetry last_phase_telemetry_{};
   std::vector<double> joint_pos_;
   std::vector<double> joint_vel_;

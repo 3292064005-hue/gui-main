@@ -206,33 +206,25 @@ class MainWindowLayoutBuilder:
         w.assessment_page = AssessmentPage()
         w.replay_page = ReplayPage()
         w.settings_page = SettingsPage()
-        w.tab_titles = [
-            "系统总览",
-            "实验配置",
-            "系统准备",
-            "自动扫查",
-            "机器人监控",
-            "视觉与路径",
-            "图像与重建",
-            "量化评估",
-            "实验回放",
-            "系统设置",
+
+        surface = dict(getattr(w, 'ui_surface_contract', {}) or {})
+        tabs: list[tuple[str, QWidget]] = [
+            ("系统总览", w.overview_page),
+            ("实验配置", w.experiment_page),
+            ("系统准备", w.prepare_page),
+            ("自动扫查", w.scan_page),
+            ("机器人监控", w.robot_monitor_page),
         ]
-        for title, page in zip(
-            w.tab_titles,
-            [
-                w.overview_page,
-                w.experiment_page,
-                w.prepare_page,
-                w.scan_page,
-                w.robot_monitor_page,
-                w.vision_page,
-                w.reconstruction_page,
-                w.assessment_page,
-                w.replay_page,
-                w.settings_page,
-            ],
-        ):
+        if dict(surface.get('vision', {})).get('visible', True):
+            tabs.append(("视觉与路径", w.vision_page))
+        if dict(surface.get('reconstruction', {})).get('visible', True):
+            tabs.append(("图像与重建", w.reconstruction_page))
+        tabs.append(("量化评估", w.assessment_page))
+        if dict(surface.get('replay', {})).get('visible', True):
+            tabs.append(("实验回放", w.replay_page))
+        tabs.append(("系统设置", w.settings_page))
+        w.tab_titles = [title for title, _ in tabs]
+        for title, page in tabs:
             w.tabs.addTab(page, title)
         layout.addWidget(w.tabs)
         return container
@@ -280,7 +272,7 @@ class MainWindowLayoutBuilder:
                 ("btn_new_exp", "新建实验", "create_experiment"),
                 ("btn_localize", "视觉定位", "run_localization"),
                 ("btn_path", "生成路径", "generate_path"),
-                ("btn_scan_start", "开始扫查", "start_scan"),
+                ("btn_scan_start", "开始扫查", "start_procedure"),
                 ("btn_scan_pause", "暂停", "pause_scan"),
                 ("btn_scan_resume", "恢复", "resume_scan"),
                 ("btn_scan_stop", "结束本轮扫查", "stop_scan"),

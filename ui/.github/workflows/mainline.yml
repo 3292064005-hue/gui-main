@@ -9,34 +9,97 @@ jobs:
   hygiene:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo hygiene gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python scripts/check_python_compile.py
+      - run: python scripts/check_repository_gates.py
 
   mainline-verification:
     runs-on: ubuntu-22.04
     steps:
-      - run: ./scripts/verify_mainline.sh
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: chmod +x scripts/verify_mainline.sh
+      - run: VERIFY_PHASE=python ./scripts/verify_mainline.sh
 
   canonical-import-gate:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo canonical import gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/check_canonical_imports.py
 
   protocol-sync-gate:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo protocol sync gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/check_protocol_sync.py
+
+  runtime-config-contract-gate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/check_runtime_config_contract.py
+      - run: python scripts/check_runtime_contract_parity.py
 
   runtime-core-gate:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo runtime core gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: chmod +x scripts/verify_mainline.sh
+      - run: VERIFY_PHASE=mock ./scripts/verify_mainline.sh
 
   evidence-gate:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo evidence gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/check_artifact_lifecycle_registry.py
+      - run: python scripts/check_algorithm_plugin_contracts.py
+      - run: python scripts/check_verification_boundary.py
 
   mock-e2e:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo mock e2e gate declared
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: pytest -q tests/test_runtime_mode_policy.py tests/test_mainline_runtime_doctor.py tests/test_backend_link_and_api_bridge.py
+
+  prod-contract-release-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: chmod +x scripts/verify_mainline.sh
+      - run: VERIFY_PHASE=prod ROBOT_CORE_WITH_XCORE_SDK=OFF ROBOT_CORE_WITH_XMATE_MODEL=OFF ./scripts/verify_mainline.sh

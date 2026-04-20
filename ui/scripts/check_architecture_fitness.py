@@ -17,6 +17,7 @@ APP_CONTROLLER_RUNTIME_MIXIN = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_cont
 APP_RUNTIME_BRIDGE = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_runtime_bridge.py'
 CONFIG_MANAGER = ROOT / 'spine_ultrasound_ui' / 'services' / 'config_manager.py'
 MAIN_WINDOW_LAYOUT = ROOT / 'spine_ultrasound_ui' / 'views' / 'main_window_layout.py'
+LOCK_HIERARCHY_DOC = ROOT / 'docs' / '03_runtime' / 'LOCK_HIERARCHY.md'
 RUNTIME_READINESS_SERVICE = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_readiness_manifest_service.py'
 RUNTIME_COMMAND_CATALOG = ROOT / 'spine_ultrasound_ui' / 'services' / 'runtime_command_catalog.py'
 GENERATED_COMMAND_MANIFEST = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'generated_command_manifest.inc'
@@ -408,6 +409,8 @@ def main() -> int:
             failures.append(f'CoreRuntime RT recording lock-scope contract missing: {required}')
 
     runtime_readiness_text = RUNTIME_READINESS_SERVICE.read_text(encoding='utf-8')
+    if not LOCK_HIERARCHY_DOC.exists():
+        failures.append('Lock hierarchy document must exist for runtime lane governance')
     for required in (
         'RuntimeReadinessManifestService',
         'static_contract_ready',

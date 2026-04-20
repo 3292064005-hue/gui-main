@@ -1,5 +1,19 @@
 // Generated from schemas/runtime_command_manifest.json via runtime_command_contracts.py. Do not edit manually.
 
+inline std::string CoreRuntime::handleAcquireControlLeaseTyped(const RuntimeCommandContext& context, const AcquireControlLeaseRequest& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = AcquireControlLeaseRequest::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(AcquireControlLeaseRequest::kCommand);
+  return handleSessionCommand(invocation);
+}
+
+template <> inline std::string CoreRuntime::handleTypedCommand<AcquireControlLeaseRequest>(const RuntimeCommandContext& context, const AcquireControlLeaseRequest& request) {
+  return handleAcquireControlLeaseTyped(context, request);
+}
+
 inline std::string CoreRuntime::handleApproachPrescanTyped(const RuntimeCommandContext& context, const ApproachPrescanRequest& request) {
   RuntimeCommandInvocation invocation{};
   invocation.request_id = context.request_id;
@@ -686,6 +700,34 @@ template <> inline std::string CoreRuntime::handleTypedCommand<QueryRlProjectsRe
   return handleQueryRlProjectsTyped(context, request);
 }
 
+inline std::string CoreRuntime::handleReleaseControlLeaseTyped(const RuntimeCommandContext& context, const ReleaseControlLeaseRequest& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = ReleaseControlLeaseRequest::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(ReleaseControlLeaseRequest::kCommand);
+  return handleSessionCommand(invocation);
+}
+
+template <> inline std::string CoreRuntime::handleTypedCommand<ReleaseControlLeaseRequest>(const RuntimeCommandContext& context, const ReleaseControlLeaseRequest& request) {
+  return handleReleaseControlLeaseTyped(context, request);
+}
+
+inline std::string CoreRuntime::handleRenewControlLeaseTyped(const RuntimeCommandContext& context, const RenewControlLeaseRequest& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = RenewControlLeaseRequest::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(RenewControlLeaseRequest::kCommand);
+  return handleSessionCommand(invocation);
+}
+
+template <> inline std::string CoreRuntime::handleTypedCommand<RenewControlLeaseRequest>(const RuntimeCommandContext& context, const RenewControlLeaseRequest& request) {
+  return handleRenewControlLeaseTyped(context, request);
+}
+
 inline std::string CoreRuntime::handleReplayPathTyped(const RuntimeCommandContext& context, const ReplayPathRequest& request) {
   RuntimeCommandInvocation invocation{};
   invocation.request_id = context.request_id;
@@ -796,6 +838,20 @@ inline std::string CoreRuntime::handleSetManualModeTyped(const RuntimeCommandCon
 
 template <> inline std::string CoreRuntime::handleTypedCommand<SetManualModeRequest>(const RuntimeCommandContext& context, const SetManualModeRequest& request) {
   return handleSetManualModeTyped(context, request);
+}
+
+inline std::string CoreRuntime::handleStartProcedureTyped(const RuntimeCommandContext& context, const StartProcedureRequest& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = StartProcedureRequest::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(StartProcedureRequest::kCommand);
+  return handleExecutionCommand(invocation);
+}
+
+template <> inline std::string CoreRuntime::handleTypedCommand<StartProcedureRequest>(const RuntimeCommandContext& context, const StartProcedureRequest& request) {
+  return handleStartProcedureTyped(context, request);
 }
 
 inline std::string CoreRuntime::handleStartRecordPathTyped(const RuntimeCommandContext& context, const StartRecordPathRequest& request) {

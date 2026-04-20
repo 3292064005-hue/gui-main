@@ -20,8 +20,8 @@
     "avg_confidence": 1.0
   },
   "spec": {
-    "dataset_manifest": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/generated/frame_anatomy_training_manifest.json",
-    "output_dir": "/tmp/spine_work/spine_proj/models/frame_anatomy_keypoint/generated",
+    "dataset_manifest": "models/frame_anatomy_keypoint/generated/frame_anatomy_training_manifest.json",
+    "output_dir": "models/frame_anatomy_keypoint/generated",
     "task_name": "frame_anatomy_keypoint_export",
     "trainer_backend": "numpy_baseline",
     "patch_radius_px": 4,

@@ -348,6 +348,7 @@ bool buildRuntimeCommandInvocation(const std::string& envelope_json,
   const auto request_id = json::extractString(envelope_json, "request_id");
   const auto command = json::extractString(envelope_json, "command");
   const auto payload_json = json::extractObject(envelope_json, "payload", "{}");
+  const auto context_json = json::extractObject(payload_json, "_command_context", "{}");
   RuntimeCommandRequest parsed;
   std::string payload_error;
   if (!validateAndParseRuntimeCommandPayload(command, payload_json, &parsed, &payload_error)) {
@@ -367,6 +368,26 @@ bool buildRuntimeCommandInvocation(const std::string& envelope_json,
     invocation->request = std::move(parsed);
     invocation->typed_request = std::move(typed_request);
     invocation->typed_contract = findRuntimeCommandTypedContract(command);
+    invocation->command_context = RuntimeCommandContext{
+        request_id,
+        command,
+        envelope_json,
+        json::extractString(context_json, "actor_id", "implicit-operator"),
+        json::extractString(context_json, "workspace", "desktop"),
+        json::extractString(context_json, "role", "operator"),
+        json::extractString(context_json, "lease_id", ""),
+        json::extractString(context_json, "session_id", ""),
+        json::extractString(context_json, "profile", json::extractString(context_json, "deployment_profile", "dev")),
+        json::extractString(context_json, "intent_reason", command),
+        json::extractString(context_json, "source", "unknown"),
+        json::extractString(context_json, "required_claim", ""),
+        json::extractStringArray(context_json, "requested_claims"),
+        json::extractBool(context_json, "lease_required", true),
+        json::extractBool(context_json, "auto_issue_implicit_lease", true),
+    };
+    if (invocation->command_context.requested_claims.empty()) {
+      invocation->command_context.requested_claims = json::extractStringArray(context_json, "granted_claims");
+    }
   }
   return true;
 }

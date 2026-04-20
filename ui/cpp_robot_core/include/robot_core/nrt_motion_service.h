@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "robot_core/runtime_types.h"
+
 namespace robot_core {
 
 class SdkRobotFacade;
@@ -40,6 +42,23 @@ struct NrtProfileTemplate {
   bool delegates_to_sdk{true};
 };
 
+struct NrtFallbackTargets {
+  std::vector<double> home_joint_rad;
+  std::vector<double> approach_pose_xyzabc;
+  std::vector<double> entry_pose_xyzabc;
+  std::vector<double> retreat_pose_xyzabc;
+};
+
+struct NrtSessionTargets {
+  std::vector<double> home_joint_rad;
+  ScanWaypoint approach_pose{};
+  ScanWaypoint entry_pose{};
+  ScanWaypoint retreat_pose{};
+  bool approach_pose_valid{false};
+  bool entry_pose_valid{false};
+  bool retreat_pose_valid{false};
+};
+
 struct NrtMotionSnapshot {
   bool ready{false};
   bool degraded_without_sdk{true};
@@ -62,23 +81,41 @@ public:
   explicit NrtMotionService(SdkRobotFacade* sdk = nullptr);
 
   void bind(SdkRobotFacade* sdk);
-  bool goHome();
-  bool approachPrescan();
-  bool alignToEntry();
-  bool safeRetreat();
-  bool recoveryRetreat();
-  bool postScanHome();
+  /**
+   * @brief Configure session-frozen NRT targets used by bring-up/retreat profiles.
+   * @param targets Session-owned home/approach/entry/retreat targets.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Replaces hard-coded NRT business poses with session-frozen plan/profile targets.
+   */
+  void configureSessionTargets(const NrtSessionTargets& targets);
+  void configureFallbackTargets(const NrtFallbackTargets& targets);
+  /**
+   * @brief Clear any previously bound session-frozen NRT targets.
+   * @return void
+   * @throws No exceptions are thrown.
+   * @boundary Forces subsequent NRT profile execution to use only emergency fallback profiles.
+   */
+  void clearSessionTargets();
+  bool goHome(std::string* reason = nullptr);
+  bool approachPrescan(std::string* reason = nullptr);
+  bool alignToEntry(std::string* reason = nullptr);
+  bool safeRetreat(std::string* reason = nullptr);
+  bool recoveryRetreat(std::string* reason = nullptr);
+  bool postScanHome(std::string* reason = nullptr);
   NrtMotionSnapshot snapshot() const;
 
 private:
   NrtMotionPlan buildProfile(const std::string& profile_name) const;
   bool executeProfile(const NrtMotionPlan& plan, std::string* reason = nullptr);
-  bool dispatchProfile(const NrtProfileTemplate& profile);
+  bool dispatchProfile(const NrtProfileTemplate& profile, std::string* reason = nullptr);
   NrtProfileTemplate profileTemplate(const std::string& profile) const;
   void record(const std::string& message);
 
   SdkRobotFacade* sdk_{nullptr};
   NrtMotionSnapshot snapshot_{};
+  NrtSessionTargets session_targets_{};
+  NrtFallbackTargets fallback_targets_{};
 };
 
 }  // namespace robot_core

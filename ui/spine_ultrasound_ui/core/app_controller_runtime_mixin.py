@@ -95,8 +95,36 @@ class AppControllerRuntimeMixin:
     def approve_localization_review(self, operator_id: str = "operator", adjustments: list[dict] | None = None, reason: str = "manual_guidance_review") -> None:
         workflow_ops.approve_localization_review(self, operator_id=operator_id, adjustments=adjustments, reason=reason)
 
-    def start_scan(self) -> None:
+    def start_procedure(self, procedure: str = "scan") -> None:
+        """Start a canonical runtime procedure owned by the execution graph.
+
+        Args:
+            procedure: Canonical procedure token. Only ``scan`` is currently
+                supported by the desktop workflow surface.
+
+        Returns:
+            None. Successful execution delegates to the workflow layer, which
+            freezes the session, loads the execution plan, and sends the
+            canonical ``start_procedure`` runtime command.
+
+        Raises:
+            ValueError: Raised when callers request an unsupported procedure
+                token through the desktop controller surface.
+
+        Boundary behavior:
+            ``start_scan`` remains available as a compatibility alias, but new
+            UI/runtime code must enter the workflow through this canonical
+            method so permission surfaces and logs resolve to
+            ``start_procedure(scan)``.
+        """
+        normalized_procedure = str(procedure or "").strip().lower()
+        if normalized_procedure != "scan":
+            raise ValueError(f"unsupported procedure: {procedure}")
         workflow_ops.start_scan(self)
+
+    def start_scan(self) -> None:
+        """Compatibility alias for the canonical ``start_procedure(scan)`` entry."""
+        self.start_procedure("scan")
 
     def pause_scan(self) -> None:
         self._run_guarded_command("pause_scan", success_message="扫查已暂停，系统进入保持状态。", fallback_to_safe_retreat=True)
@@ -180,11 +208,12 @@ class AppControllerRuntimeMixin:
         self.backend.telemetry_received.connect(self._handle_telemetry, Qt.QueuedConnection)
         if hasattr(self.backend, "log_generated"):
             self.backend.log_generated.connect(self._forward_log, Qt.QueuedConnection)
-        if hasattr(self.backend, "camera_pixmap_ready"):
+        capabilities = self.backend.media_capabilities() if hasattr(self.backend, "media_capabilities") else {"camera": True, "ultrasound": True, "reconstruction": True}
+        if capabilities.get("camera", False) and hasattr(self.backend, "camera_pixmap_ready"):
             self.backend.camera_pixmap_ready.connect(self._on_camera_pixmap, Qt.QueuedConnection)
-        if hasattr(self.backend, "ultrasound_pixmap_ready"):
+        if capabilities.get("ultrasound", False) and hasattr(self.backend, "ultrasound_pixmap_ready"):
             self.backend.ultrasound_pixmap_ready.connect(self._on_ultrasound_pixmap, Qt.QueuedConnection)
-        if hasattr(self.backend, "reconstruction_pixmap_ready"):
+        if capabilities.get("reconstruction", False) and hasattr(self.backend, "reconstruction_pixmap_ready"):
             self.backend.reconstruction_pixmap_ready.connect(self.reconstruction_pixmap_ready.emit, Qt.QueuedConnection)
 
     @Slot(object)
@@ -209,9 +238,10 @@ class AppControllerRuntimeMixin:
     def _run_guarded_command(self, command: str, payload: Optional[dict] = None, *, success_message: Optional[str] = None, fallback_to_safe_retreat: bool = False) -> bool:
         return self.runtime_bridge.run_guarded_command(command, payload, success_message=success_message, fallback_to_safe_retreat=fallback_to_safe_retreat)
 
-    def _run_scan_start_step(self, command: str) -> bool:
+    def _run_scan_start_step(self, command: str, payload: Optional[dict] = None) -> bool:
         return self.runtime_bridge.run_guarded_command(
             command,
+            payload,
             fallback_to_safe_retreat=True,
             force_asset_refresh=False,
         )

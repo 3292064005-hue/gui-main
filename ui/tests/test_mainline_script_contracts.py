@@ -233,7 +233,7 @@ def test_cpp_prereq_script_uses_ephemeral_build_dir_and_cleans_it() -> None:
 
 def test_readme_and_deployment_document_tls_bootstrap_before_doctor() -> None:
     readme = _read('README.md')
-    deployment = _read('DEPLOYMENT.md')
+    deployment = _read('docs/04_profiles_and_release/RELEASE_READINESS.md')
     assert './scripts/generate_dev_tls_cert.sh' in readme
     assert './scripts/generate_dev_tls_cert.sh' in deployment
 
@@ -247,11 +247,11 @@ def test_cpp_prereq_script_enforces_cmake_minimum_version() -> None:
 
 def test_readme_and_deployment_document_current_runtime_version_policy() -> None:
     readme = _read('README.md')
-    deployment = _read('DEPLOYMENT.md')
+    deployment = _read('docs/04_profiles_and_release/RELEASE_READINESS.md')
     requirements = _read('requirements.txt')
     assert "PySide6 >= 6.7" in readme
     assert "protobuf>=3.20.3,<8" in readme
-    assert "PySide6>=6.7" in deployment
+    assert "PySide6 >= 6.7" in deployment
     assert "protobuf>=3.20.3,<8" in deployment
     assert "protobuf>=3.20.3,<8" in requirements
 
@@ -281,7 +281,7 @@ def test_verify_mainline_prod_phase_builds_tests_and_installs() -> None:
     assert 'run_cpp_profile_install_check' in verify_script
     assert 'run_prod_profile_release_smoke' in verify_script
     assert 'scripts/deployment_smoke_test.py' in verify_script
-    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"' in verify_script
+    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"' in verify_script
 
 
 
@@ -292,7 +292,8 @@ def test_p2_acceptance_artifacts_are_generated_outside_repository_payload() -> N
     hygiene_script = _read('scripts/check_repo_hygiene.sh')
     assert 'P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance"' in verify_script
     assert 'tempfile.gettempdir()' in generator_script
-    assert 'tempfile.gettempdir()' in checker_script
+    assert '/tmp/spine_p2_acceptance_static' not in checker_script
+    assert 'missing P2 acceptance artifacts in configured output root' in checker_script
     assert 'derived/postprocess/postprocess_stage_manifest.json' in hygiene_script
     assert 'derived/session/session_intelligence_manifest.json' in hygiene_script
 
@@ -367,6 +368,9 @@ def test_live_evidence_bundle_mode_does_not_mix_external_readiness_manifest_flag
     assert 'if [[ -n "$LIVE_EVIDENCE_BUNDLE" ]]; then' in acceptance_script
     assert 'WRITE_ARGS+=(--live-evidence-bundle "$LIVE_EVIDENCE_BUNDLE")' in acceptance_script
     assert 'WRITE_ARGS+=(--write-readiness-manifest "$READINESS_MANIFEST_REPORT")' in acceptance_script
+    assert 'if [[ -z "$LIVE_EVIDENCE_BUNDLE" ]]; then SUMMARY_ARGS+=(--readiness-manifest "$READINESS_MANIFEST_REPORT"); fi' in acceptance_script
+    assert 'LEDGER_ARGS+=(--readiness-manifest "$READINESS_MANIFEST_REPORT")' in acceptance_script
+    assert 'LEDGER_ARGS+=(--live-evidence-bundle "$LIVE_EVIDENCE_BUNDLE")' in acceptance_script
 
 
 
@@ -378,7 +382,7 @@ def test_acceptance_audit_builds_and_registers_the_same_cpp_test_set_as_mainline
     verify_targets = _extract_shell_array(verify_script, 'CPP_TEST_TARGETS')
     acceptance_targets = _extract_shell_array(acceptance_script, 'CPP_TEST_TARGETS')
     assert acceptance_targets == verify_targets
-    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"' in acceptance_script
+    assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"' in acceptance_script
     assert 'count_registered_cpp_tests' in acceptance_script
     assert 'ctest registered $REGISTERED_CPP_TESTS' in acceptance_script
 def test_acceptance_audit_emits_build_evidence_and_summary_reports() -> None:
@@ -405,9 +409,9 @@ def test_start_headless_script_delegates_default_backend_resolution_to_runtime_p
 
 def test_readme_and_profile_matrix_align_review_headless_policy() -> None:
     readme = _read('README.md')
-    profile_matrix = _read('docs/PROFILE_MATRIX.md')
+    profile_matrix = _read('docs/04_profiles_and_release/PROFILE_MATRIX.md')
     runtime_policy = _read('spine_ultrasound_ui/services/runtime_mode_policy.py')
-    assert 'headless 默认 `core`，显式 `mock` 仅允许只读 evidence / replay / contract inspection' in readme
+    assert 'headless 默认后端由 deployment profile 决定：`dev -> mock`，`review/lab/research/clinical -> core`；其中 `review` 仅允许在只读 evidence / replay / contract inspection 场景显式切到 `mock`。' in readme
     assert 'headless review may use `mock` **only** for read-only evidence / replay / contract inspection flows' in profile_matrix
     assert '"review": frozenset({"mock", "core"})' in runtime_policy
     assert '"review": "core"' in runtime_policy

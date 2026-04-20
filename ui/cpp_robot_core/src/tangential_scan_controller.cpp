@@ -5,7 +5,7 @@
 
 namespace robot_core {
 
-namespace { double mmToM(double mm) { return mm / 1000.0; } }
+namespace { double tangentialMmToM(double mm) { return mm / 1000.0; } }
 
 void TangentialScanController::configure(const TangentialScanConfig& config) {
   config_ = config;
@@ -18,13 +18,13 @@ void TangentialScanController::configure(const TangentialScanConfig& config) {
 
 TangentialScanState TangentialScanController::advance(double requested_speed_mm_s, double dt_s) {
   const double speed_mm_s = std::clamp(requested_speed_mm_s, config_.tangent_speed_min_mm_s, config_.tangent_speed_max_mm_s);
-  state_.progress_m += mmToM(speed_mm_s) * std::max(0.0, dt_s);
-  state_.saturated = state_.progress_m >= mmToM(config_.max_travel_mm);
+  state_.progress_m += tangentialMmToM(speed_mm_s) * std::max(0.0, dt_s);
+  state_.saturated = state_.progress_m >= tangentialMmToM(config_.max_travel_mm);
   if (state_.saturated) {
-    state_.progress_m = mmToM(config_.max_travel_mm);
+    state_.progress_m = tangentialMmToM(config_.max_travel_mm);
   }
   if (config_.enable_lateral_modulation) {
-    state_.lateral_offset_m = mmToM(config_.lateral_amplitude_mm) * std::sin(2.0 * M_PI * config_.modulation_frequency_hz * state_.progress_m / std::max(1e-6, mmToM(speed_mm_s)));
+    state_.lateral_offset_m = tangentialMmToM(config_.lateral_amplitude_mm) * std::sin(2.0 * M_PI * config_.modulation_frequency_hz * state_.progress_m / std::max(1e-6, tangentialMmToM(speed_mm_s)));
   } else {
     state_.lateral_offset_m = 0.0;
   }

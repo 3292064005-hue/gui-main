@@ -479,6 +479,78 @@
       "compatibility_note": ""
     },
     {
+      "name": "acquire_control_lease",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "control_authority_write",
+      "write_command": true,
+      "canonical_command": "acquire_control_lease",
+      "alias_kind": "canonical",
+      "handler_group": "handleSessionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "actor_id": "string",
+        "role": "string",
+        "workspace": "string",
+        "session_id": "string",
+        "intent_reason": "string",
+        "profile": "string",
+        "ttl_s": "integer",
+        "source": "string",
+        "lease_id": "string",
+        "preempt": "boolean",
+        "preempt_reason": "string",
+        "requested_claims": "array"
+      }
+    },
+    {
+      "name": "renew_control_lease",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "control_authority_write",
+      "write_command": true,
+      "canonical_command": "renew_control_lease",
+      "alias_kind": "canonical",
+      "handler_group": "handleSessionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "lease_id": "string",
+        "actor_id": "string",
+        "ttl_s": "integer"
+      }
+    },
+    {
+      "name": "release_control_lease",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "*"
+      ],
+      "capability_claim": "control_authority_write",
+      "write_command": true,
+      "canonical_command": "release_control_lease",
+      "alias_kind": "canonical",
+      "handler_group": "handleSessionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "field_types": {
+        "lease_id": "string",
+        "actor_id": "string",
+        "reason": "string"
+      }
+    },
+    {
       "name": "get_session_drift_contract",
       "required_payload_fields": [],
       "state_preconditions": [
@@ -746,14 +818,24 @@
         "session_dir",
         "config_snapshot",
         "device_roster",
-        "scan_plan_hash"
+        "scan_plan_hash",
+        "device_health_snapshot",
+        "safety_thresholds"
       ],
       "field_types": {
         "session_id": "string",
         "session_dir": "string",
         "config_snapshot": "object",
         "device_roster": "object",
-        "scan_plan_hash": "string"
+        "scan_plan_hash": "string",
+        "software_version": "string",
+        "build_id": "string",
+        "force_sensor_provider": "string",
+        "protocol_version": "integer",
+        "strict_runtime_freeze_gate": "string",
+        "session_freeze_policy": "object",
+        "safety_thresholds": "object",
+        "device_health_snapshot": "object"
       },
       "state_preconditions": [
         "AUTO_READY"
@@ -834,21 +916,45 @@
       "compatibility_note": ""
     },
     {
-      "name": "start_scan",
-      "required_payload_fields": [],
+      "name": "start_procedure",
+      "required_payload_fields": [
+        "procedure"
+      ],
+      "payload_field_types": {
+        "procedure": "string"
+      },
       "state_preconditions": [
+        "PATH_VALIDATED",
         "CONTACT_STABLE",
         "PAUSED_HOLD"
       ],
       "capability_claim": "rt_motion_write",
       "write_command": true,
-      "canonical_command": "start_scan",
+      "canonical_command": "start_procedure",
       "alias_kind": "canonical",
       "handler_group": "handleExecutionCommand",
       "deprecation_stage": "",
       "removal_target": "",
       "replacement_command": "",
       "compatibility_note": ""
+    },
+    {
+      "name": "start_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "CONTACT_STABLE",
+        "PAUSED_HOLD"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "start_procedure",
+      "alias_kind": "compatibility_alias",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "deprecated",
+      "removal_target": "after start_procedure migration completes",
+      "replacement_command": "start_procedure",
+      "compatibility_note": "Compatibility alias for legacy scan start requests; use start_procedure with procedure=scan."
     },
     {
       "name": "pause_scan",

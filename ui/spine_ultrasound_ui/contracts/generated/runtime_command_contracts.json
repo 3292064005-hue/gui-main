@@ -2,6 +2,296 @@
   "schema_version": 1,
   "commands": [
     {
+      "name": "acquire_control_lease",
+      "canonical_command": "acquire_control_lease",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "control_authority_write",
+      "handler_group": "handleSessionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [
+        {
+          "name": "actor_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "intent_reason",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "lease_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "preempt",
+          "required": false,
+          "field_type": "boolean",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "preempt_reason",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "profile",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "requested_claims",
+          "required": false,
+          "field_type": "array",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "role",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "session_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "source",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "ttl_s",
+          "required": false,
+          "field_type": "integer",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "workspace",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "actor_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "intent_reason",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "lease_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "preempt",
+            "required": false,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "preempt_reason",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "profile",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "requested_claims",
+            "required": false,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "role",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "session_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "source",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "ttl_s",
+            "required": false,
+            "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "workspace",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "control_authority",
+        "data_required_fields": [
+          "summary_state",
+          "detail",
+          "lease"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "lease",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "lease_id",
+              "actor_id",
+              "workspace",
+              "role"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "control_authority",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [
+              "summary_state",
+              "detail"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "acquire_control_lease",
+        "handler_group": "handleSessionCommand"
+      }
+    },
+    {
       "name": "approach_prescan",
       "canonical_command": "approach_prescan",
       "alias_kind": "canonical",
@@ -18,7 +308,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -72,7 +371,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -126,7 +434,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -180,7 +497,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -296,6 +622,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -392,6 +726,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -448,7 +790,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -508,7 +859,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -568,7 +928,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -652,6 +1021,14 @@
             "name": "type",
             "required": false,
             "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -2217,6 +2594,8 @@
           "remote_ip",
           "local_ip",
           "rt_mode",
+          "runtime_config_contract_digest",
+          "runtime_config_schema_version",
           "rt_phase_contract"
         ],
         "data_fields": [
@@ -2238,6 +2617,22 @@
           },
           {
             "name": "rt_mode",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "runtime_config_contract_digest",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "runtime_config_schema_version",
             "required": true,
             "field_type": "string",
             "nested_required_fields": [],
@@ -2360,7 +2755,9 @@
         "data_required_fields": [
           "session_locked",
           "session_id",
-          "plan_hash"
+          "plan_hash",
+          "freeze_consistent",
+          "strict_runtime_freeze_gate"
         ],
         "data_fields": [
           {
@@ -2383,6 +2780,78 @@
             "name": "plan_hash",
             "required": true,
             "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "freeze_consistent",
+            "required": true,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "strict_runtime_freeze_gate",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "session_freeze_policy",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "frozen_execution_critical_fields",
+            "required": false,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "string",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "frozen_evidence_only_fields",
+            "required": false,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "string",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "recheck_on_start_procedure",
+            "required": false,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "live_binding_established",
+            "required": false,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "control_source_exclusive",
+            "required": false,
+            "field_type": "boolean",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "network_healthy",
+            "required": false,
+            "field_type": "boolean",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -2559,7 +3028,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -2635,6 +3113,14 @@
             "name": "fault_name",
             "required": true,
             "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -2736,6 +3222,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -2788,6 +3282,14 @@
       ],
       "fields": [
         {
+          "name": "build_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
           "name": "config_snapshot",
           "required": true,
           "field_type": "object",
@@ -2796,7 +3298,39 @@
           "array_item_required_fields": []
         },
         {
+          "name": "device_health_snapshot",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
           "name": "device_roster",
+          "required": true,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "force_sensor_provider",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "protocol_version",
+          "required": false,
+          "field_type": "integer",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "safety_thresholds",
           "required": true,
           "field_type": "object",
           "nested_required_fields": [],
@@ -2820,8 +3354,32 @@
           "array_item_required_fields": []
         },
         {
+          "name": "session_freeze_policy",
+          "required": false,
+          "field_type": "object",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
           "name": "session_id",
           "required": true,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "software_version",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "strict_runtime_freeze_gate",
+          "required": false,
           "field_type": "string",
           "nested_required_fields": [],
           "array_item_type": "",
@@ -2838,9 +3396,19 @@
           "session_dir",
           "config_snapshot",
           "device_roster",
-          "scan_plan_hash"
+          "scan_plan_hash",
+          "device_health_snapshot",
+          "safety_thresholds"
         ],
         "fields": [
+          {
+            "name": "build_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
           {
             "name": "config_snapshot",
             "required": true,
@@ -2850,7 +3418,39 @@
             "array_item_required_fields": []
           },
           {
+            "name": "device_health_snapshot",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
             "name": "device_roster",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "force_sensor_provider",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "protocol_version",
+            "required": false,
+            "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "safety_thresholds",
             "required": true,
             "field_type": "object",
             "nested_required_fields": [],
@@ -2874,9 +3474,41 @@
             "array_item_required_fields": []
           },
           {
+            "name": "session_freeze_policy",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
             "name": "session_id",
             "required": true,
             "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "software_version",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "strict_runtime_freeze_gate",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -2940,7 +3572,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -2999,7 +3640,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3057,7 +3707,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3117,7 +3776,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3410,6 +4078,284 @@
       }
     },
     {
+      "name": "release_control_lease",
+      "canonical_command": "release_control_lease",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "control_authority_write",
+      "handler_group": "handleSessionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [
+        {
+          "name": "actor_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "lease_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "reason",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "actor_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "lease_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "reason",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "control_authority",
+        "data_required_fields": [
+          "summary_state",
+          "detail"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "control_authority",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [
+              "summary_state",
+              "detail"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "release_control_lease",
+        "handler_group": "handleSessionCommand"
+      }
+    },
+    {
+      "name": "renew_control_lease",
+      "canonical_command": "renew_control_lease",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "control_authority_write",
+      "handler_group": "handleSessionCommand",
+      "state_preconditions": [
+        "*"
+      ],
+      "fields": [
+        {
+          "name": "actor_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "lease_id",
+          "required": false,
+          "field_type": "string",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        },
+        {
+          "name": "ttl_s",
+          "required": false,
+          "field_type": "integer",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "actor_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "lease_id",
+            "required": false,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "ttl_s",
+            "required": false,
+            "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "control_authority",
+        "data_required_fields": [
+          "summary_state",
+          "detail",
+          "lease"
+        ],
+        "data_fields": [
+          {
+            "name": "summary_state",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "detail",
+            "required": true,
+            "field_type": "string",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "lease",
+            "required": true,
+            "field_type": "object",
+            "nested_required_fields": [
+              "lease_id",
+              "actor_id",
+              "workspace",
+              "role"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "control_authority",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [
+              "summary_state",
+              "detail"
+            ],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "*"
+        ],
+        "lane": "command"
+      },
+      "dispatch_contract": {
+        "canonical_command": "renew_control_lease",
+        "handler_group": "handleSessionCommand"
+      }
+    },
+    {
       "name": "replay_path",
       "canonical_command": "replay_path",
       "alias_kind": "canonical",
@@ -3458,6 +4404,14 @@
             "name": "rate",
             "required": false,
             "field_type": "double",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -3518,7 +4472,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3608,6 +4571,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -3673,7 +4644,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3767,6 +4747,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -3825,7 +4813,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3883,7 +4880,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3940,7 +4946,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -3980,6 +4995,92 @@
       }
     },
     {
+      "name": "start_procedure",
+      "canonical_command": "start_procedure",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "CONTACT_STABLE",
+        "PAUSED_HOLD"
+      ],
+      "fields": [
+        {
+          "name": "procedure",
+          "required": true,
+          "field_type": "",
+          "nested_required_fields": [],
+          "array_item_type": "",
+          "array_item_required_fields": []
+        }
+      ],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [
+          "procedure"
+        ],
+        "fields": [
+          {
+            "name": "procedure",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "PATH_VALIDATED",
+          "CONTACT_STABLE",
+          "PAUSED_HOLD"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "start_procedure",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
       "name": "start_record_path",
       "canonical_command": "start_record_path",
       "alias_kind": "canonical",
@@ -4010,6 +5111,14 @@
             "name": "duration_s",
             "required": false,
             "field_type": "integer",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -4053,23 +5162,33 @@
     },
     {
       "name": "start_scan",
-      "canonical_command": "start_scan",
-      "alias_kind": "canonical",
+      "canonical_command": "start_procedure",
+      "alias_kind": "compatibility_alias",
       "write_command": true,
       "capability_claim": "rt_motion_write",
       "handler_group": "handleExecutionCommand",
       "state_preconditions": [
+        "PATH_VALIDATED",
         "CONTACT_STABLE",
         "PAUSED_HOLD"
       ],
       "fields": [],
-      "deprecation_stage": "",
-      "removal_target": "",
-      "replacement_command": "",
-      "compatibility_note": "",
+      "deprecation_stage": "deprecated",
+      "removal_target": "after start_procedure migration completes",
+      "replacement_command": "start_procedure",
+      "compatibility_note": "Compatibility alias for legacy scan start requests; use start_procedure with procedure=scan.",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -4097,13 +5216,14 @@
       },
       "guard_contract": {
         "allowed_states": [
+          "PATH_VALIDATED",
           "CONTACT_STABLE",
           "PAUSED_HOLD"
         ],
         "lane": "rt_control"
       },
       "dispatch_contract": {
-        "canonical_command": "start_scan",
+        "canonical_command": "start_procedure",
         "handler_group": "handleExecutionCommand"
       }
     },
@@ -4124,7 +5244,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [
@@ -4240,6 +5369,14 @@
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
+          },
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
           }
         ]
       },
@@ -4306,7 +5443,16 @@
       "compatibility_note": "",
       "request_contract": {
         "required_fields": [],
-        "fields": []
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
       },
       "response_contract": {
         "envelope_fields": [

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from spine_ultrasound_ui.utils import ensure_dir, now_text
+from spine_ultrasound_ui.runtime.model_bundle_contract import build_model_bundle_manifest, write_model_bundle_manifest
 
 
 class ModelExportService:
@@ -79,9 +80,21 @@ class ModelExportService:
             'launch_plan': dict(training_result.get('launch_plan', {})),
         }
         meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding='utf-8')
+        manifest = build_model_bundle_manifest(
+            bundle_id=f"{model_name}:{package_dir.name}",
+            package_name=package_dir.name,
+            runtime_profile='clinical_mainline',
+            weights_path=runtime_model_path or str(parameter_path.name),
+            entrypoint=f'spine_ultrasound_ui.training.runtime_adapters.{model_name}',
+            parameter_path=str(parameter_path.name),
+            meta_path=str(meta_path.name),
+            metrics=dict(training_result.get('metrics', {})),
+        )
+        manifest_path = write_model_bundle_manifest(package_dir, manifest)
         return {
             'package_dir': str(package_dir),
             'parameter_path': str(parameter_path),
             'model_meta_path': str(meta_path),
             'runtime_model_path': runtime_model_path,
+            'bundle_manifest_path': str(manifest_path),
         }

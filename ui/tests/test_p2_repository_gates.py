@@ -17,9 +17,9 @@ def test_repository_gates_audit_passes() -> None:
 
 def test_codeowners_and_gate_docs_exist() -> None:
     assert Path('.github/CODEOWNERS').exists()
-    assert Path('docs/REPOSITORY_GATES.md').exists()
-    assert Path('docs/CANONICAL_MODULE_REGISTRY.md').exists()
-    assert Path('docs/VERIFICATION_BOUNDARY.md').exists()
+    assert Path('docs/07_repo_governance/REPOSITORY_GOVERNANCE.md').exists()
+    assert Path('docs/07_repo_governance/CANONICAL_MODULES_AND_DEPENDENCIES.md').exists()
+    assert Path('docs/05_verification/VERIFICATION_POLICY.md').exists()
 
 
 def test_verification_boundary_audit_passes() -> None:

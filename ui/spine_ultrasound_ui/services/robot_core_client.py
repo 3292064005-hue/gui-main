@@ -14,11 +14,12 @@ from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.utils import ensure_dir, now_text
 
 from .backend_authoritative_contract_service import BackendAuthoritativeContractService
+from .backend_command_error_service import BackendCommandErrorService
+from .backend_error_mapper import BackendErrorMapper  # explicit authority edge for backend error normalization
+from .backend_capability_matrix_service import BackendCapabilityMatrixService
 from .backend_base import BackendBase
 from .backend_control_plane_projection_service import BackendControlPlaneProjectionService
 from .backend_control_plane_service import BackendControlPlaneService
-from .backend_error_mapper import BackendErrorMapper
-from .backend_errors import normalize_backend_exception
 from .backend_projection_cache import BackendProjectionCache
 from .backend_recent_command_service import BackendRecentCommandService
 from .core_transport import parse_telemetry_payload, send_tls_command
@@ -138,8 +139,12 @@ class RobotCoreClientBackend(QObject, BackendBase):
             self._log("INFO", f"{command}: {reply.message or ('OK' if reply.ok else 'FAILED')}")
             return reply
         except (OSError, TimeoutError, ConnectionError, ValueError, TypeError, RuntimeError, ssl.SSLError) as exc:
-            normalized = normalize_backend_exception(exc, command=command, context="robot-core-command")
-            failed = BackendErrorMapper.reply_from_exception(normalized, data={"command": command}, command=command, context="robot-core-command")
+            normalized, failed = BackendCommandErrorService.build_reply(
+                exc,
+                command=command,
+                context="robot-core-command",
+                data={"command": command},
+            )
             self._remember_recent_command(command, failed)
             self._log("ERROR", f"{command}: {normalized.error_type}: {normalized.message}")
             return failed
@@ -173,6 +178,19 @@ class RobotCoreClientBackend(QObject, BackendBase):
 
     def get_final_verdict(self, plan=None, config: RuntimeConfig | None = None) -> dict[str, Any]:
         return self.compile_final_verdict(plan, config)
+
+    def capability_matrix(self) -> dict[str, dict[str, Any]]:
+        """Return the explicit capability contract for the direct core backend."""
+        return BackendCapabilityMatrixService.build({
+            "camera": "hidden",
+            "ultrasound": "hidden",
+            "reconstruction": "hidden",
+            "recording": "monitor_only",
+        })
+
+    def media_capabilities(self) -> dict[str, bool]:
+        """Return compatibility booleans derived from the richer capability matrix."""
+        return BackendCapabilityMatrixService.to_media_capabilities(self.capability_matrix())
 
     def close(self) -> None:
         """Stop the telemetry loop and join the background thread."""
@@ -262,6 +280,8 @@ class RobotCoreClientBackend(QObject, BackendBase):
             "telemetry_connected": self._telemetry_connected,
             "camera_connected": False,
             "ultrasound_connected": False,
+            "media_capabilities": self.media_capabilities(),
+            "capability_matrix": self.capability_matrix(),
             "rest_reachable": True,
             "using_websocket_telemetry": False,
             "using_websocket_media": False,

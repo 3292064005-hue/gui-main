@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Mapping
 import zipfile
 
+from spine_ultrasound_ui.services.robot_identity_service import RobotIdentityService
+
 
 @dataclass(frozen=True)
 class LiveEvidenceBundleInspection:
@@ -18,6 +20,11 @@ class LiveEvidenceBundleInspection:
     runtime_identity_ok: bool
     readiness_ok: bool
     metrics_ok: bool
+    readiness_summary_state: str = ''
+    readiness_verification_boundary: str = ''
+    readiness_evidence_tier: str = ''
+    readiness_live_runtime_ready: bool = False
+    readiness_live_runtime_verified: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -29,6 +36,11 @@ class LiveEvidenceBundleInspection:
             'runtime_identity_ok': self.runtime_identity_ok,
             'readiness_ok': self.readiness_ok,
             'metrics_ok': self.metrics_ok,
+            'readiness_summary_state': self.readiness_summary_state,
+            'readiness_verification_boundary': self.readiness_verification_boundary,
+            'readiness_evidence_tier': self.readiness_evidence_tier,
+            'readiness_live_runtime_ready': self.readiness_live_runtime_ready,
+            'readiness_live_runtime_verified': self.readiness_live_runtime_verified,
         }
 
 
@@ -93,14 +105,22 @@ class LiveEvidenceBundleService:
         readiness_snapshot = self._load_json_dict(files['runtime_readiness_manifest.json'], 'runtime_readiness_manifest.json')
         runtime_ok, runtime_reason = self._validate_runtime_identity(runtime_cfg)
         readiness_ok, readiness_reason = self._validate_readiness(readiness_snapshot)
+        readiness_verification = dict((readiness_snapshot or {}).get('verification') or {})
         metrics_ok, metrics_reason = self._validate_metrics(runtime_cfg, metrics)
+        common = dict(
+            readiness_summary_state=str(readiness_snapshot.get('summary_state', '')),
+            readiness_verification_boundary=str(readiness_verification.get('verification_boundary', '')),
+            readiness_evidence_tier=str(readiness_verification.get('evidence_tier', '')),
+            readiness_live_runtime_ready=bool(readiness_verification.get('live_runtime_ready', False)),
+            readiness_live_runtime_verified=bool(readiness_verification.get('live_runtime_verified', False)),
+        )
         if not runtime_ok:
-            return LiveEvidenceBundleInspection(False, runtime_reason, str(path), files['_kind'], members, False, readiness_ok, metrics_ok)
+            return LiveEvidenceBundleInspection(False, runtime_reason, str(path), files['_kind'], members, False, readiness_ok, metrics_ok, **common)
         if not readiness_ok:
-            return LiveEvidenceBundleInspection(False, readiness_reason, str(path), files['_kind'], members, True, False, metrics_ok)
+            return LiveEvidenceBundleInspection(False, readiness_reason, str(path), files['_kind'], members, True, False, metrics_ok, **common)
         if not metrics_ok:
-            return LiveEvidenceBundleInspection(False, metrics_reason, str(path), files['_kind'], members, True, True, False)
-        return LiveEvidenceBundleInspection(True, 'live evidence bundle passed archived structural, readiness, and RT metric checks', str(path), files['_kind'], members, True, True, True)
+            return LiveEvidenceBundleInspection(False, metrics_reason, str(path), files['_kind'], members, True, True, False, **common)
+        return LiveEvidenceBundleInspection(True, 'live evidence bundle passed archived structural, readiness, and RT metric checks', str(path), files['_kind'], members, True, True, True, **common)
 
     def _read_bundle(self, path: Path) -> dict[str, str]:
         if path.is_dir():
@@ -126,19 +146,19 @@ class LiveEvidenceBundleService:
 
     @staticmethod
     def _validate_runtime_identity(runtime_cfg: Mapping[str, Any]) -> tuple[bool, str]:
-        expected = {
-            'robot_model': 'xmate3',
-            'sdk_robot_class': 'xMateRobot',
-            'axis_count': 6,
-            'preferred_link': 'wired_direct',
-        }
-        for key, value in expected.items():
-            current = runtime_cfg.get(key)
-            if current != value:
-                return False, f'runtime_config.json identity mismatch: expected {key}={value!r}, got {current!r}'
+        try:
+            identity = RobotIdentityService().resolve(
+                str(runtime_cfg.get('robot_model') or ''),
+                str(runtime_cfg.get('sdk_robot_class') or ''),
+                int(runtime_cfg.get('axis_count', 0) or 0),
+            )
+        except Exception as exc:
+            return False, f'runtime_config.json identity mismatch: {exc}'
+        if str(runtime_cfg.get('preferred_link') or '') != identity.preferred_link:
+            return False, f"runtime_config.json identity mismatch: expected preferred_link={identity.preferred_link!r}, got {runtime_cfg.get('preferred_link')!r}"
         rt_mode = str(runtime_cfg.get('rt_mode') or runtime_cfg.get('clinical_mainline_mode') or '')
-        if rt_mode != 'cartesianImpedance':
-            return False, f'runtime_config.json mainline mode mismatch: expected cartesianImpedance, got {rt_mode!r}'
+        if rt_mode != identity.rt_mode:
+            return False, f'runtime_config.json mainline mode mismatch: expected {identity.rt_mode}, got {rt_mode!r}'
         if not isinstance(runtime_cfg.get('rt_phase_contract'), Mapping):
             return False, 'runtime_config.json must include rt_phase_contract for measured HIL checks'
         return True, ''

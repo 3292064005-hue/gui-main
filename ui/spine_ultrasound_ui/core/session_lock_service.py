@@ -11,7 +11,10 @@ from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.models import RuntimeConfig, ScanPlan
 from spine_ultrasound_ui.services.device_readiness import build_device_readiness
 from spine_ultrasound_ui.services.spine_scan_protocol import build_scan_protocol
+from spine_ultrasound_ui.services.runtime_source_policy_service import RuntimeSourcePolicyService
 from spine_ultrasound_ui.services.xmate_profile import load_xmate_profile
+from spine_ultrasound_ui.utils.robot_family_descriptor import build_profile_snapshot, build_robot_family_descriptor
+from spine_ultrasound_ui.utils.truth_ledger_service import build_live_truth_ledger, build_repo_truth_ledger
 
 
 @dataclass
@@ -24,6 +27,8 @@ class SessionLockResult:
     readiness: dict[str, Any]
     patient_registration: dict[str, Any]
     scan_protocol: dict[str, Any]
+    repo_truth_ledger: dict[str, Any]
+    live_truth_ledger: dict[str, Any]
     localization_readiness: dict[str, Any]
     calibration_bundle: dict[str, Any]
     localization_freeze: dict[str, Any]
@@ -105,6 +110,12 @@ class SessionLockService:
         replay_payload = dict(localization_replay_index or {})
         guidance_registry_payload = dict(guidance_algorithm_registry or {})
         guidance_steps_payload = list(guidance_processing_steps or [])
+        RuntimeSourcePolicyService().validate_session_lock(
+            config=config,
+            patient_registration=registration_payload,
+            localization_readiness=readiness_payload,
+            source_frame_set=source_frame_set_payload,
+        )
         localization_freeze = self._build_localization_freeze(
             patient_registration=registration_payload,
             localization_readiness=readiness_payload,
@@ -118,6 +129,25 @@ class SessionLockService:
             localization_readiness=readiness_payload,
             calibration_bundle=calibration_payload,
             source_frame_set=source_frame_set_payload,
+        )
+        profile_snapshot = build_profile_snapshot(config)
+        robot_family_descriptor = build_robot_family_descriptor(config)
+        repo_truth_ledger = build_repo_truth_ledger(
+            session_id="pending",
+            session_dir="pending",
+            profile=profile_snapshot,
+            build_id=config.build_id,
+            protocol_version=protocol_version,
+            scan_plan_hash=preview_plan.plan_hash(),
+            runtime_config=config.to_dict(),
+            robot_family_descriptor=robot_family_descriptor,
+        )
+        live_truth_ledger = build_live_truth_ledger(
+            session_id="pending",
+            session_dir="pending",
+            build_id=config.build_id,
+            profile=profile_snapshot,
+            robot_family_descriptor=robot_family_descriptor,
         )
         locked = self.exp_manager.lock_session(
             exp_id=exp_id,
@@ -147,7 +177,7 @@ class SessionLockService:
             source_frame_set_hash=self._canonical_hash(source_frame_set_payload, preferred_keys=("source_frame_set_hash",)),
             guidance_version="camera_guidance_v1",
             guidance_mode="guidance_only",
-            guidance_source_type=str(registration_payload.get("source_type", "")),
+            guidance_source_type=self._resolved_guidance_source_type(patient_registration=registration_payload, localization_readiness=readiness_payload, source_frame_set=source_frame_set_payload, config=config),
             force_sensor_provider=config.force_sensor_provider,
             safety_thresholds=safety_thresholds or {},
             device_health_snapshot=device_health_snapshot or {},
@@ -162,9 +192,32 @@ class SessionLockService:
             control_authority=control_authority or {},
             guidance_algorithm_registry=guidance_registry_payload,
             guidance_processing_steps=guidance_steps_payload,
+            repo_truth_ledger=repo_truth_ledger,
+            live_truth_ledger=live_truth_ledger,
         )
         session_dir = Path(locked["session_dir"])
         locked_plan = ScanPlan.from_dict(locked["scan_plan"])
+        repo_truth_ledger = build_repo_truth_ledger(
+            session_id=locked["session_id"],
+            session_dir=str(session_dir),
+            profile=profile_snapshot,
+            build_id=config.build_id,
+            protocol_version=protocol_version,
+            scan_plan_hash=locked_plan.plan_hash(),
+            runtime_config=config.to_dict(),
+            robot_family_descriptor=robot_family_descriptor,
+        )
+        live_truth_ledger = build_live_truth_ledger(
+            session_id=locked["session_id"],
+            session_dir=str(session_dir),
+            build_id=config.build_id,
+            profile=profile_snapshot,
+            robot_family_descriptor=robot_family_descriptor,
+        )
+        repo_truth_ledger_path = self.exp_manager.save_json_artifact(session_dir, "meta/repo_truth_ledger.json", repo_truth_ledger)
+        self.exp_manager.append_artifact(session_dir, "repo_truth_ledger", repo_truth_ledger_path)
+        live_truth_ledger_path = self.exp_manager.save_json_artifact(session_dir, "meta/live_truth_ledger.json", live_truth_ledger)
+        self.exp_manager.append_artifact(session_dir, "live_truth_ledger", live_truth_ledger_path)
         readiness = build_device_readiness(
             config=config,
             device_roster=device_health_snapshot,
@@ -224,6 +277,8 @@ class SessionLockService:
             manual_adjustment=manual_adjustment_payload,
             source_frame_set=source_frame_set_payload,
             scan_protocol=scan_protocol,
+            repo_truth_ledger=repo_truth_ledger,
+            live_truth_ledger=live_truth_ledger,
             localization_readiness_hash=self._canonical_hash(readiness_payload, preferred_keys=("readiness_hash",)),
             calibration_bundle_hash=self._canonical_hash(calibration_payload, preferred_keys=("bundle_hash",)),
             localization_freeze_hash=self._canonical_hash(localization_freeze, preferred_keys=("freeze_hash",)),
@@ -237,7 +292,7 @@ class SessionLockService:
             guidance_processing_steps=guidance_steps_payload,
             guidance_version="camera_guidance_v1",
             guidance_mode="guidance_only",
-            guidance_source_type=str(registration_payload.get("source_type", "")),
+            guidance_source_type=self._resolved_guidance_source_type(patient_registration=registration_payload, localization_readiness=readiness_payload, source_frame_set=source_frame_set_payload, config=config),
         )
         return SessionLockResult(
             session_id=locked["session_id"],
@@ -248,11 +303,30 @@ class SessionLockService:
             readiness=readiness,
             patient_registration=registration_payload,
             scan_protocol=scan_protocol,
+            repo_truth_ledger=repo_truth_ledger,
+            live_truth_ledger=live_truth_ledger,
             localization_readiness=readiness_payload,
             calibration_bundle=calibration_payload,
             localization_freeze=localization_freeze,
             manual_adjustment=manual_adjustment_payload,
             source_frame_set=source_frame_set_payload,
+        )
+
+    @staticmethod
+    def _resolved_guidance_source_type(
+        *,
+        patient_registration: dict[str, Any],
+        localization_readiness: dict[str, Any],
+        source_frame_set: dict[str, Any],
+        config: RuntimeConfig,
+    ) -> str:
+        return str(
+            patient_registration.get("source_type")
+            or localization_readiness.get("source_type")
+            or source_frame_set.get("source_type")
+            or source_frame_set.get("provider_mode")
+            or getattr(config, "camera_guidance_input_mode", "")
+            or ""
         )
 
     @staticmethod

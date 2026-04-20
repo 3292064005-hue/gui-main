@@ -59,6 +59,28 @@ class RuntimeCommandRequestContract:
     fields: tuple[RuntimeCommandFieldContract, ...]
 
 
+_AUTHORITY_CONTEXT_FIELD = RuntimeCommandFieldContract(
+    name="_command_context",
+    required=False,
+    field_type="object",
+    nested_required_fields=(),
+)
+
+
+def _command_requires_authority_context(*, command: str, capability_claim: str, write_command: bool) -> bool:
+    """Return whether a command contract should expose runtime authority context.
+
+    The context remains additive and optional at the manifest-contract layer so
+    compatibility callers do not fail payload validation prematurely. Runtime
+    dispatch still consumes the normalized context when present and remains the
+    final authority arbiter for write and plan-compile requests.
+    """
+
+    if write_command:
+        return True
+    return capability_claim == "plan_compile"
+
+
 @dataclass(frozen=True)
 class RuntimeCommandResponseContract:
     """Typed response contract for one runtime command."""
@@ -134,16 +156,19 @@ _RESPONSE_REQUIRED_FIELDS_BY_COMMAND: dict[str, tuple[str, ...]] = {
     "validate_scan_plan": ("final_verdict",),
     "compile_scan_plan": ("final_verdict",),
     "get_authoritative_runtime_envelope": ("authoritative_runtime_envelope_present", "control_authority", "final_verdict"),
+    "acquire_control_lease": ("summary_state", "detail", "lease"),
+    "renew_control_lease": ("summary_state", "detail", "lease"),
+    "release_control_lease": ("summary_state", "detail"),
     "get_io_snapshot": ("di", "do", "ai", "ao", "registers", "xpanel_vout_mode"),
     "get_register_snapshot": ("registers",),
     "get_safety_config": ("collision_detection_enabled", "soft_limit_enabled"),
     "get_motion_contract": ("rt_mode", "sdk_boundary_units", "rt_contract", "nrt_contract"),
     "get_runtime_alignment": ("runtime_source", "sdk_available", "robot_family"),
     "get_xmate_model_summary": ("model_source", "kinematics_ready", "dynamics_ready"),
-    "get_sdk_runtime_config": ("remote_ip", "local_ip", "rt_mode", "rt_phase_contract"),
+    "get_sdk_runtime_config": ("remote_ip", "local_ip", "rt_mode", "runtime_config_contract_digest", "runtime_config_schema_version", "rt_phase_contract"),
     "get_identity_contract": ("robot_model", "sdk_robot_class", "axis_count"),
     "get_clinical_mainline_contract": ("robot_model", "clinical_mainline_mode", "required_sequence"),
-    "get_session_freeze": ("session_locked", "session_id", "plan_hash"),
+    "get_session_freeze": ("session_locked", "session_id", "plan_hash", "freeze_consistent", "strict_runtime_freeze_gate"),
     "get_controller_evidence": ("runtime_source", "last_event", "last_transition"),
     "get_fault_injection_contract": ("summary_state", "detail", "active_faults"),
 }
@@ -178,6 +203,23 @@ _RESPONSE_FIELD_SPECS_BY_COMMAND: dict[str, tuple[RuntimeCommandFieldContract, .
         RuntimeCommandFieldContract("control_authority", True, "object", ("summary_state", "detail")),
         RuntimeCommandFieldContract("final_verdict", True, "object", ("accepted", "authoritative", "reason")),
     ),
+    "acquire_control_lease": (
+        RuntimeCommandFieldContract("summary_state", True, "string", ()),
+        RuntimeCommandFieldContract("detail", True, "string", ()),
+        RuntimeCommandFieldContract("lease", True, "object", ("lease_id", "actor_id", "workspace", "role")),
+        RuntimeCommandFieldContract("control_authority", False, "object", ("summary_state", "detail")),
+    ),
+    "renew_control_lease": (
+        RuntimeCommandFieldContract("summary_state", True, "string", ()),
+        RuntimeCommandFieldContract("detail", True, "string", ()),
+        RuntimeCommandFieldContract("lease", True, "object", ("lease_id", "actor_id", "workspace", "role")),
+        RuntimeCommandFieldContract("control_authority", False, "object", ("summary_state", "detail")),
+    ),
+    "release_control_lease": (
+        RuntimeCommandFieldContract("summary_state", True, "string", ()),
+        RuntimeCommandFieldContract("detail", True, "string", ()),
+        RuntimeCommandFieldContract("control_authority", False, "object", ("summary_state", "detail")),
+    ),
     "get_io_snapshot": (
         RuntimeCommandFieldContract("di", True, "object", ()),
         RuntimeCommandFieldContract("do", True, "object", ()),
@@ -211,6 +253,8 @@ _RESPONSE_FIELD_SPECS_BY_COMMAND: dict[str, tuple[RuntimeCommandFieldContract, .
         RuntimeCommandFieldContract("remote_ip", True, "string", ()),
         RuntimeCommandFieldContract("local_ip", True, "string", ()),
         RuntimeCommandFieldContract("rt_mode", True, "string", ()),
+        RuntimeCommandFieldContract("runtime_config_contract_digest", True, "string", ()),
+        RuntimeCommandFieldContract("runtime_config_schema_version", True, "string", ()),
         RuntimeCommandFieldContract("rt_phase_contract", True, "object", ()),
     ),
     "get_identity_contract": (
@@ -227,6 +271,15 @@ _RESPONSE_FIELD_SPECS_BY_COMMAND: dict[str, tuple[RuntimeCommandFieldContract, .
         RuntimeCommandFieldContract("session_locked", True, "boolean", ()),
         RuntimeCommandFieldContract("session_id", True, "string", ()),
         RuntimeCommandFieldContract("plan_hash", True, "string", ()),
+        RuntimeCommandFieldContract("freeze_consistent", True, "boolean", ()),
+        RuntimeCommandFieldContract("strict_runtime_freeze_gate", True, "string", ()),
+        RuntimeCommandFieldContract("session_freeze_policy", False, "string", ()),
+        RuntimeCommandFieldContract("frozen_execution_critical_fields", False, "array", (), array_item_type="string"),
+        RuntimeCommandFieldContract("frozen_evidence_only_fields", False, "array", (), array_item_type="string"),
+        RuntimeCommandFieldContract("recheck_on_start_procedure", False, "boolean", ()),
+        RuntimeCommandFieldContract("live_binding_established", False, "boolean", ()),
+        RuntimeCommandFieldContract("control_source_exclusive", False, "boolean", ()),
+        RuntimeCommandFieldContract("network_healthy", False, "boolean", ()),
     ),
     "get_controller_evidence": (
         RuntimeCommandFieldContract("runtime_source", True, "string", ()),
@@ -253,6 +306,9 @@ _DATA_CONTRACT_BY_COMMAND: dict[str, str] = {
     "validate_scan_plan": "final_verdict",
     "compile_scan_plan": "final_verdict",
     "get_authoritative_runtime_envelope": "authoritative_runtime_envelope",
+    "acquire_control_lease": "control_authority",
+    "renew_control_lease": "control_authority",
+    "release_control_lease": "control_authority",
     "get_session_freeze": "session_freeze",
     "get_control_governance_contract": "control_governance_contract",
     "get_controller_evidence": "controller_evidence",
@@ -319,9 +375,13 @@ def contract_for(command: str) -> RuntimeCommandContract:
     )
     capability_claim = command_capability_claim(command)
     handler_group = command_handler_group(command)
+    write_command = bool(spec.get("write_command", True))
+    request_fields = list(fields)
+    if _command_requires_authority_context(command=command, capability_claim=capability_claim, write_command=write_command) and all(field.name != "_command_context" for field in request_fields):
+        request_fields.append(_AUTHORITY_CONTEXT_FIELD)
     request_contract = RuntimeCommandRequestContract(
         required_fields=required_fields,
-        fields=fields,
+        fields=tuple(request_fields),
     )
     data_contract_token = _response_contract_token(command, capability_claim, handler_group)
     response_required_fields = _response_required_fields(command, data_contract_token)
@@ -344,7 +404,7 @@ def contract_for(command: str) -> RuntimeCommandContract:
         name=command,
         canonical_command=str(spec.get("canonical_command", command)).strip() or command,
         alias_kind=command_alias_kind(command) or "canonical",
-        write_command=bool(spec.get("write_command", True)),
+        write_command=write_command,
         capability_claim=capability_claim,
         handler_group=handler_group,
         state_preconditions=guard_contract.allowed_states,

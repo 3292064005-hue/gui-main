@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from spine_ultrasound_ui.models import WorkflowArtifacts
+from spine_ultrasound_ui.utils.session_freeze_policy import build_session_freeze_policy
 from spine_ultrasound_ui.services.session_products_authority_surface import SessionProductsAuthoritySurface
 from spine_ultrasound_ui.services.force_control_config import load_force_control_config
 from spine_ultrasound_ui.services.scan_plan_contract import runtime_scan_plan_payload
@@ -55,7 +56,7 @@ class AppWorkflowHost(Protocol):
     guidance_review_service: Any
 
     def _send_command(self, command: str, payload: dict[str, Any] | None = None, *, workflow_step: str, auto_action: str = "") -> Any: ...
-    def _run_scan_start_step(self, command: str) -> bool: ...
+    def _run_scan_start_step(self, command: str, payload: dict[str, Any] | None = None) -> bool: ...
     def _run_guarded_command(
         self,
         command: str,
@@ -245,6 +246,8 @@ def start_scan(host: AppWorkflowHost) -> None:
                 "scan_plan_hash": locked.scan_plan.plan_hash(),
                 "force_sensor_provider": host.config.force_sensor_provider,
                 "protocol_version": 1,
+                "strict_runtime_freeze_gate": host.config.strict_runtime_freeze_gate,
+                "session_freeze_policy": build_session_freeze_policy(host.config.strict_runtime_freeze_gate),
                 "safety_thresholds": load_force_control_config(),
                 "device_health_snapshot": host.telemetry.device_roster(),
             },
@@ -285,10 +288,9 @@ def start_scan(host: AppWorkflowHost) -> None:
         host._log("ERROR", f"加载扫查路径失败：{reply.message}。会话保持锁定以便排查，不执行扫查启动链。")
         host._emit_status()
         return
-    for command in ["approach_prescan", "seek_contact", "start_scan"]:
-        if not host._run_scan_start_step(command):
-            return
-    host._log("INFO", "扫查启动链路已完成，系统进入自动扫查流程。")
+    if not host._run_scan_start_step("start_procedure", {"procedure": "scan"}):
+        return
+    host._log("INFO", "start_procedure(scan) 已交由 runtime execution graph 接管，系统进入自动扫查流程。")
     host._refresh_session_governance()
     host.experiments_updated.emit(host.experiments)
     host._emit_status()

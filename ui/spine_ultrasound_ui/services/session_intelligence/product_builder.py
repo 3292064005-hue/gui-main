@@ -3,22 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from spine_ultrasound_ui.services.session_intelligence.product_contracts import SessionIntelligenceInputBundle, SessionIntelligenceProductBundle
+
 
 class SessionIntelligenceProductBuilder:
     """Build session-intelligence products from already loaded inputs."""
 
-    def build(self, service, session_dir: Path, inputs: dict[str, Any]) -> dict[str, Any]:
-        manifest = inputs["manifest"]
-        scan_plan = inputs["scan_plan"]
-        command_journal = inputs["command_journal"]
-        annotations = inputs["annotations"]
-        alarms = inputs["alarms"]
-        quality = inputs["quality"]
-        report = inputs["report"]
-        summary = inputs["summary"]
-        evidence_seal = inputs["evidence_seal"]
-        integrity = inputs["integrity"]
-        session_id = inputs["session_id"]
+    def build(self, service, session_dir: Path, inputs: SessionIntelligenceInputBundle) -> SessionIntelligenceProductBundle:
+        manifest = inputs.manifest
+        scan_plan = inputs.scan_plan
+        command_journal = inputs.command_journal
+        annotations = inputs.annotations
+        alarms = inputs.alarms
+        quality = inputs.quality
+        report = inputs.report
+        summary = inputs.summary
+        evidence_seal = inputs.evidence_seal
+        integrity = inputs.integrity
+        session_id = inputs.session_id
 
         lineage = service.lineage_builder.build(service, session_id=session_id, manifest=manifest, scan_plan=scan_plan, command_journal=command_journal, report=report)
         recovery_report = service.recovery_builder.build_recovery_report(service, session_id=session_id, command_journal=command_journal, annotations=annotations, alarms=alarms)
@@ -69,28 +71,28 @@ class SessionIntelligenceProductBuilder:
         bridge_observability_report = service.incident_report_builder.build_bridge_observability(service, session_id=session_id, summary=summary, event_delivery_summary=event_delivery_summary)
         artifact_registry_snapshot = service.release_artifact_builder.build_artifact_registry_snapshot(service, session_id=session_id, manifest=manifest)
         evidence_seal_snapshot = evidence_seal or service.evidence_seal.build(session_dir, manifest=manifest)
-        return {
-            "lineage": lineage,
-            "resume_state": resume_state,
-            "resume_decision": resume_decision,
-            "recovery_report": recovery_report,
-            "recovery_decision_timeline": recovery_decision_timeline,
-            "operator_incident_report": operator_incident_report,
-            "session_incidents": incidents,
-            "event_log_index": event_log_index,
-            "event_delivery_summary": event_delivery_summary,
-            "selected_execution_rationale": selected_execution_rationale,
-            "release_gate_decision": release_gate_decision,
-            "control_plane_snapshot": control_plane_snapshot,
-            "control_authority_snapshot": control_authority_snapshot,
-            "bridge_observability_report": bridge_observability_report,
-            "artifact_registry_snapshot": artifact_registry_snapshot,
-            "session_evidence_seal": evidence_seal_snapshot,
-            "resume_attempts": resume_attempts,
-            "resume_attempt_outcomes": resume_attempt_outcomes,
-            "command_state_policy": command_state_policy,
-            "command_policy_snapshot": command_policy_snapshot,
-            "contract_kernel_diff": contract_kernel_diff,
-            "contract_consistency": contract_consistency,
-            "release_evidence_pack": release_evidence_pack,
-        }
+        return SessionIntelligenceProductBundle(
+            lineage=lineage,
+            resume_state=resume_state,
+            resume_decision=resume_decision,
+            recovery_report=recovery_report,
+            recovery_decision_timeline=recovery_decision_timeline,
+            operator_incident_report=operator_incident_report,
+            session_incidents=incidents,
+            event_log_index=event_log_index,
+            event_delivery_summary=event_delivery_summary,
+            selected_execution_rationale=selected_execution_rationale,
+            release_gate_decision=release_gate_decision,
+            control_plane_snapshot=control_plane_snapshot,
+            control_authority_snapshot=control_authority_snapshot,
+            bridge_observability_report=bridge_observability_report,
+            artifact_registry_snapshot=artifact_registry_snapshot,
+            session_evidence_seal=evidence_seal_snapshot,
+            resume_attempts=resume_attempts,
+            resume_attempt_outcomes=resume_attempt_outcomes,
+            command_state_policy=command_state_policy,
+            command_policy_snapshot=command_policy_snapshot,
+            contract_kernel_diff=contract_kernel_diff,
+            contract_consistency=contract_consistency,
+            release_evidence_pack=release_evidence_pack,
+        )

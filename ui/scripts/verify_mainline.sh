@@ -12,7 +12,6 @@ BUILD_EVIDENCE_REPORT="${BUILD_EVIDENCE_REPORT:-}"
 VERIFICATION_REPORT="${VERIFICATION_REPORT:-}"
 READINESS_MANIFEST_REPORT="${READINESS_MANIFEST_REPORT:-}"
 LIVE_EVIDENCE_BUNDLE="${LIVE_EVIDENCE_BUNDLE:-}"
-EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"
 CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-4}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
@@ -32,8 +31,37 @@ CPP_TEST_TARGETS=(
   test_recovery_manager
   test_recording_service
   test_rt_motion_service_truth
+  test_execution_plan_runtime_truth
+  test_xmate_model_compile_contract
 )
 CPP_BUILD_TARGETS=(spine_robot_core_runtime spine_robot_core "${CPP_TEST_TARGETS[@]}")
+EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"
+
+cpp_test_targets_for_profile() {
+  local profile="$1"
+  local targets=("${CPP_TEST_TARGETS[@]}")
+  local with_sdk="${ROBOT_CORE_WITH_XCORE_SDK:-OFF}"
+  local with_model="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"
+  if [[ "$profile" == "mock" || "$with_sdk" != "ON" || "$with_model" != "ON" ]]; then
+    local filtered=()
+    local target
+    for target in "${targets[@]}"; do
+      [[ "$target" == "test_xmate_model_compile_contract" ]] && continue
+      filtered+=("$target")
+    done
+    targets=("${filtered[@]}")
+  fi
+  printf '%s\n' "${targets[@]}"
+}
+
+cpp_build_targets_for_profile() {
+  local profile="$1"
+  local targets=(spine_robot_core_runtime spine_robot_core)
+  while IFS= read -r target; do
+    [[ -n "$target" ]] && targets+=("$target")
+  done < <(cpp_test_targets_for_profile "$profile")
+  printf '%s\n' "${targets[@]}"
+}
 
 on_error() {
   local lineno="$1"
@@ -41,9 +69,9 @@ on_error() {
   echo "[FAIL] verify_mainline.sh phase=${CURRENT_PHASE} profile=${CURRENT_PROFILE:-n/a} build_dir=${CURRENT_BUILD_DIR:-n/a} line=${lineno} command=${command}" >&2
 }
 
-cleanup_generated_artifacts() {
-  rm -rf "${BUILD_DIR}" 2>/dev/null || true
+cleanup_repo_generated_artifacts() {
   local cleanup_roots=(
+    "${REPO_ROOT}"
     "${REPO_ROOT}/spine_ultrasound_ui"
     "${REPO_ROOT}/tests"
     "${REPO_ROOT}/scripts"
@@ -55,6 +83,11 @@ cleanup_generated_artifacts() {
     find "${root}" -type d \( -name __pycache__ -o -name .pytest_cache \) -prune -exec rm -rf {} + 2>/dev/null || true
     find "${root}" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
   done
+}
+
+cleanup_generated_artifacts() {
+  rm -rf "${BUILD_DIR}" 2>/dev/null || true
+  cleanup_repo_generated_artifacts
 }
 
 trap 'on_error "${LINENO}" "${BASH_COMMAND}"' ERR
@@ -97,15 +130,20 @@ run_repository_gates() {
   "$PYTHON_BIN" scripts/strict_convergence_audit.py
   "$PYTHON_BIN" scripts/generate_runtime_command_artifacts.py
   "$PYTHON_BIN" scripts/check_protocol_sync.py
+"$PYTHON_BIN" scripts/check_runtime_config_contract.py
+"$PYTHON_BIN" scripts/check_runtime_contract_parity.py
   "$PYTHON_BIN" scripts/check_backend_authority_parity.py
   "$PYTHON_BIN" scripts/check_rt_purity_gate.py
   "$PYTHON_BIN" scripts/check_rt_quality_gate.py
+"$PYTHON_BIN" scripts/check_model_bundle_contract.py
   "$PYTHON_BIN" scripts/check_robot_identity_registry.py
   "$PYTHON_BIN" scripts/check_python_compile.py
   "$PYTHON_BIN" scripts/check_canonical_imports.py
   "$PYTHON_BIN" scripts/check_repository_gates.py
   # compatibility hint: python scripts/check_architecture_fitness.py
   "$PYTHON_BIN" scripts/check_architecture_fitness.py
+  "$PYTHON_BIN" scripts/check_artifact_lifecycle_registry.py
+  "$PYTHON_BIN" scripts/check_algorithm_plugin_contracts.py
   "$PYTHON_BIN" scripts/check_verification_boundary.py
   P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance" "$PYTHON_BIN" scripts/generate_p2_acceptance_artifacts.py
   P2_ACCEPTANCE_OUTPUT_ROOT="${BUILD_DIR}/p2_acceptance" "$PYTHON_BIN" scripts/check_p2_acceptance.py
@@ -150,6 +188,11 @@ configure_cpp_profile() {
   mkdir -p "${profile_build_dir_path}"
 
   local extra_args=( -DROBOT_CORE_PROFILE="${profile}" )
+  local unity_build="${VERIFY_ENABLE_UNITY_BUILD:-1}"
+  local unity_batch_size="${VERIFY_UNITY_BATCH_SIZE:-4}"
+  if [[ "${unity_build}" == "1" ]]; then
+    extra_args+=( -DCMAKE_UNITY_BUILD=ON -DCMAKE_UNITY_BUILD_BATCH_SIZE="${unity_batch_size}" )
+  fi
   if [[ "${profile}" == "mock" ]]; then
     extra_args+=( -DROBOT_CORE_WITH_XCORE_SDK=OFF -DROBOT_CORE_WITH_XMATE_MODEL=OFF )
   else
@@ -166,7 +209,8 @@ build_cpp_profile_targets() {
   CURRENT_PHASE="build-${profile}"
   CURRENT_PROFILE="${profile}"
   CURRENT_BUILD_DIR="${profile_build_dir_path}"
-  "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "${profile_build_dir_path}" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL}" "${CPP_BUILD_TARGETS[@]}"
+  mapfile -t profile_cpp_build_targets < <(cpp_build_targets_for_profile "${profile}")
+  "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "${profile_build_dir_path}" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL}" "${profile_cpp_build_targets[@]}"
 }
 
 assert_registered_cpp_tests() {
@@ -185,8 +229,10 @@ assert_registered_cpp_tests() {
     echo "[FAIL] unable to determine registered ctest count for profile=${profile}" >&2
     return 1
   fi
-  if [[ "${total}" != "${EXPECTED_CPP_TEST_COUNT}" ]]; then
-    echo "[FAIL] profile=${profile} expected ${EXPECTED_CPP_TEST_COUNT} registered ctests but found ${total}" >&2
+  mapfile -t profile_cpp_test_targets < <(cpp_test_targets_for_profile "${profile}")
+  local expected_cpp_test_count="${#profile_cpp_test_targets[@]}"
+  if [[ "${total}" != "${expected_cpp_test_count}" ]]; then
+    echo "[FAIL] profile=${profile} expected ${expected_cpp_test_count} registered ctests but found ${total}" >&2
     return 1
   fi
 }
@@ -324,6 +370,7 @@ case "${VERIFY_PHASE}" in
     ;;
 esac
 
+cleanup_repo_generated_artifacts
 emit_verification_report
 
 exit 0

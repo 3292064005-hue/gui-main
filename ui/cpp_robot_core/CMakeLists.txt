@@ -101,7 +101,7 @@ if(VendoredRokaeSdk_FOUND)
   target_compile_definitions(robot_core_sdk_binding INTERFACE ROBOT_CORE_WITH_XCORE_SDK=1)
   target_include_directories(robot_core_sdk_binding INTERFACE ${VendoredRokaeSdk_INCLUDE_DIR} ${VendoredRokaeSdk_EXTERNAL_DIR})
   if(ROBOT_CORE_WITH_XMATE_MODEL AND TARGET Rokae::xMateModel)
-    target_compile_definitions(robot_core_sdk_binding INTERFACE ROBOT_CORE_WITH_XMATE_MODEL=1)
+    target_compile_definitions(robot_core_sdk_binding INTERFACE ROBOT_CORE_WITH_XMATE_MODEL=1 XMATEMODEL_LIB_SUPPORTED=1)
   endif()
 endif()
 
@@ -115,8 +115,12 @@ set(CORE_RUNTIME_SOURCES
   src/core_runtime_power_validation.cpp
   src/core_runtime_session_execution.cpp
   src/core_runtime_contracts.cpp
+  src/core_runtime_contract_projection.cpp
+  src/core_runtime_contract_envelope.cpp
   src/runtime_state_store.cpp
   src/session_runtime.cpp
+  src/session_freeze_runtime.cpp
+  src/execution_plan_runtime.cpp
   src/contact_gate.cpp
   src/contact_observer.cpp
   src/model_authority.cpp
@@ -139,20 +143,33 @@ set(CORE_RUNTIME_SOURCES
   src/sdk_robot_facade_lifecycle.cpp
   src/sdk_robot_facade_nrt.cpp
   src/sdk_robot_facade_rt.cpp
+  src/sdk_robot_facade_rt_contract.cpp
   src/sdk_robot_facade_cache.cpp
   src/sdk_robot_facade_ports.cpp
   src/sdk_robot_facade_state.cpp
+  src/sdk_robot_facade_model.cpp
   src/normal_force_estimator.cpp
   src/normal_axis_admittance_controller.cpp
   src/tangential_scan_controller.cpp
   src/orientation_trim_controller.cpp
   src/contact_control_contract.cpp
   src/telemetry_publisher.cpp
-  src/kinematics_validator.cpp
   src/pose_interpolator.cpp
 )
 
 add_library(spine_robot_core_runtime STATIC ${CORE_RUNTIME_SOURCES} ${GENERATED_RUNTIME_COMMAND_MANIFEST_INC})
+set_source_files_properties(
+  src/core_runtime_contracts.cpp
+  src/core_runtime_contract_projection.cpp
+  src/core_runtime_contract_envelope.cpp
+  src/runtime_state_store.cpp
+  src/sdk_robot_facade.cpp
+  src/sdk_robot_facade_rt.cpp
+  src/sdk_robot_facade_rt_contract.cpp
+  src/normal_axis_admittance_controller.cpp
+  src/tangential_scan_controller.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
+)
 add_dependencies(spine_robot_core_runtime generate_runtime_command_artifacts)
 robot_core_apply_common_options(spine_robot_core_runtime)
 target_link_libraries(spine_robot_core_runtime
@@ -203,6 +220,13 @@ robot_core_add_cpp_test(test_protocol_bridge tests/test_protocol_bridge.cpp spin
 robot_core_add_cpp_test(test_recovery_manager tests/test_recovery_manager.cpp spine_robot_core_runtime)
 robot_core_add_cpp_test(test_recording_service tests/test_recording_service.cpp spine_robot_core_runtime)
 robot_core_add_cpp_test(test_rt_motion_service_truth tests/test_rt_motion_service_truth.cpp spine_robot_core_runtime)
+robot_core_add_cpp_test(test_execution_plan_runtime_truth tests/test_execution_plan_runtime_truth.cpp spine_robot_core_runtime)
+
+set(ROBOT_CORE_ENABLE_XMATE_MODEL_COMPILE_GATE OFF)
+if(ROBOT_CORE_WITH_XCORE_SDK AND ROBOT_CORE_WITH_XMATE_MODEL AND VendoredRokaeSdk_FOUND AND TARGET Rokae::xMateModel)
+  set(ROBOT_CORE_ENABLE_XMATE_MODEL_COMPILE_GATE ON)
+  robot_core_add_cpp_test(test_xmate_model_compile_contract tests/test_xmate_model_compile_contract.cpp)
+endif()
 
 if(ROBOT_CORE_BUILD_EXAMPLES)
   add_executable(impedance_scan_example examples/impedance_scan_example.cpp)
@@ -226,3 +250,7 @@ install(TARGETS spine_robot_core DESTINATION /opt/spine_ultrasound/cpp_robot_cor
 install(TARGETS spine_robot_core_runtime DESTINATION /opt/spine_ultrasound/cpp_robot_core/lib)
 
 add_test(NAME cpp_rt_motion_service_truth COMMAND test_rt_motion_service_truth)
+add_test(NAME cpp_execution_plan_runtime_truth COMMAND test_execution_plan_runtime_truth)
+if(ROBOT_CORE_ENABLE_XMATE_MODEL_COMPILE_GATE)
+  add_test(NAME cpp_xmate_model_compile_contract COMMAND test_xmate_model_compile_contract)
+endif()

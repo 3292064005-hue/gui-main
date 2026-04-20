@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 from spine_ultrasound_ui.utils.mainline_identity_defaults import MAINLINE_IDENTITY_DEFAULTS
 from spine_ultrasound_ui.utils.sdk_unit_contract import build_sdk_boundary_contract
+from spine_ultrasound_ui.utils.session_freeze_policy import normalize_strict_runtime_freeze_gate
 
 
 @dataclass
@@ -97,6 +98,7 @@ class RuntimeConfig:
     feature_threshold: float = 0.6
     rt_mode: str = "cartesianImpedance"
     network_stale_ms: int = 150
+    strict_runtime_freeze_gate: str = "enforce"
     pressure_stale_ms: int = 100
     telemetry_rate_hz: int = 20
     tool_name: str = "ultrasound_probe"
@@ -116,6 +118,8 @@ class RuntimeConfig:
     allow_contract_shell_writes: bool = False
     build_id: str = "dev"
     software_version: str = "0.3.0"
+    runtime_config_contract_digest: str = ""
+    runtime_config_schema_version: str = ""
     camera_guidance_input_mode: str = "synthetic"
     camera_guidance_source_path: str = ""
     camera_guidance_file_glob: str = "*.npy"
@@ -154,6 +158,11 @@ class RuntimeConfig:
     ])
     load_com_mm: List[float] = field(default_factory=lambda: [0.0, 0.0, 62.0])
     load_inertia: List[float] = field(default_factory=lambda: [0.0012, 0.0012, 0.0008, 0.0, 0.0, 0.0])
+    home_joint_rad: List[float] = field(default_factory=lambda: [0.0, 0.30, 0.60, 0.0, 1.20, 0.0, 0.0])
+    emergency_home_joint_rad: List[float] = field(default_factory=lambda: [0.0, 0.30, 0.60, 0.0, 1.20, 0.0, 0.0])
+    emergency_approach_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.205, 3.1415926535, 0.0, 1.5707963267])
+    emergency_entry_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.190, 3.1415926535, 0.0, 1.5707963267])
+    emergency_retreat_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.230, 3.1415926535, 0.0, 1.5707963267])
 
 
     def build_rt_phase_contract(self) -> Dict[str, Any]:
@@ -228,6 +237,8 @@ class RuntimeConfig:
         }
 
     def to_dict(self) -> Dict[str, Any]:
+        from spine_ultrasound_ui.utils.runtime_config_contract import runtime_config_contract_metadata
+
         payload = asdict(self)
         payload["contact_control"] = asdict(self.contact_control)
         payload["force_estimator"] = asdict(self.force_estimator)
@@ -239,6 +250,11 @@ class RuntimeConfig:
         )
         payload["rt_phase_contract"] = self.build_rt_phase_contract()
         payload["legacy_compatibility"] = self.legacy_compatibility_projection()
+        payload["strict_runtime_freeze_gate"] = normalize_strict_runtime_freeze_gate(self.strict_runtime_freeze_gate)
+        contract_metadata = runtime_config_contract_metadata()
+        payload["runtime_config_contract"] = contract_metadata
+        payload["runtime_config_contract_digest"] = str(contract_metadata.get("digest", ""))
+        payload["runtime_config_schema_version"] = str(contract_metadata.get("schema_version", ""))
         return payload
 
     def sdk_boundary_contract(self) -> Dict[str, Any]:
@@ -257,6 +273,22 @@ class RuntimeConfig:
             payload["network_stale_ms"] = int(payload.pop("network_tolerance")) * 10
         if "load_mass_kg" in payload and "load_kg" not in payload:
             payload["load_kg"] = payload.pop("load_mass_kg")
+        payload["strict_runtime_freeze_gate"] = normalize_strict_runtime_freeze_gate(payload.get("strict_runtime_freeze_gate"))
+        runtime_config_contract = payload.get("runtime_config_contract", {})
+        if isinstance(runtime_config_contract, dict):
+            payload["runtime_config_contract"] = dict(runtime_config_contract)
+            payload.setdefault("runtime_config_contract_digest", str(runtime_config_contract.get("digest", "")))
+            payload.setdefault("runtime_config_schema_version", str(runtime_config_contract.get("schema_version", "")))
+        else:
+            payload.pop("runtime_config_contract", None)
+        if "fallback_home_joint_rad" in payload and "emergency_home_joint_rad" not in payload:
+            payload["emergency_home_joint_rad"] = payload.pop("fallback_home_joint_rad")
+        if "fallback_approach_pose_xyzabc" in payload and "emergency_approach_pose_xyzabc" not in payload:
+            payload["emergency_approach_pose_xyzabc"] = payload.pop("fallback_approach_pose_xyzabc")
+        if "fallback_entry_pose_xyzabc" in payload and "emergency_entry_pose_xyzabc" not in payload:
+            payload["emergency_entry_pose_xyzabc"] = payload.pop("fallback_entry_pose_xyzabc")
+        if "fallback_retreat_pose_xyzabc" in payload and "emergency_retreat_pose_xyzabc" not in payload:
+            payload["emergency_retreat_pose_xyzabc"] = payload.pop("fallback_retreat_pose_xyzabc")
 
         rt_phase_contract = payload.get("rt_phase_contract")
         if isinstance(rt_phase_contract, dict):

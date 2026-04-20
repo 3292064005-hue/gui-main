@@ -211,7 +211,7 @@ class ViewStateFactory:
     def _pick_recommended_command(actions: dict[str, dict[str, str | bool]]) -> str | None:
         preferred_order = [
             "connect_robot", "power_on", "set_auto_mode", "create_experiment", "run_localization", "approve_localization_review", "generate_path",
-            "refresh_sdk_assets", "start_scan", "run_preprocess", "run_reconstruction", "run_assessment", "export_summary",
+            "refresh_sdk_assets", "start_procedure", "start_scan", "run_preprocess", "run_reconstruction", "run_assessment", "export_summary",
         ]
         for name in preferred_order:
             if actions.get(name, {}).get("enabled"):
@@ -223,7 +223,7 @@ class ViewStateFactory:
         mapping = {
             "connect_robot": "系统准备", "power_on": "系统准备", "set_auto_mode": "系统准备", "create_experiment": "实验配置",
             "run_localization": "视觉与路径", "approve_localization_review": "视觉与路径", "generate_path": "视觉与路径", "refresh_sdk_assets": "机器人监控",
-            "start_scan": "自动扫查", "run_preprocess": "图像与重建", "run_reconstruction": "图像与重建",
+            "start_procedure": "自动扫查", "start_scan": "自动扫查", "run_preprocess": "图像与重建", "run_reconstruction": "图像与重建",
             "run_assessment": "量化评估", "export_summary": "系统总览",
         }
         return mapping.get(command, "系统总览")

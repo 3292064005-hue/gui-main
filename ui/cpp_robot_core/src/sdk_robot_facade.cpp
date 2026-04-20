@@ -1,11 +1,27 @@
 #include "robot_core/sdk_robot_facade_internal.h"
 
 #include <sstream>
+#include <cstdlib>
 #include <stdexcept>
 
 namespace robot_core {
 
 using namespace sdk_robot_facade_internal;
+
+namespace {
+
+bool facadeDeploymentShellWritesForbidden() {
+  const char* profile = std::getenv("SPINE_DEPLOYMENT_PROFILE");
+  const std::string profile_name = profile != nullptr ? std::string(profile) : std::string();
+  if (profile_name == "research" || profile_name == "clinical") return true;
+  const char* strict = std::getenv("SPINE_STRICT_CONTROL_AUTHORITY");
+  if (strict == nullptr) return false;
+  const std::string value(strict);
+  return value == "1" || value == "true" || value == "TRUE" || value == "on" || value == "ON";
+}
+
+}  // namespace
+
 
 SdkRobotFacade::SdkRobotFacade() {
   lifecycle_port_ = std::make_unique<SdkRobotLifecyclePort>(*this);
@@ -171,10 +187,20 @@ bool SdkRobotFacade::requireLiveWrite(const std::string& prefix, std::string* re
   if (live_binding_established_ && robot_ != nullptr) {
     return true;
   }
-  if (rt_config_.allow_contract_shell_writes) {
+  if (rt_config_.allow_contract_shell_writes && !facadeDeploymentShellWritesForbidden()) {
     appendLog(prefix + " contract_shell_write_override");
     return true;
   }
+  if (rt_config_.allow_contract_shell_writes && facadeDeploymentShellWritesForbidden()) {
+    captureFailure(prefix, "deployment_profile_forbids_contract_shell_write", reason);
+    binding_detail_ = "contract_shell_write_forbidden_by_profile";
+    refreshBindingTruth();
+    return false;
+  }
+#ifdef ROBOT_CORE_PROFILE_mock
+  appendLog(prefix + " mock_profile_contract_shell_write");
+  return true;
+#endif
   captureFailure(prefix, vendored_sdk_detected_ ? "live_binding_required" : "sdk_live_binding_unavailable", reason);
   binding_detail_ = vendored_sdk_detected_ ? "live_write_blocked_contract_shell" : "live_write_blocked_no_sdk";
   refreshBindingTruth();

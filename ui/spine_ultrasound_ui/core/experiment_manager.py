@@ -11,6 +11,7 @@ from typing import Any, Dict
 from spine_ultrasound_ui.models import ArtifactDescriptor, ProcessingStepRecord, ScanPlan, SessionManifest
 from spine_ultrasound_ui.utils import ensure_dir, now_text
 from spine_ultrasound_ui.core.artifact_path_policy import infer_dependencies, infer_source_stage
+from spine_ultrasound_ui.core.artifact_lifecycle_registry import lifecycle_spec_for_artifact
 from spine_ultrasound_ui.core.artifact_schema_registry import schema_for_artifact
 from spine_ultrasound_ui.contracts.schema_validator import validate_payload_against_schema
 
@@ -32,6 +33,8 @@ ENFORCED_CANONICAL_JSON_ARTIFACTS = {
     "body_surface",
     "guidance_targets",
     "scan_protocol",
+    "repo_truth_ledger",
+    "live_truth_ledger",
 }
 
 MANIFEST_CANONICAL_PAYLOAD_TO_ARTIFACT = {
@@ -44,6 +47,8 @@ MANIFEST_CANONICAL_PAYLOAD_TO_ARTIFACT = {
     "manual_adjustment": "manual_adjustment",
     "source_frame_set": "source_frame_set",
     "scan_protocol": "scan_protocol",
+    "repo_truth_ledger": "repo_truth_ledger",
+    "live_truth_ledger": "live_truth_ledger",
 }
 
 MANIFEST_CANONICAL_HASH_TO_PAYLOAD = {
@@ -143,6 +148,8 @@ class ExperimentManager:
         control_authority: Dict[str, Any] | None = None,
         guidance_algorithm_registry: Dict[str, Any] | None = None,
         guidance_processing_steps: list[Dict[str, Any]] | None = None,
+        repo_truth_ledger: Dict[str, Any] | None = None,
+        live_truth_ledger: Dict[str, Any] | None = None,
     ) -> dict:
         exp_dir = self.root / exp_id
         session_id = self.make_session_id(exp_id)
@@ -198,6 +205,8 @@ class ExperimentManager:
             safety_thresholds=safety_thresholds or {},
             device_health_snapshot=device_health_snapshot or {},
             device_readiness=readiness_payload,
+            repo_truth_ledger=repo_truth_ledger or {},
+            live_truth_ledger=live_truth_ledger or {},
             robot_profile=robot_profile or {},
             patient_registration=patient_registration or {},
             localization_readiness=localization_readiness or {},
@@ -538,19 +547,23 @@ class ExperimentManager:
     def _build_artifact_descriptor(self, session_dir: Path, name: str, artifact_path: Path) -> ArtifactDescriptor:
         mime_type = mimetypes.guess_type(str(artifact_path))[0] or "application/octet-stream"
         rel_path = str(artifact_path.relative_to(session_dir))
+        lifecycle = lifecycle_spec_for_artifact(name)
         return ArtifactDescriptor(
             artifact_type=name,
             path=rel_path,
             mime_type=mime_type,
-            producer="experiment_manager",
+            producer=lifecycle.producer if lifecycle is not None else "experiment_manager",
             schema=schema_for_artifact(name),
             artifact_id=name,
             size_bytes=artifact_path.stat().st_size if artifact_path.exists() else 0,
             checksum=self._checksum_for_path(artifact_path),
             created_at=now_text(),
             summary=name.replace("_", " "),
-            source_stage=infer_source_stage(name),
+            source_stage=lifecycle.source_stage if lifecycle is not None else infer_source_stage(name),
             dependencies=infer_dependencies(name),
+            consumer_domains=list(lifecycle.consumers) if lifecycle is not None else [],
+            materialization_state="materialized" if lifecycle is None else lifecycle.materialization_policy,
+            evidence_status="present" if artifact_path.exists() else "missing",
         )
 
     def _write_manifest(self, session_dir: Path, manifest: SessionManifest) -> None:

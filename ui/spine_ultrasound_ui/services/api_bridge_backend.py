@@ -7,7 +7,6 @@ import threading
 from collections import deque
 from pathlib import Path
 from typing import Any, Optional
-
 import httpx
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
@@ -19,10 +18,12 @@ from .api_bridge_backend_helpers import build_command_headers, decode_pixmap_pay
 from .api_bridge_lease_service import ApiBridgeLeaseService
 from .api_bridge_verdict_service import ApiBridgeVerdictService
 from .backend_authoritative_contract_service import BackendAuthoritativeContractService
+from .backend_command_error_service import BackendCommandErrorService
+from .backend_error_mapper import BackendErrorMapper  # explicit authority edge for backend error normalization
 from .backend_base import BackendBase
+from .backend_capability_matrix_service import BackendCapabilityMatrixService
 from .backend_control_plane_projection_service import BackendControlPlaneProjectionService
 from .backend_control_plane_service import BackendControlPlaneService
-from .backend_error_mapper import BackendErrorMapper
 from .backend_errors import BackendOperationError, normalize_backend_exception
 from .backend_link_service import BackendLinkMetrics, BackendLinkService
 from .backend_projection_cache import BackendProjectionCache
@@ -48,7 +49,6 @@ class ApiBridgeBackend(QObject, BackendBase):
     Internally the backend now normalizes authoritative runtime facts through a
     shared service and tracks partition revisions for control-plane caching.
     """
-
     telemetry_received = Signal(object)
     log_generated = Signal(str, str)
     camera_pixmap_ready = Signal(QPixmap)
@@ -153,8 +153,8 @@ class ApiBridgeBackend(QObject, BackendBase):
             context: Optional command-side control/actor context.
 
         Returns:
-            A normalized reply envelope. Transport errors are converted to the
-            existing compatibility reply shape through BackendErrorMapper.
+            A normalized reply envelope. Transport/HTTP errors are normalized
+            through the canonical backend command error service.
         """
         request_payload = dict(payload or {})
         command_context = dict(context or {})
@@ -176,6 +176,7 @@ class ApiBridgeBackend(QObject, BackendBase):
                     workspace=str(command_context.get("workspace") or self._workspace),
                     role=str(command_context.get("role") or self._role),
                     session_id=str(command_context.get("session_id") or ""),
+                    lease_id=self._lease_id,
                     include_lease=effective_include_lease,
                 ),
             )
@@ -191,7 +192,8 @@ class ApiBridgeBackend(QObject, BackendBase):
                     self._metrics.last_error = message
                 remember_backend_error(self._last_errors, f"{command}: {message}")
                 self._log("WARN", f"API {command}: {message}")
-                return BackendErrorMapper.reply_from_exception(RuntimeError(message), data={"http_status": response.status_code, "command": command}, command=command, context="api-command")
+                _, failed = BackendCommandErrorService.build_reply(RuntimeError(message), command=command, context="api-command", data={"http_status": response.status_code, "command": command})
+                return failed
             reply = ReplyEnvelope(
                 ok=bool(body.get("ok", False)),
                 message=str(body.get("message", "")),
@@ -210,13 +212,22 @@ class ApiBridgeBackend(QObject, BackendBase):
             self._log("INFO" if reply.ok else "WARN", f"API {command}: {reply.message or ('OK' if reply.ok else 'FAILED')}")
             return reply
         except (httpx.HTTPError, json.JSONDecodeError, OSError, RuntimeError, ValueError, TypeError) as exc:
-            normalized = normalize_backend_exception(exc, command=command, context="api-command")
+            normalized, failed = BackendCommandErrorService.build_reply(exc, command=command, context="api-command", data={"command": command})
             with self._lock:
                 self._metrics.commands_failed += 1
                 self._metrics.last_error = normalized.message
             remember_backend_error(self._last_errors, f"{command}: {normalized.error_type}: {normalized.message}")
             self._log("ERROR", f"API {command} 失败：{normalized.error_type}: {normalized.message}")
-            return BackendErrorMapper.reply_from_exception(normalized, data={"command": command}, command=command, context="api-command")
+            return failed
+    def capability_matrix(self) -> dict[str, dict[str, Any]]:
+        """Return the explicit capability contract for the API bridge surface."""
+        return BackendCapabilityMatrixService.build({
+            "camera": "monitor_only",
+            "ultrasound": "monitor_only",
+            "reconstruction": "monitor_only",
+            "recording": "monitor_only",
+        })
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._status_cache)
@@ -239,7 +250,7 @@ class ApiBridgeBackend(QObject, BackendBase):
             projection_cache=self._projection_cache,
             control_authority=control_authority,
         )
-        return self.link_service.build_snapshot(
+        snapshot = self.link_service.build_snapshot(
             mode="api",
             http_base=self.base_url,
             ws_base=self.ws_base,
@@ -251,6 +262,9 @@ class ApiBridgeBackend(QObject, BackendBase):
             local_runtime_config=self.config.to_dict(),
             authoritative_runtime_envelope=authoritative_envelope,
         )
+        snapshot["media_capabilities"] = self.media_capabilities()
+        snapshot["capability_matrix"] = self.capability_matrix()
+        return snapshot
     def resolve_authoritative_runtime_envelope(self) -> dict[str, Any]:
         """Return the canonical runtime-owned authoritative envelope for read consumers."""
         with self._lock:
@@ -266,9 +280,16 @@ class ApiBridgeBackend(QObject, BackendBase):
 
     def resolve_control_authority(self) -> dict[str, Any]:
         """Return the canonical control-authority snapshot for read consumers."""
-        envelope = self.resolve_authoritative_runtime_envelope()
-        return dict(envelope.get("control_authority", {}))
-
+        return dict(self.resolve_authoritative_runtime_envelope().get("control_authority", {}))
+    def acquire_control_lease(self, *, force: bool = False) -> dict[str, Any]:
+        """Acquire a runtime-owned control lease through the API bridge."""
+        return dict(self._lease_service.acquire_control_lease(force=force))
+    def renew_control_lease(self, *, ttl_s: int | None = None) -> dict[str, Any]:
+        """Renew the currently cached runtime-owned control lease."""
+        return dict(self._lease_service.renew_control_lease(ttl_s=ttl_s))
+    def release_control_lease(self, *, reason: str = "") -> dict[str, Any]:
+        """Release the currently cached runtime-owned control lease."""
+        return dict(self._lease_service.release_control_lease(reason=reason))
     def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict[str, Any]:
         """Resolve the authoritative runtime final verdict through the canonical backend API."""
         return self._verdict_service.resolve_final_verdict(plan, config, read_only=read_only)

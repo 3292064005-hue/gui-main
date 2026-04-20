@@ -1,0 +1,27 @@
+{
+  "bundle_id": "frame_anatomy_keypoint_preweight:frame_anatomy_keypoint_preweight",
+  "bundle_version": "v1",
+  "package_name": "frame_anatomy_keypoint_preweight",
+  "runtime_profile": "clinical_mainline",
+  "artifacts": {
+    "weights_path": "parameters.json",
+    "entrypoint": "spine_ultrasound_ui.training.runtime_adapters.frame_anatomy_keypoint_preweight",
+    "parameter_path": "parameters.json",
+    "meta_path": "model_meta.json"
+  },
+  "compatibility": {
+    "robot_models": [
+      "xmate3",
+      "xmate7",
+      "xmateer3pro",
+      "xmateer7pro"
+    ],
+    "runtime_modes": [
+      "core",
+      "headless_review"
+    ]
+  },
+  "preprocess": {},
+  "postprocess": {},
+  "metrics": {}
+}

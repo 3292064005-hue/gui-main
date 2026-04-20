@@ -174,11 +174,11 @@ class SessionResumeService:
             base.append({'command': 'seek_contact', 'required_contact_state': required_contact_state})
         if mode == 'patch_before_resume' and patch_candidate_windows:
             base.append({'command': 'load_scan_plan', 'payload_hint': {'patch_window_count': len(patch_candidate_windows)}, 'required_plan_hash': plan_hash})
-            base.append({'command': 'start_scan', 'payload_hint': {'resume_from_segment': cursor.get('segment_id', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
+            base.append({'command': 'start_procedure', 'payload_hint': {'procedure': 'scan', 'resume_from_segment': cursor.get('segment_id', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
         elif mode == 'exact_waypoint_resume':
             base.append({'command': 'resume_scan', 'required_state': 'PAUSED_HOLD', 'payload_hint': {'segment_id': cursor.get('segment_id', 0), 'waypoint_index': cursor.get('waypoint_index', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
         elif mode == 'segment_restart':
-            base.append({'command': 'start_scan', 'payload_hint': {'segment_id': cursor.get('segment_id', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
+            base.append({'command': 'start_procedure', 'payload_hint': {'procedure': 'scan', 'segment_id': cursor.get('segment_id', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
         elif mode == 'reacquire_contact_then_resume':
             base.append({'command': 'resume_scan', 'required_state': 'PAUSED_HOLD', 'payload_hint': {'segment_id': cursor.get('segment_id', 0)}, 'required_contact_state': 'CONTACT_STABLE'})
         return base

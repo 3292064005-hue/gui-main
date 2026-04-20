@@ -1,11 +1,74 @@
 #include "robot_core/sdk_robot_facade_internal.h"
 
 #include <sstream>
+#include <cstdlib>
 #include <stdexcept>
+#include <algorithm>
+#include <cmath>
 
 namespace robot_core {
 
 using namespace sdk_robot_facade_internal;
+
+
+namespace {
+
+bool rtDeploymentShellWritesForbidden() {
+  const char* profile = std::getenv("SPINE_DEPLOYMENT_PROFILE");
+  const std::string profile_name = profile != nullptr ? std::string(profile) : std::string();
+  if (profile_name == "research" || profile_name == "clinical") return true;
+  const char* strict = std::getenv("SPINE_STRICT_CONTROL_AUTHORITY");
+  if (strict == nullptr) return false;
+  const std::string value(strict);
+  return value == "1" || value == "true" || value == "TRUE" || value == "on" || value == "ON";
+}
+
+}  // namespace
+
+namespace {
+
+double rtScanWaypointDistanceM(const ScanWaypoint& a, const ScanWaypoint& b) {
+  const double dx = b.x - a.x;
+  const double dy = b.y - a.y;
+  const double dz = b.z - a.z;
+  return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+std::array<double, 16> scanWaypointToPose(const ScanWaypoint& waypoint) {
+  return postureVectorToMatrix({waypoint.x, waypoint.y, waypoint.z, waypoint.rx, waypoint.ry, waypoint.rz});
+}
+
+std::vector<double> rtBuildCumulativeLengthsM(const std::vector<ScanWaypoint>& waypoints) {
+  std::vector<double> cumulative;
+  cumulative.reserve(waypoints.size());
+  double total = 0.0;
+  cumulative.push_back(0.0);
+  for (std::size_t idx = 1; idx < waypoints.size(); ++idx) {
+    total += std::max(0.0, rtScanWaypointDistanceM(waypoints[idx - 1], waypoints[idx]));
+    cumulative.push_back(total);
+  }
+  return cumulative;
+}
+
+std::array<double, 16> interpolatePoseOnSegment(const std::vector<ScanWaypoint>& waypoints, const std::vector<double>& cumulative_lengths_m, double progress_m) {
+  if (waypoints.empty()) return identityPoseMatrix();
+  if (waypoints.size() == 1 || cumulative_lengths_m.empty()) return scanWaypointToPose(waypoints.front());
+  const double total = cumulative_lengths_m.back();
+  const double clamped = std::clamp(progress_m, 0.0, total);
+  std::size_t upper = 1;
+  while (upper < cumulative_lengths_m.size() && cumulative_lengths_m[upper] < clamped) ++upper;
+  if (upper >= waypoints.size()) return scanWaypointToPose(waypoints.back());
+  const std::size_t lower = upper - 1;
+  const double span = std::max(1e-9, cumulative_lengths_m[upper] - cumulative_lengths_m[lower]);
+  const double alpha = std::clamp((clamped - cumulative_lengths_m[lower]) / span, 0.0, 1.0);
+  auto a = scanWaypointToPose(waypoints[lower]);
+  auto b = scanWaypointToPose(waypoints[upper]);
+  std::array<double, 16> out{};
+  for (std::size_t i = 0; i < out.size(); ++i) out[i] = a[i] + (b[i] - a[i]) * alpha;
+  return out;
+}
+
+}  // namespace
 
 class RtControlAdapter {
 public:
@@ -19,9 +82,9 @@ public:
       if (reason != nullptr) *reason = "controller_not_connected";
       return false;
     }
-    if (!owner_.liveBindingEstablished() && !owner_.runtimeConfig().allow_contract_shell_writes) {
+    if (!owner_.liveBindingEstablished() && (!owner_.runtimeConfig().allow_contract_shell_writes || rtDeploymentShellWritesForbidden())) {
       live_ok = false;
-      local_reason = "live_binding_required";
+      local_reason = rtDeploymentShellWritesForbidden() ? "deployment_profile_forbids_contract_shell_write" : "live_binding_required";
       if (reason != nullptr) *reason = local_reason;
     }
 #ifdef ROBOT_CORE_WITH_XCORE_SDK
@@ -57,134 +120,6 @@ public:
 private:
   SdkRobotFacade& owner_;
 };
-
-std::array<double, 16> SdkRobotFacade::defaultPoseMatrix() {
-  return identityPoseMatrix();
-}
-
-double SdkRobotFacade::measuredNormalForce(const RtObservedState& state) const {
-  return normal_force_estimator_.lastEstimate().estimated_force_n;
-}
-
-void SdkRobotFacade::configureContactControllersFromRuntimeConfig() {
-  contact_control_contract_ = buildContactControlContract(rt_config_);
-  normal_force_estimator_.configure(contact_control_contract_.force_estimator);
-  normal_admittance_controller_.configure(contact_control_contract_.seek_contact_admittance);
-  tangential_scan_controller_.configure(contact_control_contract_.tangential_scan);
-  orientation_trim_controller_.configure(contact_control_contract_.orientation_trim);
-  rt_config_.contact_control.mode = "normal_axis_admittance";
-  rt_config_.contact_control.virtual_mass = contact_control_contract_.seek_contact_admittance.virtual_mass;
-  rt_config_.contact_control.virtual_damping = contact_control_contract_.seek_contact_admittance.virtual_damping;
-  rt_config_.contact_control.virtual_stiffness = contact_control_contract_.seek_contact_admittance.virtual_stiffness;
-  rt_config_.contact_control.force_deadband_n = contact_control_contract_.seek_contact_admittance.force_deadband_n;
-  rt_config_.contact_control.max_normal_step_mm = contact_control_contract_.seek_contact_admittance.max_step_mm;
-  rt_config_.contact_control.max_normal_velocity_mm_s = contact_control_contract_.seek_contact_admittance.max_velocity_mm_s;
-  rt_config_.contact_control.max_normal_acc_mm_s2 = contact_control_contract_.seek_contact_admittance.max_acceleration_mm_s2;
-  rt_config_.contact_control.max_normal_travel_mm = contact_control_contract_.seek_contact_admittance.max_displacement_mm;
-  rt_config_.contact_control.anti_windup_limit_n = contact_control_contract_.seek_contact_admittance.integrator_limit_n;
-  rt_config_.contact_control.integrator_leak = contact_control_contract_.pause_hold_admittance.integrator_leak;
-  rt_config_.force_estimator.preferred_source = contact_control_contract_.force_estimator.preferred_source;
-  rt_config_.force_estimator.pressure_weight = contact_control_contract_.force_estimator.pressure_weight;
-  rt_config_.force_estimator.wrench_weight = contact_control_contract_.force_estimator.wrench_weight;
-  rt_config_.force_estimator.stale_timeout_ms = static_cast<int>(contact_control_contract_.force_estimator.stale_timeout_ms);
-  rt_config_.force_estimator.timeout_ms = static_cast<int>(contact_control_contract_.force_estimator.timeout_ms);
-  rt_config_.force_estimator.auto_bias_zero = contact_control_contract_.force_estimator.auto_bias_zero;
-  rt_config_.force_estimator.min_confidence = contact_control_contract_.force_estimator.min_confidence;
-  rt_config_.orientation_trim.gain = contact_control_contract_.orientation_trim.gain;
-  rt_config_.orientation_trim.max_trim_deg = contact_control_contract_.orientation_trim.max_trim_deg;
-  rt_config_.orientation_trim.lowpass_hz = contact_control_contract_.orientation_trim.lowpass_hz;
-}
-
-double SdkRobotFacade::measuredNormalVelocity(const RtObservedState& state) const {
-  return state.normal_axis_velocity_m_s;
-}
-
-void SdkRobotFacade::clampCommandPose(std::array<double, 16>& pose, const std::array<double, 16>& anchor) {
-  const double dt = 1.0 / std::max(1, nominal_rt_loop_hz_);
-  const double max_step_m = mmToM(std::max(0.01, rt_phase_contract_.common.max_cart_step_mm));
-  const double max_vel_m_s = mmToM(std::max(0.01, rt_phase_contract_.common.max_cart_vel_mm_s));
-  const double max_acc_m_s2 = mmToM(std::max(1.0, rt_phase_contract_.common.max_cart_acc_mm_s2));
-  const double prev_vel_m_s = rt_phase_loop_state_.last_command_step_m > 0.0 ? (rt_phase_loop_state_.last_command_step_m / dt) : 0.0;
-  const double accel_limited_vel_m_s = std::min(max_vel_m_s, prev_vel_m_s + max_acc_m_s2 * dt);
-  const double allowed_m = std::min(max_step_m, std::max(mmToM(0.01), accel_limited_vel_m_s * dt));
-  double max_applied_delta_m = 0.0;
-  for (const auto idx : kTranslationIndices) {
-    const double delta = pose[idx] - anchor[idx];
-    if (!std::isfinite(delta)) {
-      pose[idx] = anchor[idx];
-      continue;
-    }
-    const double clamped = clampSigned(delta, allowed_m);
-    pose[idx] = anchor[idx] + clamped;
-    max_applied_delta_m = std::max(max_applied_delta_m, std::abs(clamped));
-  }
-  rt_phase_loop_state_.last_command_step_m = max_applied_delta_m;
-}
-
-void SdkRobotFacade::clampPoseTrim(std::array<double, 16>& pose, const std::array<double, 16>& anchor) const {
-  (void)anchor;
-  for (auto& item : pose) {
-    if (!std::isfinite(item)) item = 0.0;
-  }
-  pose[15] = 1.0;
-}
-
-void SdkRobotFacade::applyLocalPitchTrim(std::array<double, 16>& pose, const std::array<double, 16>& anchor, double trim_rad) const {
-  const double c = std::cos(trim_rad);
-  const double s = std::sin(trim_rad);
-  pose = anchor;
-  pose[0] = anchor[0] * c - anchor[2] * s;
-  pose[1] = anchor[1];
-  pose[2] = anchor[0] * s + anchor[2] * c;
-  pose[4] = anchor[4] * c - anchor[6] * s;
-  pose[5] = anchor[5];
-  pose[6] = anchor[4] * s + anchor[6] * c;
-  pose[8] = anchor[8] * c - anchor[10] * s;
-  pose[9] = anchor[9];
-  pose[10] = anchor[8] * s + anchor[10] * c;
-  pose[3] = anchor[3];
-  pose[7] = anchor[7];
-  pose[11] = anchor[11];
-  pose[12] = 0.0; pose[13] = 0.0; pose[14] = 0.0; pose[15] = 1.0;
-}
-
-void SdkRobotFacade::resetRtPhaseIntegrators() {
-  rt_phase_loop_state_ = {};
-  rt_phase_loop_state_.contact_axis_index = translationIndexForAxis(2);
-  rt_phase_loop_state_.scan_axis_index = translationIndexForAxis(0);
-  rt_phase_loop_state_.lateral_axis_index = translationIndexForAxis(1);
-  rt_phase_loop_state_.contact_direction_sign = (rt_config_.desired_wrench_n[2] < 0.0) ? -1.0 : 1.0;
-  normal_force_estimator_.reset();
-  normal_admittance_controller_.reset();
-  tangential_scan_controller_.reset();
-  orientation_trim_controller_.reset();
-  last_phase_telemetry_ = {};
-}
-
-void SdkRobotFacade::setRtPhaseControlContract(const RtPhaseControlContract& contract) {
-  rt_phase_contract_ = contract;
-  configureContactControllersFromRuntimeConfig();
-}
-
-bool SdkRobotFacade::validateRtControlContract(std::string* reason) const {
-  if (rt_phase_contract_.common.max_cart_step_mm <= 0.0 ||
-      rt_phase_contract_.common.max_cart_vel_mm_s <= 0.0 ||
-      rt_phase_contract_.common.max_cart_acc_mm_s2 <= 0.0 ||
-      rt_phase_contract_.common.max_pose_trim_deg <= 0.0 ||
-      rt_phase_contract_.common.stale_state_timeout_ms <= 0.0 ||
-      rt_phase_contract_.seek_contact.establish_cycles < 1 ||
-      rt_phase_contract_.scan_follow.tangent_speed_min_mm_s <= 0.0 ||
-      rt_phase_contract_.scan_follow.tangent_speed_max_mm_s < rt_phase_contract_.scan_follow.tangent_speed_min_mm_s ||
-      rt_phase_contract_.controlled_retract.release_cycles < 1 ||
-      rt_phase_contract_.controlled_retract.timeout_ms <= 0.0 ||
-      rt_phase_contract_.controlled_retract.release_force_n > rt_phase_contract_.seek_contact.force_target_n) {
-    if (reason != nullptr) {
-      *reason = "invalid_rt_phase_control_contract";
-    }
-    return false;
-  }
-  return validateContactControlContract(contact_control_contract_, reason);
-}
 
 bool SdkRobotFacade::populateObservedState(RtObservedState& out, std::string* reason) {
   out = {};
@@ -256,8 +191,13 @@ RtPhaseStepResult SdkRobotFacade::stepSeekContact(const RtObservedState& state) 
   }
   auto& loop = rt_phase_loop_state_;
   if (!loop.anchor_initialized) {
-    loop.anchor_pose = state.tcp_pose;
-    loop.hold_reference_pose = state.tcp_pose;
+    if (planned_segment_.configured && !planned_segment_.waypoints.empty()) {
+      loop.anchor_pose = scanWaypointToPose(planned_segment_.waypoints.front());
+      loop.hold_reference_pose = loop.anchor_pose;
+    } else {
+      loop.anchor_pose = state.tcp_pose;
+      loop.hold_reference_pose = state.tcp_pose;
+    }
     loop.anchor_initialized = true;
   }
   const double dt = 1.0 / std::max(1, nominal_rt_loop_hz_);
@@ -324,8 +264,13 @@ RtPhaseStepResult SdkRobotFacade::stepScanFollow(const RtObservedState& state) {
   }
   auto& loop = rt_phase_loop_state_;
   if (!loop.anchor_initialized) {
-    loop.anchor_pose = state.tcp_pose;
-    loop.hold_reference_pose = state.tcp_pose;
+    if (planned_segment_.configured && !planned_segment_.waypoints.empty()) {
+      loop.anchor_pose = scanWaypointToPose(planned_segment_.waypoints.front());
+      loop.hold_reference_pose = loop.anchor_pose;
+    } else {
+      loop.anchor_pose = state.tcp_pose;
+      loop.hold_reference_pose = state.tcp_pose;
+    }
     loop.anchor_initialized = true;
   }
   const double dt = 1.0 / std::max(1, nominal_rt_loop_hz_);
@@ -353,29 +298,40 @@ RtPhaseStepResult SdkRobotFacade::stepScanFollow(const RtObservedState& state) {
   const auto tangent = tangential_scan_controller_.advance(rt_config_.scan_speed_mm_s, dt);
   const auto trim = orientation_trim_controller_.step(normal.state.force_error_n / std::max(0.1, rt_phase_contract_.common.max_force_error_n), dt);
   loop.scan_progress_m = tangent.progress_m;
-  result.command_pose = loop.anchor_pose;
-  result.command_pose[loop.scan_axis_index] = loop.anchor_pose[loop.scan_axis_index] + tangent.progress_m;
-  result.command_pose[loop.contact_axis_index] = loop.anchor_pose[loop.contact_axis_index] + loop.contact_direction_sign * normal.state.x_m;
-  result.command_pose[loop.lateral_axis_index] = loop.anchor_pose[loop.lateral_axis_index] + tangent.lateral_offset_m;
+  const bool plan_driven = planned_segment_.configured && !planned_segment_.waypoints.empty();
+  if (plan_driven) {
+    const double segment_length_m = std::max(planned_segment_.total_length_m, mmToM(std::max(0.5, rt_config_.sample_step_mm)) * std::max<std::size_t>(1, planned_segment_.waypoints.size() - 1));
+    const double clamped_progress_m = std::clamp(tangent.progress_m, 0.0, segment_length_m);
+    result.command_pose = interpolatePoseOnSegment(planned_segment_.waypoints, planned_segment_.cumulative_lengths_m, clamped_progress_m);
+    result.command_pose[loop.contact_axis_index] += loop.contact_direction_sign * normal.state.x_m;
+    result.telemetry.tangent_progress_m = clamped_progress_m;
+    if (clamped_progress_m >= segment_length_m - 1e-6) {
+      result.finished = true;
+      result.verdict = RtPhaseVerdict::PhaseCompleted;
+    }
+  } else {
+    result.command_pose = loop.anchor_pose;
+    result.command_pose[loop.scan_axis_index] = loop.anchor_pose[loop.scan_axis_index] + tangent.progress_m;
+    result.command_pose[loop.contact_axis_index] = loop.anchor_pose[loop.contact_axis_index] + loop.contact_direction_sign * normal.state.x_m;
+    result.command_pose[loop.lateral_axis_index] = loop.anchor_pose[loop.lateral_axis_index] + tangent.lateral_offset_m;
+    result.telemetry.tangent_progress_m = tangent.progress_m;
+    if (tangent.saturated || tangent.progress_m >= mmToM(rt_phase_contract_.scan_follow.max_travel_mm)) {
+      result.finished = true;
+      result.verdict = RtPhaseVerdict::PhaseCompleted;
+    }
+  }
   const auto trim_anchor_pose = result.command_pose;
   applyLocalPitchTrim(result.command_pose, trim_anchor_pose, trim.trim_rad);
   result.telemetry.normal_force_error_n = normal.state.force_error_n;
   result.telemetry.estimated_normal_force_n = estimate.estimated_force_n;
   result.telemetry.normal_force_confidence = estimate.confidence;
   result.telemetry.normal_force_source = estimate.source;
-  result.telemetry.tangent_progress_m = tangent.progress_m;
   result.telemetry.pose_trim_rad = trim.trim_rad;
   result.telemetry.orientation_trim_saturated = trim.saturated;
   result.telemetry.admittance_displacement_m = normal.state.x_m;
   result.telemetry.admittance_velocity_m_s = normal.state.v_m_s;
   result.telemetry.admittance_saturated = normal.state.saturated;
-  if (tangent.saturated || tangent.progress_m >= mmToM(rt_phase_contract_.scan_follow.max_travel_mm)) {
-    result.finished = true;
-    result.verdict = RtPhaseVerdict::PhaseCompleted;
-    last_phase_telemetry_ = result.telemetry;
-    return result;
-  }
-  if (std::abs(normal.state.force_error_n) > rt_phase_contract_.common.max_force_error_n || normal.state.saturated) {
+  if (result.verdict == RtPhaseVerdict::Continue && (std::abs(normal.state.force_error_n) > rt_phase_contract_.common.max_force_error_n || normal.state.saturated)) {
     result.verdict = RtPhaseVerdict::NeedPauseHold;
   }
   last_phase_telemetry_ = result.telemetry;

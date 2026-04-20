@@ -56,10 +56,44 @@ if rg -n "Windows|PowerShell|api_server_win_mock|requirements-win-dev|ui_fronten
   fail "README.md and docs/ must stay focused on the current mainline payload"
 fi
 
+if ! python3 - <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path('.').resolve()
+flagged = []
+keys = {'runtime_model_path', 'package_dir', 'dataset_manifest', 'output_dir'}
+for path in root.glob('models/**/*.json'):
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    stack = [payload]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if key in keys and isinstance(value, str):
+                    if value.startswith('/tmp/') or value.startswith('/mnt/data/') or (len(value) > 2 and value[1] == ':' and value[2] in ('\\', '/')):
+                        flagged.append(f'{path.relative_to(root)}::{key}={value}')
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(item for item in current if isinstance(item, (dict, list)))
+if flagged:
+    print('portable manifest path check failed:', *flagged, sep='\n', file=sys.stderr)
+    raise SystemExit(1)
+PY
+then
+  fail "portable model package manifests must not capture build-machine absolute paths"
+fi
+
+
 echo "repo hygiene: OK"
 
-if [ ! -f "${REPO_ROOT}/docs/CANONICAL_MODULE_REGISTRY.md" ]; then
-  fail "docs/CANONICAL_MODULE_REGISTRY.md must exist"
+if [ ! -f "${REPO_ROOT}/docs/07_repo_governance/CANONICAL_MODULES_AND_DEPENDENCIES.md" ]; then
+  fail "docs/07_repo_governance/CANONICAL_MODULES_AND_DEPENDENCIES.md must exist"
 fi
 if [ ! -f "${REPO_ROOT}/.github/CODEOWNERS" ]; then
   fail ".github/CODEOWNERS must exist"

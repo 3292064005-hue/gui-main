@@ -16,6 +16,7 @@ REQUIRED_WORKFLOW_JOBS = [
     'mainline-verification',
     'canonical-import-gate',
     'protocol-sync-gate',
+    'runtime-config-contract-gate',
     'runtime-core-gate',
     'evidence-gate',
     'mock-e2e',

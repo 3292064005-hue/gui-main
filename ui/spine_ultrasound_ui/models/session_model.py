@@ -248,6 +248,9 @@ class ArtifactDescriptor:
     summary: str = ""
     source_stage: str = ""
     dependencies: List[str] = field(default_factory=list)
+    consumer_domains: List[str] = field(default_factory=list)
+    materialization_state: str = "materialized"
+    evidence_status: str = "present"
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -302,6 +305,8 @@ class SessionManifest:
     safety_thresholds: Dict[str, Any] = field(default_factory=dict)
     device_health_snapshot: Dict[str, Any] = field(default_factory=dict)
     device_readiness: Dict[str, Any] = field(default_factory=dict)
+    repo_truth_ledger: Dict[str, Any] = field(default_factory=dict)
+    live_truth_ledger: Dict[str, Any] = field(default_factory=dict)
     robot_profile: Dict[str, Any] = field(default_factory=dict)
     patient_registration: Dict[str, Any] = field(default_factory=dict)
     localization_readiness: Dict[str, Any] = field(default_factory=dict)

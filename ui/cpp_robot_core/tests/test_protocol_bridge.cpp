@@ -59,6 +59,26 @@ int main() {
     return 1;
   }
 
+  const auto snapshot = runtime.takeTelemetrySnapshot();
+  bool saw_camera = false;
+  bool saw_pressure = false;
+  bool saw_ultrasound = false;
+  for (const auto& device : snapshot.devices) {
+    if (device.device_name == "camera") {
+      saw_camera = true;
+      if (!require(!device.connected && !device.authoritative, "camera must not become connected/authoritative from robot connect alone")) return 1;
+    }
+    if (device.device_name == "pressure") {
+      saw_pressure = true;
+      if (!require(!device.connected, "pressure must not become connected from robot connect alone")) return 1;
+    }
+    if (device.device_name == "ultrasound") {
+      saw_ultrasound = true;
+      if (!require(!device.connected, "ultrasound must not become connected from robot connect alone")) return 1;
+    }
+  }
+  if (!require(saw_camera && saw_pressure && saw_ultrasound, "device roster must include camera/pressure/ultrasound")) return 1;
+
   spine_core::Command bad_version;
   bad_version.set_protocol_version(robot_core::kIpcProtocolVersion + 1);
   bad_version.set_command("connect_robot");

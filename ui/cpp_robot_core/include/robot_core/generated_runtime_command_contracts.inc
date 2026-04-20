@@ -1,49 +1,79 @@
 // Generated from schemas/runtime_command_manifest.json via runtime_command_contracts.py. Do not edit manually.
 
+      {"acquire_control_lease", RuntimeCommandRequestContract{"acquire_control_lease", {
+          {"actor_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"intent_reason", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"lease_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"preempt", false, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
+          {"preempt_reason", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"profile", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"requested_claims", false, RuntimeContractFieldType::Array, "", RuntimeContractFieldType::Any, ""},
+          {"role", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"session_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"source", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"ttl_s", false, RuntimeContractFieldType::Integer, "", RuntimeContractFieldType::Any, ""},
+          {"workspace", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
+        }}, RuntimeCommandResponseContract{"acquire_control_lease", "control_authority", "summary_state|detail|lease", {
+          {"summary_state", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"detail", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"lease", true, RuntimeContractFieldType::Object, "lease_id|actor_id|workspace|role", RuntimeContractFieldType::Any, ""},
+          {"control_authority", false, RuntimeContractFieldType::Object, "summary_state|detail", RuntimeContractFieldType::Any, ""}
+        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"acquire_control_lease", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"acquire_control_lease", "acquire_control_lease", "handleSessionCommand"}},
       {"approach_prescan", RuntimeCommandRequestContract{"approach_prescan", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"approach_prescan", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"approach_prescan", "PATH_VALIDATED", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"approach_prescan", "approach_prescan", "handleExecutionCommand"}},
       {"cancel_record_path", RuntimeCommandRequestContract{"cancel_record_path", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"cancel_record_path", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"cancel_record_path", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"cancel_record_path", "cancel_record_path", "handleExecutionCommand"}},
       {"clear_fault", RuntimeCommandRequestContract{"clear_fault", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"clear_fault", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"clear_fault", "FAULT", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"clear_fault", "clear_fault", "handleExecutionCommand"}},
       {"clear_injected_faults", RuntimeCommandRequestContract{"clear_injected_faults", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"clear_injected_faults", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"clear_injected_faults", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"clear_injected_faults", "clear_injected_faults", "handleFaultInjectionCommand"}},
       {"compile_scan_plan", RuntimeCommandRequestContract{"compile_scan_plan", {
           {"config_snapshot", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
           {"scan_plan", true, RuntimeContractFieldType::Object, "plan_id|segments|plan_hash", RuntimeContractFieldType::Any, ""},
-          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"compile_scan_plan", "final_verdict", "final_verdict", {
           {"final_verdict", true, RuntimeContractFieldType::Object, "accepted|authoritative|reason", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"compile_scan_plan", "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"compile_scan_plan", "validate_scan_plan", "handleValidationCommand"}},
       {"connect_robot", RuntimeCommandRequestContract{"connect_robot", {
           {"local_ip", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"remote_ip", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"remote_ip", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"connect_robot", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"connect_robot", "BOOT|DISCONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"connect_robot", "connect_robot", "handleConnectionCommand"}},
       {"disable_drag", RuntimeCommandRequestContract{"disable_drag", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"disable_drag", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"disable_drag", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"disable_drag", "disable_drag", "handleExecutionCommand"}},
       {"disconnect_robot", RuntimeCommandRequestContract{"disconnect_robot", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"disconnect_robot", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"disconnect_robot", "BOOT|DISCONNECTED|CONNECTED|POWERED|AUTO_READY|FAULT|ESTOP", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"disconnect_robot", "disconnect_robot", "handleConnectionCommand"}},
       {"emergency_stop", RuntimeCommandRequestContract{"emergency_stop", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"emergency_stop", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"emergency_stop", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"emergency_stop", "emergency_stop", "handleExecutionCommand"}},
       {"enable_drag", RuntimeCommandRequestContract{"enable_drag", {
           {"space", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"type", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"type", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"enable_drag", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"enable_drag", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"enable_drag", "enable_drag", "handleExecutionCommand"}},
@@ -169,10 +199,12 @@
           {"detail", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"get_safety_recovery_contract", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"get_safety_recovery_contract", "get_safety_recovery_contract", "handleQueryCommand"}},
       {"get_sdk_runtime_config", RuntimeCommandRequestContract{"get_sdk_runtime_config", {
-        }}, RuntimeCommandResponseContract{"get_sdk_runtime_config", "sdk_runtime_config", "remote_ip|local_ip|rt_mode|rt_phase_contract", {
+        }}, RuntimeCommandResponseContract{"get_sdk_runtime_config", "sdk_runtime_config", "remote_ip|local_ip|rt_mode|runtime_config_contract_digest|runtime_config_schema_version|rt_phase_contract", {
           {"remote_ip", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
           {"local_ip", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
           {"rt_mode", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"runtime_config_contract_digest", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"runtime_config_schema_version", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
           {"rt_phase_contract", true, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"get_sdk_runtime_config", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"get_sdk_runtime_config", "get_sdk_runtime_config", "handleQueryCommand"}},
       {"get_session_drift_contract", RuntimeCommandRequestContract{"get_session_drift_contract", {
@@ -181,10 +213,19 @@
           {"detail", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"get_session_drift_contract", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"get_session_drift_contract", "get_session_drift_contract", "handleQueryCommand"}},
       {"get_session_freeze", RuntimeCommandRequestContract{"get_session_freeze", {
-        }}, RuntimeCommandResponseContract{"get_session_freeze", "session_freeze", "session_locked|session_id|plan_hash", {
+        }}, RuntimeCommandResponseContract{"get_session_freeze", "session_freeze", "session_locked|session_id|plan_hash|freeze_consistent|strict_runtime_freeze_gate", {
           {"session_locked", true, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
           {"session_id", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"plan_hash", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"plan_hash", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"freeze_consistent", true, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
+          {"strict_runtime_freeze_gate", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"session_freeze_policy", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"frozen_execution_critical_fields", false, RuntimeContractFieldType::Array, "", RuntimeContractFieldType::String, ""},
+          {"frozen_evidence_only_fields", false, RuntimeContractFieldType::Array, "", RuntimeContractFieldType::String, ""},
+          {"recheck_on_start_procedure", false, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
+          {"live_binding_established", false, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
+          {"control_source_exclusive", false, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""},
+          {"network_healthy", false, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"get_session_freeze", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"get_session_freeze", "get_session_freeze", "handleQueryCommand"}},
       {"get_vendor_boundary_contract", RuntimeCommandRequestContract{"get_vendor_boundary_contract", {
         }}, RuntimeCommandResponseContract{"get_vendor_boundary_contract", "vendor_boundary_contract", "summary_state|detail", {
@@ -198,42 +239,58 @@
           {"dynamics_ready", true, RuntimeContractFieldType::Boolean, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"get_xmate_model_summary", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"get_xmate_model_summary", "get_xmate_model_summary", "handleQueryCommand"}},
       {"go_home", RuntimeCommandRequestContract{"go_home", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"go_home", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"go_home", "CONNECTED|POWERED|AUTO_READY|PATH_VALIDATED|SCAN_COMPLETE|SEGMENT_ABORTED|PLAN_ABORTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"go_home", "go_home", "handleExecutionCommand"}},
       {"inject_fault", RuntimeCommandRequestContract{"inject_fault", {
-          {"fault_name", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"fault_name", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"inject_fault", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"inject_fault", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"inject_fault", "inject_fault", "handleFaultInjectionCommand"}},
       {"load_scan_plan", RuntimeCommandRequestContract{"load_scan_plan", {
           {"scan_plan", true, RuntimeContractFieldType::Object, "plan_id|segments", RuntimeContractFieldType::Any, ""},
-          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"load_scan_plan", "session_command_ack", "session_command_ack", {
           {"session_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"load_scan_plan", "SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"load_scan_plan", "load_scan_plan", "handleSessionCommand"}},
       {"lock_session", RuntimeCommandRequestContract{"lock_session", {
+          {"build_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
           {"config_snapshot", true, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
+          {"device_health_snapshot", true, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
           {"device_roster", true, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
+          {"force_sensor_provider", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"protocol_version", false, RuntimeContractFieldType::Integer, "", RuntimeContractFieldType::Any, ""},
+          {"safety_thresholds", true, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
           {"scan_plan_hash", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
           {"session_dir", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"session_id", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"session_freeze_policy", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
+          {"session_id", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"software_version", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"strict_runtime_freeze_gate", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"lock_session", "session_command_ack", "session_command_ack", {
           {"session_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"lock_session", "AUTO_READY", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"lock_session", "lock_session", "handleSessionCommand"}},
       {"pause_rl_project", RuntimeCommandRequestContract{"pause_rl_project", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"pause_rl_project", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"pause_rl_project", "AUTO_READY|SCANNING|PAUSED_HOLD|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"pause_rl_project", "pause_rl_project", "handleExecutionCommand"}},
       {"pause_scan", RuntimeCommandRequestContract{"pause_scan", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"pause_scan", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"pause_scan", "SCANNING", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"pause_scan", "pause_scan", "handleExecutionCommand"}},
       {"power_off", RuntimeCommandRequestContract{"power_off", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"power_off", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"power_off", "CONNECTED|POWERED|AUTO_READY|SESSION_LOCKED|PATH_VALIDATED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"power_off", "power_off", "handlePowerModeCommand"}},
       {"power_on", RuntimeCommandRequestContract{"power_on", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"power_on", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"power_on", "CONNECTED|POWERED|AUTO_READY", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"power_on", "power_on", "handlePowerModeCommand"}},
@@ -255,65 +312,105 @@
           {"projects", true, RuntimeContractFieldType::Array, "", RuntimeContractFieldType::Object, "name|tasks"},
           {"status", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"query_rl_projects", "*", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"query_rl_projects", "query_rl_projects", "handleQueryCommand"}},
+      {"release_control_lease", RuntimeCommandRequestContract{"release_control_lease", {
+          {"actor_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"lease_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"reason", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
+        }}, RuntimeCommandResponseContract{"release_control_lease", "control_authority", "summary_state|detail", {
+          {"summary_state", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"detail", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"control_authority", false, RuntimeContractFieldType::Object, "summary_state|detail", RuntimeContractFieldType::Any, ""}
+        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"release_control_lease", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"release_control_lease", "release_control_lease", "handleSessionCommand"}},
+      {"renew_control_lease", RuntimeCommandRequestContract{"renew_control_lease", {
+          {"actor_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"lease_id", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"ttl_s", false, RuntimeContractFieldType::Integer, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
+        }}, RuntimeCommandResponseContract{"renew_control_lease", "control_authority", "summary_state|detail|lease", {
+          {"summary_state", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"detail", true, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"lease", true, RuntimeContractFieldType::Object, "lease_id|actor_id|workspace|role", RuntimeContractFieldType::Any, ""},
+          {"control_authority", false, RuntimeContractFieldType::Object, "summary_state|detail", RuntimeContractFieldType::Any, ""}
+        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"renew_control_lease", "*", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"renew_control_lease", "renew_control_lease", "handleSessionCommand"}},
       {"replay_path", RuntimeCommandRequestContract{"replay_path", {
           {"name", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"rate", false, RuntimeContractFieldType::Double, "", RuntimeContractFieldType::Any, ""}
+          {"rate", false, RuntimeContractFieldType::Double, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"replay_path", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"replay_path", "AUTO_READY|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"replay_path", "replay_path", "handleExecutionCommand"}},
       {"resume_scan", RuntimeCommandRequestContract{"resume_scan", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"resume_scan", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"resume_scan", "PAUSED_HOLD", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"resume_scan", "resume_scan", "handleExecutionCommand"}},
       {"run_rl_project", RuntimeCommandRequestContract{"run_rl_project", {
           {"project", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"task", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"task", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"run_rl_project", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"run_rl_project", "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"run_rl_project", "run_rl_project", "handleExecutionCommand"}},
       {"safe_retreat", RuntimeCommandRequestContract{"safe_retreat", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"safe_retreat", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"safe_retreat", "PATH_VALIDATED|APPROACHING|CONTACT_SEEKING|CONTACT_STABLE|SCANNING|PAUSED_HOLD|RECOVERY_RETRACT|FAULT", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"safe_retreat", "safe_retreat", "handleExecutionCommand"}},
       {"save_record_path", RuntimeCommandRequestContract{"save_record_path", {
           {"name", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
-          {"save_as", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"save_as", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"save_record_path", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"save_record_path", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"save_record_path", "save_record_path", "handleExecutionCommand"}},
       {"seek_contact", RuntimeCommandRequestContract{"seek_contact", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"seek_contact", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"seek_contact", "PATH_VALIDATED|APPROACHING|PAUSED_HOLD|RECOVERY_RETRACT", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"seek_contact", "seek_contact", "handleExecutionCommand"}},
       {"set_auto_mode", RuntimeCommandRequestContract{"set_auto_mode", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"set_auto_mode", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"set_auto_mode", "POWERED|AUTO_READY", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"set_auto_mode", "set_auto_mode", "handlePowerModeCommand"}},
       {"set_manual_mode", RuntimeCommandRequestContract{"set_manual_mode", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"set_manual_mode", "command_ack", "command_ack", {
           {"command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"set_manual_mode", "CONNECTED|POWERED|AUTO_READY", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"set_manual_mode", "set_manual_mode", "handlePowerModeCommand"}},
+      {"start_procedure", RuntimeCommandRequestContract{"start_procedure", {
+          {"procedure", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
+        }}, RuntimeCommandResponseContract{"start_procedure", "rt_command_ack", "rt_command_ack", {
+          {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
+        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"start_procedure", "PATH_VALIDATED|CONTACT_STABLE|PAUSED_HOLD", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"start_procedure", "start_procedure", "handleExecutionCommand"}},
       {"start_record_path", RuntimeCommandRequestContract{"start_record_path", {
-          {"duration_s", false, RuntimeContractFieldType::Integer, "", RuntimeContractFieldType::Any, ""}
+          {"duration_s", false, RuntimeContractFieldType::Integer, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"start_record_path", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"start_record_path", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"start_record_path", "start_record_path", "handleExecutionCommand"}},
       {"start_scan", RuntimeCommandRequestContract{"start_scan", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"start_scan", "rt_command_ack", "rt_command_ack", {
           {"rt_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
-        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"start_scan", "CONTACT_STABLE|PAUSED_HOLD", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"start_scan", "start_scan", "handleExecutionCommand"}},
+        }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"start_scan", "PATH_VALIDATED|CONTACT_STABLE|PAUSED_HOLD", CommandRuntimeLane::RtControl}, RuntimeCommandDispatchContract{"start_scan", "start_procedure", "handleExecutionCommand"}},
       {"stop_record_path", RuntimeCommandRequestContract{"stop_record_path", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"stop_record_path", "execution_command_ack", "execution_command_ack", {
           {"execution_command_ack", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"stop_record_path", "CONNECTED", CommandRuntimeLane::Command}, RuntimeCommandDispatchContract{"stop_record_path", "stop_record_path", "handleExecutionCommand"}},
       {"validate_scan_plan", RuntimeCommandRequestContract{"validate_scan_plan", {
           {"config_snapshot", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""},
           {"scan_plan", true, RuntimeContractFieldType::Object, "plan_id|segments|plan_hash", RuntimeContractFieldType::Any, ""},
-          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""}
+          {"scan_plan_hash", false, RuntimeContractFieldType::String, "", RuntimeContractFieldType::Any, ""},
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"validate_scan_plan", "final_verdict", "final_verdict", {
           {"final_verdict", true, RuntimeContractFieldType::Object, "accepted|authoritative|reason", RuntimeContractFieldType::Any, ""}
         }, true, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"validate_scan_plan", "AUTO_READY|SESSION_LOCKED|PATH_VALIDATED|SCAN_COMPLETE", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"validate_scan_plan", "validate_scan_plan", "handleValidationCommand"}},
       {"validate_setup", RuntimeCommandRequestContract{"validate_setup", {
+          {"_command_context", false, RuntimeContractFieldType::Object, "", RuntimeContractFieldType::Any, ""}
         }}, RuntimeCommandResponseContract{"validate_setup", "validation_report", "validation_report", {
           {"validation_report", true, RuntimeContractFieldType::Any, "", RuntimeContractFieldType::Any, ""}
         }, false, "ok|message|request_id|data|protocol_version"}, RuntimeCommandGuardContract{"validate_setup", "CONNECTED|POWERED|AUTO_READY|SESSION_LOCKED|PATH_VALIDATED", CommandRuntimeLane::Query}, RuntimeCommandDispatchContract{"validate_setup", "validate_setup", "handleValidationCommand"}},

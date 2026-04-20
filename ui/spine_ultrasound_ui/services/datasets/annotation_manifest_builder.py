@@ -39,6 +39,8 @@ class AnnotationManifestBuilder:
                     if not meta_path.exists():
                         continue
                     meta = json.loads(meta_path.read_text(encoding='utf-8'))
+                    export_manifest_path = session_dir / 'export_manifest.json'
+                    export_manifest = json.loads(export_manifest_path.read_text(encoding='utf-8')) if export_manifest_path.exists() else {}
                     patient_id = str(meta.get('patient_id', patient_dir.name) or patient_dir.name)
                     session_id = str(meta.get('session_id', session_dir.name) or session_dir.name)
                     case_id = f"{patient_id}/{session_id}"
@@ -48,6 +50,9 @@ class AnnotationManifestBuilder:
                         'session_id': session_id,
                         'case_dir': str(session_dir),
                         'dataset_role': str(meta.get('dataset_role', 'unknown') or 'unknown'),
+                        'integrity_state': str(export_manifest.get('integrity_state', 'unknown') or 'unknown'),
+                        'placeholder_artifact_count': int(export_manifest.get('placeholder_artifact_count', 0) or 0),
+                        'artifact_states': dict(export_manifest.get('artifact_states', {})),
                     })
         split = self.build_patient_level_split(cases)
         payload = {

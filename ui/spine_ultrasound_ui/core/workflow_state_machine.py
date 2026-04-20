@@ -29,6 +29,7 @@ class WorkflowStateMachine:
         "run_localization": "执行视觉定位",
         "generate_path": "生成扫查路径",
         "approve_localization_review": "批准视觉引导复核",
+        "start_procedure": "开始扫查",
         "start_scan": "开始扫查",
         "pause_scan": "暂停扫查",
         "resume_scan": "恢复扫查",
@@ -107,6 +108,11 @@ class WorkflowStateMachine:
                 ctx.has_experiment and ctx.localization_review_required and not ctx.localization_review_approved and ready_for_local_ops,
                 ok_reason="当前视觉引导结果需要人工复核，批准后方可冻结/规划。",
                 blocked_reason=self._review_reason(ctx, ready_for_local_ops),
+            ),
+            "start_procedure": self._rule(
+                plan_ready and s in {SystemState.AUTO_READY, SystemState.PATH_VALIDATED, SystemState.SCAN_COMPLETE},
+                ok_reason="路径预览完成，可执行扫查启动链。",
+                blocked_reason=self._start_scan_reason(ctx, plan_ready),
             ),
             "start_scan": self._rule(
                 plan_ready and s in {SystemState.AUTO_READY, SystemState.PATH_VALIDATED, SystemState.SCAN_COMPLETE},

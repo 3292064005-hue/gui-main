@@ -37,6 +37,7 @@ if(VendoredRokaeSdk_FOUND)
     set_target_properties(Rokae::xMateModel PROPERTIES
       IMPORTED_LOCATION "${VendoredRokaeSdk_XMATE_MODEL_LIB}"
       INTERFACE_INCLUDE_DIRECTORIES "${VendoredRokaeSdk_INCLUDE_DIR};${VendoredRokaeSdk_EXTERNAL_DIR}"
+      INTERFACE_COMPILE_DEFINITIONS "XMATEMODEL_LIB_SUPPORTED=1"
     )
   endif()
 
@@ -51,5 +52,8 @@ if(VendoredRokaeSdk_FOUND)
       INTERFACE_INCLUDE_DIRECTORIES "${VendoredRokaeSdk_INCLUDE_DIR};${VendoredRokaeSdk_EXTERNAL_DIR}"
       INTERFACE_LINK_LIBRARIES "${_ROKAE_LINK_LIBS}"
     )
+    if(TARGET Rokae::xMateModel)
+      set_property(TARGET Rokae::xCoreSDK APPEND PROPERTY INTERFACE_COMPILE_DEFINITIONS XMATEMODEL_LIB_SUPPORTED=1)
+    endif()
   endif()
 endif()

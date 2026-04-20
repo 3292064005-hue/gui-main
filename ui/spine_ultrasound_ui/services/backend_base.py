@@ -5,6 +5,8 @@ from typing import Optional
 from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope
 
+from .backend_capability_matrix_service import BackendCapabilityMatrixService
+
 
 class BackendBase:
     def status(self) -> dict:
@@ -66,3 +68,18 @@ class BackendBase:
 
     def get_final_verdict(self, plan=None, config: Optional[RuntimeConfig] = None) -> dict:
         return self.compile_final_verdict(plan, config)
+
+
+    def capability_matrix(self) -> dict:
+        return BackendCapabilityMatrixService.build({
+            "camera": "hidden",
+            "ultrasound": "hidden",
+            "reconstruction": "hidden",
+            "recording": "hidden",
+        })
+
+    def media_capabilities(self) -> dict:
+        return BackendCapabilityMatrixService.to_media_capabilities(self.capability_matrix())
+
+    def ui_surface_contract(self) -> dict:
+        return BackendCapabilityMatrixService.page_contract(self.capability_matrix())

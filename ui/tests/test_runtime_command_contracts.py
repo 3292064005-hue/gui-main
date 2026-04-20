@@ -179,3 +179,15 @@ def test_rt_quality_observed_fixture_exists_and_contains_loop_samples() -> None:
     assert observed['fixed_period_enforced'] is True
     assert len(observed['loop_samples']) >= 1
     assert all(sample['overrun'] is False for sample in observed['loop_samples'])
+
+
+def test_write_and_plan_compile_commands_expose_command_context_contract() -> None:
+    start_scan = contract_for('start_scan')
+    compile_plan = contract_for('validate_scan_plan')
+    start_scan_fields = {field.name: field for field in start_scan.request_contract.fields}
+    compile_fields = {field.name: field for field in compile_plan.request_contract.fields}
+    assert '_command_context' in start_scan_fields
+    assert start_scan_fields['_command_context'].field_type == 'object'
+    assert '_command_context' in compile_fields
+    assert compile_fields['_command_context'].field_type == 'object'
+

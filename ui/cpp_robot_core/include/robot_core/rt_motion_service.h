@@ -25,6 +25,24 @@ enum class SensorHealthDecision {
   Estop,
 };
 
+enum class RtControlledRetractStatus {
+  NotStarted,
+  StartRejected,
+  Completed,
+  TimedOut,
+};
+
+struct RtControlledRetractResult {
+  RtControlledRetractStatus status{RtControlledRetractStatus::NotStarted};
+  bool phase_started{false};
+  bool phase_completed{false};
+  std::string reason{"not_started"};
+
+  [[nodiscard]] bool canProceedToNrtRetreat() const {
+    return status == RtControlledRetractStatus::Completed && phase_started && phase_completed;
+  }
+};
+
 struct RtLoopContractSnapshot {
   bool loop_active{false};
   bool move_active{false};
@@ -103,7 +121,13 @@ public:
   bool faultRtPhase(const std::string& phase_name, const std::string& reason);
   void stopRtLoop();
   void stop();
-  void controlledRetract();
+  /**
+   * @brief Execute the authoritative RT controlled-retract phase and wait for a terminal result.
+   * @return RtControlledRetractResult Structured result for upper-layer recovery branching.
+   * @throws No exceptions are propagated.
+   * @boundary No NRT fallback is triggered here; callers must decide whether a follow-up NRT retreat is allowed.
+   */
+  RtControlledRetractResult controlledRetract();
   SensorHealthDecision evaluateSensorFreshnessMs(double age_ms) const;
   bool seekContact();
   void pauseAndHold();

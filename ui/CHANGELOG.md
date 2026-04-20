@@ -28,7 +28,7 @@
 - Hardened architecture gates/tests so async alarm persistence and canonical verdict resolution cannot silently regress.
 
 ## Audit closeout: verification-boundary hardening
-- Added `docs/VERIFICATION_BOUNDARY.md` to separate repository proof, profile proof, and live-controller/HIL validation claims.
+- Added `docs/05_verification/VERIFICATION_POLICY.md` to separate repository proof, profile proof, and live-controller/HIL validation claims.
 - Added `scripts/check_verification_boundary.py` and wired it into repository gates so README/docs cannot silently overstate validation scope.
 - Updated `scripts/verify_mainline.sh` to emit phase-scope notes, preventing `VERIFY_PHASE=python` or SDK-off runs from being misreported as HIL / prod / live-controller validation.
 

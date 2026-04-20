@@ -4,6 +4,8 @@ from typing import Final
 
 
 ARTIFACT_SCHEMA_HINTS: Final[dict[str, str]] = {
+    "repo_truth_ledger": "session/repo_truth_ledger_v1.schema.json",
+    "live_truth_ledger": "session/live_truth_ledger_v1.schema.json",
     "summary_json": "summary.schema.json",
     "session_report": "session_report.schema.json",
     "replay_index": "replay_index.schema.json",
@@ -18,6 +20,7 @@ ARTIFACT_SCHEMA_HINTS: Final[dict[str, str]] = {
     "session_trends": "session_trends.schema.json",
     "diagnostics_pack": "diagnostics_pack.schema.json",
     "device_readiness": "device_readiness.schema.json",
+    "scan_plan": "runtime/scan_plan_v1.schema.json",
     "xmate_profile": "xmate_profile.schema.json",
     "patient_registration": "patient_registration.schema.json",
     "localization_readiness": "localization_readiness.schema.json",
@@ -56,6 +59,7 @@ ARTIFACT_SCHEMA_HINTS: Final[dict[str, str]] = {
     "assessment_agreement": "assessment_agreement.schema.json",
     "assessment_summary": "assessment_summary.schema.json",
     "session_integrity": "artifact_registry.schema.json",
+    "artifact_registry_snapshot": "artifact_registry.schema.json",
     "lineage": "session/lineage.schema.json",
     "resume_state": "session/resume_state.schema.json",
     "recovery_report": "session/recovery_report.schema.json",

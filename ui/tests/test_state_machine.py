@@ -28,3 +28,19 @@ def test_permissions_allow_scan_start_from_auto_ready_once_preview_exists():
         )
     )
     assert perms["start_scan"] is True
+
+
+def test_permissions_expose_canonical_start_procedure_alongside_compat_alias():
+    sm = WorkflowStateMachine()
+    perms = sm.permission_matrix(
+        WorkflowContext(
+            core_state=SystemState.AUTO_READY,
+            has_experiment=True,
+            session_locked=False,
+            localization_ready=True,
+            preview_plan_ready=True,
+        )
+    )
+    assert perms["start_procedure"]["enabled"] is True
+    assert perms["start_scan"]["enabled"] is True
+    assert sm.ACTION_LABELS["start_procedure"] == "开始扫查"

@@ -21,15 +21,42 @@ CPP_TEST_TARGETS=(
   test_recovery_manager
   test_recording_service
   test_rt_motion_service_truth
+  test_execution_plan_runtime_truth
+  test_xmate_model_compile_contract
 )
 CPP_BUILD_TARGETS=(spine_robot_core_runtime spine_robot_core "${CPP_TEST_TARGETS[@]}")
-EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-12}"
+EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"
+
+cpp_test_targets_for_profile() {
+  local profile="$1"
+  local targets=("${CPP_TEST_TARGETS[@]}")
+  local with_sdk="${ROBOT_CORE_WITH_XCORE_SDK:-OFF}"
+  local with_model="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"
+  if [[ "$profile" == "mock" || "$with_sdk" != "ON" || "$with_model" != "ON" ]]; then
+    local filtered=()
+    local target
+    for target in "${targets[@]}"; do
+      [[ "$target" == "test_xmate_model_compile_contract" ]] && continue
+      filtered+=("$target")
+    done
+    targets=("${filtered[@]}")
+  fi
+  printf '%s\n' "${targets[@]}"
+}
+
+cpp_build_targets_for_profile() {
+  local profile="$1"
+  local targets=(spine_robot_core_runtime spine_robot_core)
+  while IFS= read -r target; do
+    [[ -n "$target" ]] && targets+=("$target")
+  done < <(cpp_test_targets_for_profile "$profile")
+  printf '%s\n' "${targets[@]}"
+}
 
 count_registered_cpp_tests() {
   local build_dir="$1"
   CTEST_OUTPUT=$(ctest --test-dir "$build_dir" -N 2>/dev/null || true)
-  TEST_TOTAL=$(printf '%s
-' "$CTEST_OUTPUT" | awk '/Total Tests:/ {print $3}' | tail -n 1)
+  TEST_TOTAL=$(printf '%s\n' "$CTEST_OUTPUT" | awk '/Total Tests:/ {print $3}' | tail -n 1)
   if [[ -z "$TEST_TOTAL" ]]; then
     fail "Unable to determine registered C++ test count for $build_dir"
   fi
@@ -62,6 +89,7 @@ section "Repository convergence audit"
 section "Protocol asset alignment"
 "$PYTHON_BIN" scripts/generate_runtime_command_artifacts.py
 "$PYTHON_BIN" scripts/check_protocol_sync.py
+"$PYTHON_BIN" scripts/check_runtime_contract_parity.py
 section "Robot identity registry"
 "$PYTHON_BIN" scripts/check_robot_identity_registry.py
 section "Python syntax / bytecode gate"
@@ -75,6 +103,7 @@ section "Architecture fitness"
 section "RT quality gates"
 "$PYTHON_BIN" scripts/check_rt_purity_gate.py
 "$PYTHON_BIN" scripts/check_rt_quality_gate.py
+"$PYTHON_BIN" scripts/check_model_bundle_contract.py
 section "Verification boundary"
 "$PYTHON_BIN" scripts/check_verification_boundary.py
 section "P2 acceptance artifact generation"
@@ -113,10 +142,13 @@ for PROFILE in mock hil prod; do
     PROFILE_WITH_MODEL=OFF
   fi
   cmake -S cpp_robot_core -B "$PROFILE_BUILD_DIR" -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DROBOT_CORE_PROFILE="${PROFILE}" -DROBOT_CORE_WITH_XCORE_SDK="${PROFILE_WITH_SDK}" -DROBOT_CORE_WITH_XMATE_MODEL="${PROFILE_WITH_MODEL}" >"$PROFILE_BUILD_DIR.cmake.log" 2>&1 || { tail -n 80 "$PROFILE_BUILD_DIR.cmake.log" || true; fail "C++ configure failed"; }
-  "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "$PROFILE_BUILD_DIR" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL:-1}" "${CPP_BUILD_TARGETS[@]}"
+  mapfile -t PROFILE_CPP_BUILD_TARGETS < <(cpp_build_targets_for_profile "$PROFILE")
+  mapfile -t PROFILE_CPP_TEST_TARGETS < <(cpp_test_targets_for_profile "$PROFILE")
+  "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "$PROFILE_BUILD_DIR" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL:-1}" "${PROFILE_CPP_BUILD_TARGETS[@]}"
   REGISTERED_CPP_TESTS=$(count_registered_cpp_tests "$PROFILE_BUILD_DIR")
-  if [[ "$REGISTERED_CPP_TESTS" != "$EXPECTED_CPP_TEST_COUNT" ]]; then
-    fail "C++ test registration mismatch for profile=$PROFILE: expected $EXPECTED_CPP_TEST_COUNT but ctest registered $REGISTERED_CPP_TESTS"
+  EXPECTED_PROFILE_CPP_TEST_COUNT="${#PROFILE_CPP_TEST_TARGETS[@]}"
+  if [[ "$REGISTERED_CPP_TESTS" != "$EXPECTED_PROFILE_CPP_TEST_COUNT" ]]; then
+    fail "C++ test registration mismatch for profile=$PROFILE: expected $EXPECTED_PROFILE_CPP_TEST_COUNT but ctest registered $REGISTERED_CPP_TESTS"
   fi
   ctest --test-dir "$PROFILE_BUILD_DIR" --output-on-failure || fail "C++ tests failed"
   DESTDIR="$PROFILE_BUILD_DIR/install-root" cmake --install "$PROFILE_BUILD_DIR"
@@ -128,6 +160,7 @@ READINESS_MANIFEST_REPORT="$BUILD_DIR/runtime_readiness_manifest.json"
 VERIFICATION_REPORT="$BUILD_DIR/verification_execution_report.json"
 BUILD_EVIDENCE_REPORT="$BUILD_DIR/build_evidence_report.json"
 ACCEPTANCE_SUMMARY_REPORT="$BUILD_DIR/acceptance_summary.json"
+RELEASE_LEDGER_REPORT="$BUILD_DIR/release_ledger.json"
 WRITE_ARGS=(--phase python --phase mock --phase hil --phase prod --output "$VERIFICATION_REPORT")
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then WRITE_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then WRITE_ARGS+=(--with-model); fi
@@ -143,7 +176,8 @@ if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then EVIDENCE_ARGS+=(--wit
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then EVIDENCE_ARGS+=(--with-model); fi
 "$PYTHON_BIN" scripts/verify_cpp_build_evidence.py "${EVIDENCE_ARGS[@]}" || fail "build evidence report generation failed"
 section "Acceptance summary"
-SUMMARY_ARGS=(--output "$ACCEPTANCE_SUMMARY_REPORT" --build-dir "$BUILD_DIR" --verification-report "$VERIFICATION_REPORT" --readiness-manifest "$READINESS_MANIFEST_REPORT" --build-evidence-report "$BUILD_EVIDENCE_REPORT")
+SUMMARY_ARGS=(--output "$ACCEPTANCE_SUMMARY_REPORT" --build-dir "$BUILD_DIR" --verification-report "$VERIFICATION_REPORT" --build-evidence-report "$BUILD_EVIDENCE_REPORT")
+if [[ -z "$LIVE_EVIDENCE_BUNDLE" ]]; then SUMMARY_ARGS+=(--readiness-manifest "$READINESS_MANIFEST_REPORT"); fi
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then SUMMARY_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then SUMMARY_ARGS+=(--with-model); fi
 for PROFILE in mock hil prod; do
@@ -151,6 +185,20 @@ for PROFILE in mock hil prod; do
   SUMMARY_ARGS+=(--installed-binary "$BUILD_DIR/$PROFILE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
 done
 "$PYTHON_BIN" scripts/write_acceptance_summary.py "${SUMMARY_ARGS[@]}" || fail "acceptance summary generation failed"
+section "Release ledger"
+LEDGER_ARGS=(--output "$RELEASE_LEDGER_REPORT" --build-dir "$BUILD_DIR" --verification-report "$VERIFICATION_REPORT" --build-evidence-report "$BUILD_EVIDENCE_REPORT" --acceptance-summary "$ACCEPTANCE_SUMMARY_REPORT")
+if [[ -z "$LIVE_EVIDENCE_BUNDLE" ]]; then
+  LEDGER_ARGS+=(--readiness-manifest "$READINESS_MANIFEST_REPORT")
+else
+  LEDGER_ARGS+=(--live-evidence-bundle "$LIVE_EVIDENCE_BUNDLE")
+fi
+if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then LEDGER_ARGS+=(--with-sdk); fi
+if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then LEDGER_ARGS+=(--with-model); fi
+for PROFILE in mock hil prod; do
+  LEDGER_ARGS+=(--profile "$PROFILE")
+  LEDGER_ARGS+=(--installed-binary "$BUILD_DIR/$PROFILE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
+done
+"$PYTHON_BIN" scripts/write_release_ledger.py "${LEDGER_ARGS[@]}" || fail "release ledger generation failed"
 section "Post-run payload hygiene"
 cleanup_generated_artifacts
 bash scripts/check_repo_hygiene.sh

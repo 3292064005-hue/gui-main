@@ -5,6 +5,7 @@ from typing import Any
 
 from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.xmate_profile import build_control_authority_snapshot, load_xmate_profile
+from spine_ultrasound_ui.services.runtime_source_policy_service import RuntimeSourcePolicyService
 from spine_ultrasound_ui.utils import now_text
 
 
@@ -152,6 +153,11 @@ def build_device_readiness(
     )
     review_required = bool(localization_readiness.get("review_required", False))
     review_approved = bool(dict(localization_readiness.get("review_approval", {})).get("approved", False))
+    source_policy = RuntimeSourcePolicyService().build_snapshot(
+        config=config,
+        guidance_source_type=str(localization_readiness.get("source_type", "") or source_frame_set.get("source_type", "")),
+        provider_mode=str(source_frame_set.get("provider_mode", "") or getattr(config, "camera_guidance_input_mode", "")),
+    )
     freeze_gate_consistent = bool(
         not localization_readiness
         or (
@@ -189,6 +195,7 @@ def build_device_readiness(
             localization_gate_consistent,
             freeze_gate_consistent,
             (not review_required or review_approved),
+            bool(source_policy.session_lock_ready),
         ]),
         "network_link_ok": network_link_ok,
         "single_control_source_ok": single_control_source_ok,
@@ -198,6 +205,7 @@ def build_device_readiness(
         "guidance_pipeline_available": guidance_pipeline_available,
         "localization_gate_consistent": localization_gate_consistent,
         "freeze_gate_consistent": freeze_gate_consistent,
+        "source_policy": source_policy.to_dict(),
         "control_authority": build_control_authority_snapshot(read_only_mode=read_only_mode),
         "robot_profile": profile.to_dict(),
         "rt_contract": {

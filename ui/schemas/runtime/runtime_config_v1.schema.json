@@ -1,0 +1,818 @@
+{
+  "type": "object",
+  "properties": {
+    "pressure_target": {
+      "type": "number",
+      "default": 8.0
+    },
+    "pressure_upper": {
+      "type": "number",
+      "default": 12.0
+    },
+    "pressure_lower": {
+      "type": "number",
+      "default": 5.0
+    },
+    "scan_speed_mm_s": {
+      "type": "number",
+      "default": 8.0
+    },
+    "sample_step_mm": {
+      "type": "number",
+      "default": 0.5
+    },
+    "segment_length_mm": {
+      "type": "number",
+      "default": 120.0
+    },
+    "strip_width_mm": {
+      "type": "number",
+      "default": 18.0
+    },
+    "strip_overlap_mm": {
+      "type": "number",
+      "default": 6.0
+    },
+    "contact_seek_speed_mm_s": {
+      "type": "number",
+      "default": 3.0
+    },
+    "retreat_speed_mm_s": {
+      "type": "number",
+      "default": 20.0
+    },
+    "seek_contact_max_travel_mm": {
+      "type": "number",
+      "default": 8.0
+    },
+    "retract_travel_mm": {
+      "type": "number",
+      "default": 12.0
+    },
+    "scan_follow_lateral_amplitude_mm": {
+      "type": "number",
+      "default": 0.5
+    },
+    "scan_follow_frequency_hz": {
+      "type": "number",
+      "default": 0.25
+    },
+    "rt_stale_state_timeout_ms": {
+      "type": "number",
+      "default": 40.0
+    },
+    "rt_phase_transition_debounce_cycles": {
+      "type": "integer",
+      "default": 5
+    },
+    "rt_max_cart_step_mm": {
+      "type": "number",
+      "default": 0.25
+    },
+    "rt_max_cart_vel_mm_s": {
+      "type": "number",
+      "default": 25.0
+    },
+    "rt_max_cart_acc_mm_s2": {
+      "type": "number",
+      "default": 200.0
+    },
+    "rt_max_pose_trim_deg": {
+      "type": "number",
+      "default": 1.5
+    },
+    "rt_max_force_error_n": {
+      "type": "number",
+      "default": 8.0
+    },
+    "rt_integrator_limit_n": {
+      "type": "number",
+      "default": 10.0
+    },
+    "contact_force_target_n": {
+      "type": "number",
+      "default": 8.0
+    },
+    "contact_force_tolerance_n": {
+      "type": "number",
+      "default": 1.0
+    },
+    "contact_establish_cycles": {
+      "type": "integer",
+      "default": 12
+    },
+    "normal_admittance_gain": {
+      "type": "number",
+      "default": 0.00012
+    },
+    "normal_damping_gain": {
+      "type": "number",
+      "default": 4e-05
+    },
+    "seek_contact_max_step_mm": {
+      "type": "number",
+      "default": 0.08
+    },
+    "normal_velocity_quiet_threshold_mm_s": {
+      "type": "number",
+      "default": 0.3
+    },
+    "scan_force_target_n": {
+      "type": "number",
+      "default": 8.0
+    },
+    "scan_force_tolerance_n": {
+      "type": "number",
+      "default": 1.0
+    },
+    "scan_normal_pi_kp": {
+      "type": "number",
+      "default": 0.012
+    },
+    "scan_normal_pi_ki": {
+      "type": "number",
+      "default": 0.008
+    },
+    "scan_tangent_speed_min_mm_s": {
+      "type": "number",
+      "default": 2.0
+    },
+    "scan_tangent_speed_max_mm_s": {
+      "type": "number",
+      "default": 12.0
+    },
+    "scan_pose_trim_gain": {
+      "type": "number",
+      "default": 0.08
+    },
+    "scan_follow_enable_lateral_modulation": {
+      "type": "boolean",
+      "default": true
+    },
+    "pause_hold_position_guard_mm": {
+      "type": "number",
+      "default": 0.4
+    },
+    "pause_hold_force_guard_n": {
+      "type": "number",
+      "default": 3.0
+    },
+    "pause_hold_drift_kp": {
+      "type": "number",
+      "default": 0.01
+    },
+    "pause_hold_drift_ki": {
+      "type": "number",
+      "default": 0.004
+    },
+    "pause_hold_integrator_leak": {
+      "type": "number",
+      "default": 0.02
+    },
+    "retract_release_force_n": {
+      "type": "number",
+      "default": 1.5
+    },
+    "retract_release_cycles": {
+      "type": "integer",
+      "default": 6
+    },
+    "retract_safe_gap_mm": {
+      "type": "number",
+      "default": 3.0
+    },
+    "retract_max_travel_mm": {
+      "type": "number",
+      "default": 15.0
+    },
+    "retract_jerk_limit_mm_s3": {
+      "type": "number",
+      "default": 500.0
+    },
+    "retract_timeout_ms": {
+      "type": "number",
+      "default": 1200.0
+    },
+    "image_quality_threshold": {
+      "type": "number",
+      "default": 0.7
+    },
+    "roi_mode": {
+      "type": "string",
+      "default": "auto"
+    },
+    "smoothing_factor": {
+      "type": "number",
+      "default": 0.35
+    },
+    "reconstruction_step": {
+      "type": "number",
+      "default": 0.5
+    },
+    "feature_threshold": {
+      "type": "number",
+      "default": 0.6
+    },
+    "rt_mode": {
+      "type": "string",
+      "default": "cartesianImpedance"
+    },
+    "network_stale_ms": {
+      "type": "integer",
+      "default": 150
+    },
+    "strict_runtime_freeze_gate": {
+      "type": "string",
+      "default": "enforce"
+    },
+    "pressure_stale_ms": {
+      "type": "integer",
+      "default": 100
+    },
+    "telemetry_rate_hz": {
+      "type": "integer",
+      "default": 20
+    },
+    "tool_name": {
+      "type": "string",
+      "default": "ultrasound_probe"
+    },
+    "tcp_name": {
+      "type": "string",
+      "default": "ultrasound_tcp"
+    },
+    "load_kg": {
+      "type": "number",
+      "default": 0.85
+    },
+    "remote_ip": {
+      "type": "string",
+      "default": "192.168.0.160"
+    },
+    "local_ip": {
+      "type": "string",
+      "default": "192.168.0.100"
+    },
+    "force_sensor_provider": {
+      "type": "string",
+      "default": "mock_force_sensor"
+    },
+    "contact_control": {
+      "$ref": "#/$defs/ContactControlConfig"
+    },
+    "force_estimator": {
+      "$ref": "#/$defs/ForceEstimatorConfig"
+    },
+    "orientation_trim": {
+      "$ref": "#/$defs/OrientationTrimConfig"
+    },
+    "robot_model": {
+      "type": "string",
+      "default": "xmate3"
+    },
+    "axis_count": {
+      "type": "integer",
+      "default": 6
+    },
+    "sdk_robot_class": {
+      "type": "string",
+      "default": "xMateRobot"
+    },
+    "preferred_link": {
+      "type": "string",
+      "default": "wired_direct"
+    },
+    "requires_single_control_source": {
+      "type": "boolean",
+      "default": true
+    },
+    "allow_contract_shell_writes": {
+      "type": "boolean",
+      "default": false
+    },
+    "build_id": {
+      "type": "string",
+      "default": "dev"
+    },
+    "software_version": {
+      "type": "string",
+      "default": "0.3.0"
+    },
+    "runtime_config_contract_digest": {
+      "type": "string",
+      "default": ""
+    },
+    "runtime_config_schema_version": {
+      "type": "string",
+      "default": ""
+    },
+    "camera_guidance_input_mode": {
+      "type": "string",
+      "default": "synthetic"
+    },
+    "camera_guidance_source_path": {
+      "type": "string",
+      "default": ""
+    },
+    "camera_guidance_file_glob": {
+      "type": "string",
+      "default": "*.npy"
+    },
+    "camera_guidance_frame_count": {
+      "type": "integer",
+      "default": 3
+    },
+    "camera_capture_device_index": {
+      "type": "integer",
+      "default": 0
+    },
+    "camera_capture_timeout_ms": {
+      "type": "integer",
+      "default": 500
+    },
+    "guidance_review_operator_id": {
+      "type": "string",
+      "default": "operator"
+    },
+    "rt_network_tolerance_percent": {
+      "type": "integer",
+      "default": 15
+    },
+    "joint_filter_hz": {
+      "type": "number",
+      "default": 40.0
+    },
+    "cart_filter_hz": {
+      "type": "number",
+      "default": 30.0
+    },
+    "torque_filter_hz": {
+      "type": "number",
+      "default": 25.0
+    },
+    "collision_detection_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "collision_sensitivity": {
+      "type": "integer",
+      "default": 4
+    },
+    "collision_behavior": {
+      "type": "string",
+      "default": "pause_hold"
+    },
+    "collision_fallback_mm": {
+      "type": "number",
+      "default": 8.0
+    },
+    "soft_limit_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "joint_soft_limit_margin_deg": {
+      "type": "number",
+      "default": 5.0
+    },
+    "singularity_avoidance_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "rl_project_name": {
+      "type": "string",
+      "default": "spine_mainline"
+    },
+    "rl_task_name": {
+      "type": "string",
+      "default": "scan"
+    },
+    "xpanel_vout_mode": {
+      "type": "string",
+      "default": "off"
+    },
+    "cartesian_impedance": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        1000.0,
+        1000.0,
+        1000.0,
+        80.0,
+        80.0,
+        80.0
+      ]
+    },
+    "desired_wrench_n": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.0,
+        0.0,
+        8.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "fc_frame_type": {
+      "type": "string",
+      "default": "path"
+    },
+    "fc_frame_matrix": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "tcp_frame_matrix": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        62.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "load_com_mm": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.0,
+        0.0,
+        62.0
+      ]
+    },
+    "load_inertia": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.0012,
+        0.0012,
+        0.0008,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "home_joint_rad": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.0,
+        0.3,
+        0.6,
+        0.0,
+        1.2,
+        0.0,
+        0.0
+      ]
+    },
+    "emergency_home_joint_rad": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.0,
+        0.3,
+        0.6,
+        0.0,
+        1.2,
+        0.0,
+        0.0
+      ]
+    },
+    "emergency_approach_pose_xyzabc": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.118,
+        0.015,
+        0.205,
+        3.1415926535,
+        0.0,
+        1.5707963267
+      ]
+    },
+    "emergency_entry_pose_xyzabc": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.118,
+        0.015,
+        0.19,
+        3.1415926535,
+        0.0,
+        1.5707963267
+      ]
+    },
+    "emergency_retreat_pose_xyzabc": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [
+        0.118,
+        0.015,
+        0.23,
+        3.1415926535,
+        0.0,
+        1.5707963267
+      ]
+    }
+  },
+  "required": [
+    "pressure_target",
+    "pressure_upper",
+    "pressure_lower",
+    "scan_speed_mm_s",
+    "sample_step_mm",
+    "segment_length_mm",
+    "strip_width_mm",
+    "strip_overlap_mm",
+    "contact_seek_speed_mm_s",
+    "retreat_speed_mm_s",
+    "seek_contact_max_travel_mm",
+    "retract_travel_mm",
+    "scan_follow_lateral_amplitude_mm",
+    "scan_follow_frequency_hz",
+    "rt_stale_state_timeout_ms",
+    "rt_phase_transition_debounce_cycles",
+    "rt_max_cart_step_mm",
+    "rt_max_cart_vel_mm_s",
+    "rt_max_cart_acc_mm_s2",
+    "rt_max_pose_trim_deg",
+    "rt_max_force_error_n",
+    "rt_integrator_limit_n",
+    "contact_force_target_n",
+    "contact_force_tolerance_n",
+    "contact_establish_cycles",
+    "normal_admittance_gain",
+    "normal_damping_gain",
+    "seek_contact_max_step_mm",
+    "normal_velocity_quiet_threshold_mm_s",
+    "scan_force_target_n",
+    "scan_force_tolerance_n",
+    "scan_normal_pi_kp",
+    "scan_normal_pi_ki",
+    "scan_tangent_speed_min_mm_s",
+    "scan_tangent_speed_max_mm_s",
+    "scan_pose_trim_gain",
+    "scan_follow_enable_lateral_modulation",
+    "pause_hold_position_guard_mm",
+    "pause_hold_force_guard_n",
+    "pause_hold_drift_kp",
+    "pause_hold_drift_ki",
+    "pause_hold_integrator_leak",
+    "retract_release_force_n",
+    "retract_release_cycles",
+    "retract_safe_gap_mm",
+    "retract_max_travel_mm",
+    "retract_jerk_limit_mm_s3",
+    "retract_timeout_ms",
+    "image_quality_threshold",
+    "roi_mode",
+    "smoothing_factor",
+    "reconstruction_step",
+    "feature_threshold",
+    "rt_mode",
+    "network_stale_ms",
+    "strict_runtime_freeze_gate",
+    "pressure_stale_ms",
+    "telemetry_rate_hz",
+    "tool_name",
+    "tcp_name",
+    "load_kg",
+    "remote_ip",
+    "local_ip",
+    "force_sensor_provider",
+    "contact_control",
+    "force_estimator",
+    "orientation_trim",
+    "robot_model",
+    "axis_count",
+    "sdk_robot_class",
+    "preferred_link",
+    "requires_single_control_source",
+    "allow_contract_shell_writes",
+    "build_id",
+    "software_version",
+    "runtime_config_contract_digest",
+    "runtime_config_schema_version",
+    "camera_guidance_input_mode",
+    "camera_guidance_source_path",
+    "camera_guidance_file_glob",
+    "camera_guidance_frame_count",
+    "camera_capture_device_index",
+    "camera_capture_timeout_ms",
+    "guidance_review_operator_id",
+    "rt_network_tolerance_percent",
+    "joint_filter_hz",
+    "cart_filter_hz",
+    "torque_filter_hz",
+    "collision_detection_enabled",
+    "collision_sensitivity",
+    "collision_behavior",
+    "collision_fallback_mm",
+    "soft_limit_enabled",
+    "joint_soft_limit_margin_deg",
+    "singularity_avoidance_enabled",
+    "rl_project_name",
+    "rl_task_name",
+    "xpanel_vout_mode",
+    "cartesian_impedance",
+    "desired_wrench_n",
+    "fc_frame_type",
+    "fc_frame_matrix",
+    "tcp_frame_matrix",
+    "load_com_mm",
+    "load_inertia",
+    "home_joint_rad",
+    "emergency_home_joint_rad",
+    "emergency_approach_pose_xyzabc",
+    "emergency_entry_pose_xyzabc",
+    "emergency_retreat_pose_xyzabc"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Runtime config v1",
+  "description": "Canonical single-source runtime config contract shared by Python and C++ runtime boundaries.",
+  "$defs": {
+    "ContactControlConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "default": "normal_axis_admittance"
+        },
+        "virtual_mass": {
+          "type": "number",
+          "default": 0.8
+        },
+        "virtual_damping": {
+          "type": "number",
+          "default": 120.0
+        },
+        "virtual_stiffness": {
+          "type": "number",
+          "default": 40.0
+        },
+        "force_deadband_n": {
+          "type": "number",
+          "default": 0.3
+        },
+        "max_normal_step_mm": {
+          "type": "number",
+          "default": 0.08
+        },
+        "max_normal_velocity_mm_s": {
+          "type": "number",
+          "default": 2.0
+        },
+        "max_normal_acc_mm_s2": {
+          "type": "number",
+          "default": 30.0
+        },
+        "max_normal_travel_mm": {
+          "type": "number",
+          "default": 8.0
+        },
+        "anti_windup_limit_n": {
+          "type": "number",
+          "default": 10.0
+        },
+        "integrator_leak": {
+          "type": "number",
+          "default": 0.02
+        }
+      },
+      "required": [
+        "mode",
+        "virtual_mass",
+        "virtual_damping",
+        "virtual_stiffness",
+        "force_deadband_n",
+        "max_normal_step_mm",
+        "max_normal_velocity_mm_s",
+        "max_normal_acc_mm_s2",
+        "max_normal_travel_mm",
+        "anti_windup_limit_n",
+        "integrator_leak"
+      ],
+      "additionalProperties": false
+    },
+    "ForceEstimatorConfig": {
+      "type": "object",
+      "properties": {
+        "preferred_source": {
+          "type": "string",
+          "default": "fused"
+        },
+        "pressure_weight": {
+          "type": "number",
+          "default": 0.7
+        },
+        "wrench_weight": {
+          "type": "number",
+          "default": 0.3
+        },
+        "stale_timeout_ms": {
+          "type": "integer",
+          "default": 100
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "default": 250
+        },
+        "auto_bias_zero": {
+          "type": "boolean",
+          "default": true
+        },
+        "min_confidence": {
+          "type": "number",
+          "default": 0.4
+        }
+      },
+      "required": [
+        "preferred_source",
+        "pressure_weight",
+        "wrench_weight",
+        "stale_timeout_ms",
+        "timeout_ms",
+        "auto_bias_zero",
+        "min_confidence"
+      ],
+      "additionalProperties": false
+    },
+    "OrientationTrimConfig": {
+      "type": "object",
+      "properties": {
+        "gain": {
+          "type": "number",
+          "default": 0.08
+        },
+        "max_trim_deg": {
+          "type": "number",
+          "default": 1.5
+        },
+        "lowpass_hz": {
+          "type": "number",
+          "default": 8.0
+        }
+      },
+      "required": [
+        "gain",
+        "max_trim_deg",
+        "lowpass_hz"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

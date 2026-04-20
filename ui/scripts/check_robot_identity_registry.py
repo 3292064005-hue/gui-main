@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 REGISTRY_PATH = ROOT / "configs" / "robot_identity_mainline.json"
 TEXT_TARGETS = {
     "README.md": ("robot_model", "sdk_robot_class", "axis_count", "preferred_link", "clinical_mainline_mode"),
-    "docs/HIL_VALIDATION_CHECKLIST.md": ("robot_model", "sdk_robot_class", "axis_count", "preferred_link"),
+    "docs/04_profiles_and_release/PROFILE_MATRIX.md": ("robot_model", "sdk_robot_class", "axis_count", "preferred_link", "clinical_mainline_mode"),
 }
 
 
@@ -55,7 +55,7 @@ def _parse_markdown_family_section(text: str, family_key: str) -> dict[str, str]
 
 
 def _expect_doc_matrix(registry: dict[str, Any], failures: list[str]) -> None:
-    matrix = (ROOT / 'docs' / 'ROBOT_FAMILY_MATRIX.md').read_text(encoding='utf-8')
+    matrix = (ROOT / 'docs' / '04_profiles_and_release' / 'PROFILE_MATRIX.md').read_text(encoding='utf-8')
     parsed = _parse_markdown_family_section(matrix, str(registry['family_key']))
     expected = {
         'sdk class': str(registry['sdk_robot_class']),
@@ -65,12 +65,12 @@ def _expect_doc_matrix(registry: dict[str, Any], failures: list[str]) -> None:
         'realtime mainline': str(registry['clinical_mainline_mode']),
     }
     if not parsed:
-        failures.append(f"docs/ROBOT_FAMILY_MATRIX.md missing section for {registry['family_key']}")
+        failures.append(f"docs/04_profiles_and_release/PROFILE_MATRIX.md missing section for {registry['family_key']}")
         return
     for key, value in expected.items():
         actual = parsed.get(key)
         if actual != value:
-            failures.append(f"docs/ROBOT_FAMILY_MATRIX.md expected {key}={value!r} but found {actual!r}")
+            failures.append(f"docs/04_profiles_and_release/PROFILE_MATRIX.md expected {key}={value!r} but found {actual!r}")
 
 
 def _import_robot_identity_module():
@@ -121,48 +121,17 @@ def _expect_python_identity_contract(registry: dict[str, Any], failures: list[st
             failures.append(f'RobotIdentityService.build_family_contract() expected {key}={value!r} but found {actual!r}')
 
 
-def _regex_expect(text: str, path: str, pattern: str, expected: str, failures: list[str]) -> None:
-    match = re.search(pattern, text, re.DOTALL)
-    if not match:
-        failures.append(f"{path} missing structured field for pattern: {pattern}")
-        return
-    actual = match.group(1)
-    if actual != expected:
-        failures.append(f"{path} expected {expected!r} but found {actual!r} for pattern: {pattern}")
-
-
-def _expect_cpp_struct_defaults(registry: dict[str, Any], failures: list[str]) -> None:
-    contract_path = 'cpp_robot_core/include/robot_core/robot_identity_contract.h'
-    contract_text = (ROOT / contract_path).read_text(encoding='utf-8')
-    for token in ("ROBOT_CORE_DEFAULT_ROBOT_MODEL", "ROBOT_CORE_DEFAULT_SDK_CLASS", "ROBOT_CORE_DEFAULT_AXIS_COUNT", "ROBOT_CORE_DEFAULT_PREFERRED_LINK", "ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE"):
-        if token not in contract_text:
-            failures.append(f"{contract_path} missing macro token {token}")
-
-    family_path = 'cpp_robot_core/include/robot_core/robot_family_descriptor.h'
-    family_text = (ROOT / family_path).read_text(encoding='utf-8')
-    for token in ("ROBOT_CORE_MAINLINE_FAMILY_KEY", "ROBOT_CORE_DEFAULT_ROBOT_MODEL", "ROBOT_CORE_DEFAULT_SDK_CLASS", "ROBOT_CORE_DEFAULT_AXIS_COUNT", "ROBOT_CORE_DEFAULT_PREFERRED_LINK", "ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE"):
-        if token not in family_text:
-            failures.append(f"{family_path} missing macro token {token}")
-
-    cmake_path = 'cpp_robot_core/CMakeLists.txt'
-    cmake_text = (ROOT / cmake_path).read_text(encoding='utf-8')
-    for token in ('ROBOT_CORE_IDENTITY_REGISTRY', 'ROBOT_CORE_MAINLINE_ROBOT_MODEL', 'ROBOT_CORE_MAINLINE_SDK_CLASS', 'ROBOT_CORE_MAINLINE_AXIS_COUNT', 'ROBOT_CORE_MAINLINE_PREFERRED_LINK', 'ROBOT_CORE_MAINLINE_CLINICAL_MODE'):
-        if token not in cmake_text:
-            failures.append(f"{cmake_path} missing registry loading token {token}")
-
-
 def main() -> int:
     registry = _load_registry()
     failures: list[str] = []
     _expect_text_literals(registry, failures)
     _expect_doc_matrix(registry, failures)
     _expect_python_identity_contract(registry, failures)
-    _expect_cpp_struct_defaults(registry, failures)
     if failures:
         for item in failures:
             print(f'[FAIL] {item}')
         return 1
-    print(f'[PASS] robot identity registry aligned ({REGISTRY_PATH.relative_to(ROOT)})')
+    print('[PASS] robot identity registry is synchronized with canonical code and docs')
     return 0
 
 

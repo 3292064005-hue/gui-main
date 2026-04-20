@@ -92,6 +92,18 @@ struct RuntimeCommandContext {
   std::string request_id;
   std::string command;
   std::string envelope_json;
+  std::string actor_id;
+  std::string workspace;
+  std::string role;
+  std::string lease_id;
+  std::string session_id;
+  std::string profile;
+  std::string intent_reason;
+  std::string source;
+  std::string required_claim;
+  std::vector<std::string> requested_claims;
+  bool lease_required{true};
+  bool auto_issue_implicit_lease{true};
 };
 
 struct RuntimeCommandInvocation {
@@ -101,8 +113,9 @@ struct RuntimeCommandInvocation {
   RuntimeCommandRequest request;
   RuntimeTypedRequestVariant typed_request;
   const RuntimeCommandTypedContract* typed_contract{nullptr};
+  RuntimeCommandContext command_context{};
 
-  RuntimeCommandContext context() const { return RuntimeCommandContext{request_id, command, envelope_json}; }
+  RuntimeCommandContext context() const { return command_context; }
 
   bool hasStringField(const std::string& name) const;
   bool hasObjectField(const std::string& name) const;

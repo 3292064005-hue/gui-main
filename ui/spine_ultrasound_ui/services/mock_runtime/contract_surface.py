@@ -71,7 +71,7 @@ class MockRuntimeContractSurfaceMixin:
             return {
                 "robot_model": identity.robot_model,
                 "clinical_mainline_mode": identity.rt_mode,
-                "required_sequence": ["connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_scan", "safe_retreat"],
+                "required_sequence": ["connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "safe_retreat"],
                 "single_control_source_required": identity.requires_single_control_source,
                 "preferred_link": identity.preferred_link,
                 "rt_loop_hz": 1000,

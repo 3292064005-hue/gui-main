@@ -50,6 +50,7 @@ class CommandStatePolicyService:
     _FALLBACKS = {
         'validate_setup': ('retry_validation', 'monitor'),
         'seek_contact': ('safe_retreat', 'reacquire_contact'),
+        'start_procedure': ('seek_contact', 'resume_gate'),
         'start_scan': ('seek_contact', 'resume_gate'),
         'resume_scan': ('seek_contact', 'resume_gate'),
         'safe_retreat': ('safe_retreat', 'recovery_retract'),
@@ -64,6 +65,14 @@ class CommandStatePolicyService:
         'seek_contact': {
             'required_contact_state': ('NO_CONTACT', 'CONTACT_LOST', 'CONTACT_DEGRADED', 'CONTACT_UNSTABLE', 'CONTACT_STABLE'),
             'required_plan_state': ('execution_plan_loaded',),
+        },
+        'start_procedure': {
+            'contact_states': {'CONTACT_STABLE'},
+            'plan_states': {'PATH_VALIDATED', 'PLAN_LOADED'},
+            'resume_modes': {'FRESH_START', 'RESUME_ALLOWED'},
+            'roles': {'operator'},
+            'write_command': True,
+            'blocked_reason_code': 'start_procedure_blocked',
         },
         'start_scan': {
             'required_contact_state': ('CONTACT_STABLE',),

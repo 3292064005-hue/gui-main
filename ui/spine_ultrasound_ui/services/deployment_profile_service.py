@@ -26,6 +26,9 @@ class DeploymentProfile:
     allows_lab_port: bool = True
     requires_hil_gate: bool = False
     research_sandbox_enabled: bool = False
+    allowed_guidance_source_tiers: tuple[str, ...] = ("live", "replay", "simulated")
+    allowed_force_source_tiers: tuple[str, ...] = ("live", "replay", "simulated")
+    allow_contract_shell_writes: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -44,6 +47,9 @@ class DeploymentProfile:
             "allows_lab_port": self.allows_lab_port,
             "requires_hil_gate": self.requires_hil_gate,
             "research_sandbox_enabled": self.research_sandbox_enabled,
+            "allowed_guidance_source_tiers": list(self.allowed_guidance_source_tiers),
+            "allowed_force_source_tiers": list(self.allowed_force_source_tiers),
+            "allow_contract_shell_writes": self.allow_contract_shell_writes,
         }
 
 
@@ -72,6 +78,9 @@ class DeploymentProfileService:
                 allows_lab_port=False,
                 requires_hil_gate=True,
                 research_sandbox_enabled=False,
+                allowed_guidance_source_tiers=("live",),
+                allowed_force_source_tiers=("live",),
+                allow_contract_shell_writes=False,
             )
         if requested == "research":
             return DeploymentProfile(
@@ -90,6 +99,9 @@ class DeploymentProfileService:
                 allows_lab_port=True,
                 requires_hil_gate=True,
                 research_sandbox_enabled=True,
+                allowed_guidance_source_tiers=("live",),
+                allowed_force_source_tiers=("live",),
+                allow_contract_shell_writes=False,
             )
         if requested == "lab":
             return DeploymentProfile(
@@ -108,6 +120,9 @@ class DeploymentProfileService:
                 allows_lab_port=True,
                 requires_hil_gate=False,
                 research_sandbox_enabled=True,
+                allowed_guidance_source_tiers=("live", "replay"),
+                allowed_force_source_tiers=("live", "replay", "simulated"),
+                allow_contract_shell_writes=True,
             )
         if requested == "review":
             return DeploymentProfile(
@@ -126,6 +141,9 @@ class DeploymentProfileService:
                 allows_lab_port=True,
                 requires_hil_gate=False,
                 research_sandbox_enabled=False,
+                allowed_guidance_source_tiers=("live", "replay", "simulated"),
+                allowed_force_source_tiers=("live", "replay", "simulated"),
+                allow_contract_shell_writes=False,
             )
         return DeploymentProfile(
             "dev",
@@ -143,6 +161,9 @@ class DeploymentProfileService:
             allows_lab_port=True,
             requires_hil_gate=False,
             research_sandbox_enabled=True,
+            allowed_guidance_source_tiers=("live", "replay", "simulated"),
+            allowed_force_source_tiers=("live", "replay", "simulated"),
+            allow_contract_shell_writes=True,
         )
 
     def build_snapshot(self, config: RuntimeConfig | None = None) -> dict[str, Any]:

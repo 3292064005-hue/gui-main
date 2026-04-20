@@ -14,7 +14,7 @@ bool hasLegalTransitionPolicy(const std::string& policy) {
 }
 }  // namespace
 
-bool ScanPlanValidator::validate(const ScanPlan& plan, std::string* error) const {
+bool ScanPlanValidator::validate(const ScanPlan& plan, const RuntimeConfig* config, std::string* error) const {
   if (plan.plan_id.empty()) { if (error) *error = "scan plan missing plan_id"; return false; }
   if (plan.plan_hash.empty()) { if (error) *error = "scan plan missing plan_hash"; return false; }
   if (plan.planner_version.empty() || plan.registration_hash.empty()) { if (error) *error = "scan plan missing planner_version or registration_hash"; return false; }
@@ -51,10 +51,25 @@ bool ScanPlanValidator::validate(const ScanPlan& plan, std::string* error) const
       if (waypoint_index > 1) {
         const auto& prev = segment.waypoints[static_cast<std::size_t>(waypoint_index - 2)];
         const double delta = std::fabs(waypoint.x - prev.x) + std::fabs(waypoint.y - prev.y) + std::fabs(waypoint.z - prev.z);
-        if (delta == 0.0) { if (error) *error = "consecutive waypoints must not be identical"; return false; }
-        if (waypoint.sequence_index != 0 && prev.sequence_index != 0 && waypoint.sequence_index <= prev.sequence_index) { if (error) *error = "waypoint sequence_index must be strictly increasing"; return false; }
+        if (delta == 0.0) { if (error) *error = "schema_valid: consecutive waypoints must not be identical"; return false; }
+        if (waypoint.sequence_index != 0 && prev.sequence_index != 0 && waypoint.sequence_index <= prev.sequence_index) { if (error) *error = "schema_valid: waypoint sequence_index must be strictly increasing"; return false; }
+      }
+      if (config != nullptr && waypoint_index > 1) {
+        const auto& prev = segment.waypoints[static_cast<std::size_t>(waypoint_index - 2)];
+        const double dx = waypoint.x - prev.x;
+        const double dy = waypoint.y - prev.y;
+        const double dz = waypoint.z - prev.z;
+        const double translation_delta_mm = std::sqrt(dx * dx + dy * dy + dz * dz);
+        const double rotation_delta = std::fabs(waypoint.rx - prev.rx) + std::fabs(waypoint.ry - prev.ry) + std::fabs(waypoint.rz - prev.rz);
+        const double max_step_mm = std::max(config->sample_step_mm * 16.0, std::max(10.0, config->segment_length_mm));
+        if (translation_delta_mm > max_step_mm) { if (error) *error = "runtime_feasible: waypoint translation delta exceeds configured execution envelope"; return false; }
+        if (!std::isfinite(rotation_delta) || rotation_delta > (4.0 * M_PI)) { if (error) *error = "runtime_feasible: waypoint rotation delta is not executable"; return false; }
       }
     }
+  }
+  if (config != nullptr && plan.execution_constraints.max_segment_duration_ms > 0 && config->scan_tangent_speed_max_mm_s > 0.0) {
+    const double longest_segment_ms = static_cast<double>(plan.execution_constraints.max_segment_duration_ms);
+    if (longest_segment_ms <= 0.0) { if (error) *error = "profile_compatible: max_segment_duration_ms must be positive when constraints are present"; return false; }
   }
   return true;
 }

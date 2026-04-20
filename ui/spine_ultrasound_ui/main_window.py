@@ -23,6 +23,7 @@ class MainWindow(QMainWindow):
         self.runtime_bridge = MainWindowRuntimeBridge(self)
         self.action_router = MainWindowActionRouter(self)
         self.config_form = ConfigForm(self.backend.config)
+        self.ui_surface_contract = self.backend.ui_surface_contract() if hasattr(self.backend, "ui_surface_contract") else {}
         if hasattr(self.backend, "update_config"):
             self.config_form.config_applied.connect(self.backend.update_config)
         self._build_ui()
@@ -37,17 +38,25 @@ class MainWindow(QMainWindow):
     def _connect_backend(self) -> None:
         self.backend.status_updated.connect(self._on_status, Qt.QueuedConnection)
         self.backend.log_generated.connect(self._append_log, Qt.QueuedConnection)
-        for signal_name, handler in [
-            ("camera_pixmap_ready", self._update_camera_pixmap),
-            ("ultrasound_pixmap_ready", self._update_ultrasound_pixmap),
-            ("reconstruction_pixmap_ready", self._update_reconstruction_pixmap),
+        capability_matrix = self.backend.capability_matrix() if hasattr(self.backend, "capability_matrix") else {}
+        capabilities = self.backend.media_capabilities() if hasattr(self.backend, "media_capabilities") else {"camera": True, "ultrasound": True, "reconstruction": True}
+        for signal_name, handler, capability_key in [
+            ("camera_pixmap_ready", self._update_camera_pixmap, "camera"),
+            ("ultrasound_pixmap_ready", self._update_ultrasound_pixmap, "ultrasound"),
+            ("reconstruction_pixmap_ready", self._update_reconstruction_pixmap, "reconstruction"),
         ]:
-            if hasattr(self.backend, signal_name):
+            if capabilities.get(capability_key, False) and hasattr(self.backend, signal_name):
                 getattr(self.backend, signal_name).connect(handler, Qt.QueuedConnection)
         self.backend.experiments_updated.connect(self._on_experiments, Qt.QueuedConnection)
         self.backend.system_state_changed.connect(self._on_system_state, Qt.QueuedConnection)
         if hasattr(self.backend, "alarm_raised"):
             self.backend.alarm_raised.connect(self._on_alarm, Qt.QueuedConnection)
+        hidden = [name for name, item in capability_matrix.items() if name in {"camera", "ultrasound", "reconstruction"} and str(dict(item).get("mode", "hidden")) == "hidden"]
+        monitor_only = [name for name, item in capability_matrix.items() if name in {"camera", "ultrasound", "reconstruction"} and str(dict(item).get("mode", "hidden")) == "monitor_only"]
+        if hidden:
+            self._append_log("WARN", f"当前 backend 按能力合同隐藏媒体页面：{', '.join(hidden)}")
+        if monitor_only:
+            self._append_log("INFO", f"当前 backend 仅提供监视型媒体能力：{', '.join(monitor_only)}")
         self._connect_settings_page()
 
     def _connect_settings_page(self) -> None:
@@ -77,7 +86,7 @@ class MainWindow(QMainWindow):
             self.btn_new_exp: "create_experiment",
             self.btn_localize: "run_localization",
             self.btn_path: "generate_path",
-            self.btn_scan_start: "start_scan",
+            self.btn_scan_start: "start_procedure",
             self.btn_scan_pause: "pause_scan",
             self.btn_scan_resume: "resume_scan",
             self.btn_scan_stop: "stop_scan",
@@ -219,8 +228,11 @@ class MainWindow(QMainWindow):
     def _action_generate_path(self) -> None:
         self._invoke_backend_action("generate_path")
 
+    def _action_start_procedure(self) -> None:
+        self._invoke_backend_action("start_procedure")
+
     def _action_start_scan(self) -> None:
-        self._invoke_backend_action("start_scan")
+        self._action_start_procedure()
 
     def _action_pause_scan(self) -> None:
         self._invoke_backend_action("pause_scan")

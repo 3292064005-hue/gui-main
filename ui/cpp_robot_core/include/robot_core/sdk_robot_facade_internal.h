@@ -48,17 +48,24 @@ inline std::size_t translationIndexForAxis(int axis) {
 
 inline std::array<double, 16> postureVectorToMatrix(const std::vector<double>& posture) {
   std::array<double, 16> matrix{};
-#ifdef ROBOT_CORE_WITH_XCORE_SDK
   std::array<double, 6> xyzabc{0.0, 0.0, 0.240, 0.0, 0.0, 0.0};
   for (std::size_t idx = 0; idx < std::min<std::size_t>(xyzabc.size(), posture.size()); ++idx) {
     xyzabc[idx] = posture[idx];
   }
+#ifdef ROBOT_CORE_WITH_XCORE_SDK
   rokae::Utils::postureToTransArray(xyzabc, matrix);
 #else
-  matrix = {1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.240,
-            0.0, 0.0, 0.0, 1.0};
+  const double cx = std::cos(xyzabc[3]);
+  const double sx = std::sin(xyzabc[3]);
+  const double cy = std::cos(xyzabc[4]);
+  const double sy = std::sin(xyzabc[4]);
+  const double cz = std::cos(xyzabc[5]);
+  const double sz = std::sin(xyzabc[5]);
+  matrix = {
+      cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx, xyzabc[0],
+      sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx, xyzabc[1],
+      -sy,     cy * sx,                cy * cx,                xyzabc[2],
+      0.0,     0.0,                    0.0,                    1.0};
 #endif
   return matrix;
 }

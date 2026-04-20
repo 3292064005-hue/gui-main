@@ -40,3 +40,28 @@ class PostprocessStageSpec:
         payload['input_artifacts'] = list(self.input_artifacts)
         payload['output_artifacts'] = list(self.output_artifacts)
         return payload
+
+
+@dataclass(frozen=True)
+class PostprocessStageStatusBundle:
+    preprocess: Any
+    reconstruction: Any
+    assessment: Any
+
+    @classmethod
+    def from_mapping(cls, payload: dict[str, Any]) -> "PostprocessStageStatusBundle":
+        return cls(
+            preprocess=payload.get("preprocess"),
+            reconstruction=payload.get("reconstruction"),
+            assessment=payload.get("assessment"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "preprocess": self.preprocess,
+            "reconstruction": self.reconstruction,
+            "assessment": self.assessment,
+        }
+
+    def ordered_items(self) -> tuple[tuple[str, Any], ...]:
+        return (("preprocess", self.preprocess), ("reconstruction", self.reconstruction), ("assessment", self.assessment))

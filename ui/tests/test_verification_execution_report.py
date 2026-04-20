@@ -57,7 +57,7 @@ def _write_bundle(tmp_path: Path, *, include_readiness: bool = True) -> Path:
     return bundle
 
 
-def test_verification_execution_report_defaults_to_static_and_sandbox_only(tmp_path: Path) -> None:
+def test_verification_execution_report_defaults_to_static_only_without_readiness_evidence(tmp_path: Path) -> None:
     report = VerificationExecutionReportService(tmp_path).build(
         executed_phases=['python', 'prod'],
         sdk_binding_requested=False,
@@ -65,12 +65,38 @@ def test_verification_execution_report_defaults_to_static_and_sandbox_only(tmp_p
     )
     assert report['schema_version'] == 'verification.execution_report.v1'
     assert report['proof_scope']['repository_proof'] is True
-    assert report['proof_scope']['profile_gate_proof'] is True
+    assert report['proof_scope']['profile_gate_proof'] is False
+    assert report['proof_scope']['sandbox_validation_possible'] is False
     assert report['proof_scope']['live_controller_validation'] is False
+    assert report['reported_tiers']['已静态确认'] is True
+    assert report['reported_tiers']['已沙箱验证'] is False
+    assert report['reported_tiers']['未真实环境验证'] is True
+    assert 'only when readiness evidence exists' in report['claim_guardrails']['safe_summary']
+
+
+def test_verification_execution_report_closes_sandbox_tier_with_readiness_evidence(tmp_path: Path) -> None:
+    readiness = {
+        'summary_state': 'ready',
+        'verification': {
+            'sandbox_validation_possible': True,
+            'evidence_tier': 'static_and_sandbox',
+            'verification_boundary': 'live_runtime_unverified',
+            'live_runtime_ready': True,
+            'live_runtime_verified': False,
+        },
+    }
+    report = VerificationExecutionReportService(tmp_path).build(
+        executed_phases=['python', 'prod'],
+        sdk_binding_requested=False,
+        model_binding_requested=False,
+        readiness_manifest=readiness,
+    )
+    assert report['proof_scope']['repository_proof'] is True
+    assert report['proof_scope']['profile_gate_proof'] is True
+    assert report['proof_scope']['sandbox_validation_possible'] is True
     assert report['reported_tiers']['已静态确认'] is True
     assert report['reported_tiers']['已沙箱验证'] is True
     assert report['reported_tiers']['未真实环境验证'] is True
-    assert '未真实环境验证 remains true' in report['claim_guardrails']['safe_summary']
 
 
 def test_verification_execution_report_rejects_missing_bundle_even_with_live_flags(tmp_path: Path) -> None:
@@ -306,6 +332,12 @@ def test_acceptance_summary_script_writes_machine_readable_summary(tmp_path: Pat
     import sys
 
     summary = tmp_path / 'acceptance_summary.json'
+    verification = tmp_path / 'verification_execution_report.json'
+    readiness = tmp_path / 'runtime_readiness_manifest.json'
+    build_evidence = tmp_path / 'build_evidence_report.json'
+    verification.write_text(json.dumps({'proof_scope': {'repository_proof': True, 'profile_gate_proof': False}, 'executed_phases': ['python']}), encoding='utf-8')
+    readiness.write_text(json.dumps({'summary_state': 'degraded', 'verification': {'verification_boundary': 'environment_blocked'}}), encoding='utf-8')
+    build_evidence.write_text(json.dumps({'evidence_mode': 'syntax_only_fallback'}), encoding='utf-8')
     script_path = Path('scripts/write_acceptance_summary.py')
     result = subprocess.run(
         [
@@ -313,9 +345,9 @@ def test_acceptance_summary_script_writes_machine_readable_summary(tmp_path: Pat
             str(script_path),
             '--output', str(summary),
             '--build-dir', str(tmp_path / 'build'),
-            '--verification-report', str(tmp_path / 'verification_execution_report.json'),
-            '--readiness-manifest', str(tmp_path / 'runtime_readiness_manifest.json'),
-            '--build-evidence-report', str(tmp_path / 'build_evidence_report.json'),
+            '--verification-report', str(verification),
+            '--readiness-manifest', str(readiness),
+            '--build-evidence-report', str(build_evidence),
             '--profile', 'mock',
             '--profile', 'hil',
             '--installed-binary', str(tmp_path / 'mock/spine_robot_core'),
@@ -417,6 +449,10 @@ def test_write_acceptance_summary_uses_portable_relative_paths(tmp_path: Path) -
     readiness = tmp_path / 'proof' / 'runtime_readiness_manifest.json'
     evidence = tmp_path / 'proof' / 'build_evidence_report.json'
     installed = build_dir / 'mock' / 'spine_robot_core'
+    verification.parent.mkdir(parents=True, exist_ok=True)
+    verification.write_text(json.dumps({'proof_scope': {'repository_proof': True, 'profile_gate_proof': False}, 'executed_phases': ['python']}), encoding='utf-8')
+    readiness.write_text(json.dumps({'summary_state': 'degraded', 'verification': {'verification_boundary': ''}}), encoding='utf-8')
+    evidence.write_text(json.dumps({'evidence_mode': ''}), encoding='utf-8')
     script_path = Path('scripts/write_acceptance_summary.py')
     result = subprocess.run(
         [
@@ -472,3 +508,109 @@ def test_write_verification_report_uses_portable_relative_manifest_path(tmp_path
     assert result.returncode == 0, result.stderr
     payload = json.loads(output.read_text(encoding='utf-8'))
     assert payload['runtime_readiness']['manifest_path'] == 'runtime_readiness_manifest.json'
+
+
+
+def test_acceptance_summary_falls_back_to_verification_report_when_local_readiness_manifest_is_omitted(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    summary = tmp_path / 'acceptance_summary.json'
+    verification = tmp_path / 'verification_execution_report.json'
+    build_evidence = tmp_path / 'build_evidence_report.json'
+    verification.write_text(json.dumps({
+        'proof_scope': {'repository_proof': True, 'profile_gate_proof': True, 'profile_phases': ['mock']},
+        'executed_phases': ['python', 'mock'],
+        'reported_tiers': {'python': 'repository'},
+        'runtime_readiness': {
+            'source': 'embedded_live_bundle',
+            'summary_state': 'ready',
+            'verification_boundary': 'live_runtime_unverified',
+            'evidence_tier': 'live_bundle',
+            'live_runtime_ready': True,
+            'live_runtime_verified': False,
+        },
+        'claim_guardrails': {'safe_summary': 'claim-safe'},
+    }, indent=2), encoding='utf-8')
+    build_evidence.write_text(json.dumps({'evidence_mode': 'live_bundle_index', 'claim_boundary': 'claim-safe'}, indent=2), encoding='utf-8')
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            'scripts/write_acceptance_summary.py',
+            '--output', str(summary),
+            '--build-dir', str(tmp_path / 'build'),
+            '--verification-report', str(verification),
+            '--build-evidence-report', str(build_evidence),
+            '--profile', 'mock',
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(summary.read_text(encoding='utf-8'))
+    assert payload['readiness_manifest'] == ''
+    assert payload['verification_snapshot']['summary_state'] == 'ready'
+    assert payload['verification_snapshot']['verification_boundary'] == 'live_runtime_unverified'
+    assert payload['verification_snapshot']['evidence_tier'] == 'live_bundle'
+    assert payload['verification_snapshot']['runtime_readiness_source'] == 'verification_report'
+
+
+
+
+def test_write_acceptance_summary_fails_closed_when_required_reports_are_missing(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    summary = tmp_path / 'acceptance_summary.json'
+    result = subprocess.run(
+        [
+            sys.executable,
+            'scripts/write_acceptance_summary.py',
+            '--output', str(summary),
+            '--build-dir', str(tmp_path / 'build'),
+            '--verification-report', str(tmp_path / 'missing_verification_execution_report.json'),
+            '--build-evidence-report', str(tmp_path / 'missing_build_evidence_report.json'),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert '[FAIL] verification report file does not exist:' in result.stderr
+    assert not summary.exists()
+
+
+def test_verification_execution_report_uses_embedded_bundle_readiness_snapshot(tmp_path: Path) -> None:
+    readiness_manifest = {
+        'summary_state': 'ready',
+        'verification': {
+            'verification_boundary': 'live_runtime_unverified',
+            'evidence_tier': 'live_bundle',
+            'live_runtime_ready': True,
+            'live_runtime_verified': False,
+        },
+    }
+    bundle = tmp_path / 'live_bundle.zip'
+    with zipfile.ZipFile(bundle, 'w') as zf:
+        zf.writestr('runtime_config.json', json.dumps(_runtime_config()))
+        zf.writestr('rt_phase_metrics.json', json.dumps(_phase_metrics()))
+        zf.writestr('runtime_readiness_manifest.json', json.dumps(readiness_manifest))
+
+    report = VerificationExecutionReportService(Path.cwd()).build(
+        executed_phases=['python', 'mock'],
+        sdk_binding_requested=True,
+        model_binding_requested=True,
+        readiness_manifest_path='should_not_be_used.json',
+        readiness_manifest={'summary_state': 'blocked', 'verification': {'verification_boundary': 'environment_blocked'}},
+        live_evidence_bundle=str(bundle),
+    )
+    runtime = dict(report['runtime_readiness'])
+    assert runtime['manifest_path'] == ''
+    assert runtime['source'] == 'embedded_live_bundle'
+    assert runtime['summary_state'] == 'ready'
+    assert runtime['verification_boundary'] == 'live_runtime_unverified'
+    assert runtime['evidence_tier'] == 'live_bundle'
+    assert runtime['live_runtime_ready'] is True
+    assert runtime['live_runtime_verified'] is False

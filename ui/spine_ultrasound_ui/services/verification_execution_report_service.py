@@ -20,7 +20,7 @@ class VerificationExecutionReportService:
     root_dir: Path
 
     SCHEMA_VERSION = "verification.execution_report.v1"
-    VERIFICATION_BOUNDARY_REF = "docs/VERIFICATION_BOUNDARY.md"
+    VERIFICATION_BOUNDARY_REF = "docs/05_verification/VERIFICATION_POLICY.md"
 
     def build(
         self,
@@ -36,7 +36,6 @@ class VerificationExecutionReportService:
         binding_mode = "live_candidate" if sdk_binding_requested and model_binding_requested else "contract_shell"
         repository_proof = "python" in phases
         profile_phases = [phase for phase in phases if phase in {"mock", "hil", "prod"}]
-        profile_gate_proof = bool(profile_phases)
         readiness_snapshot = dict(readiness_manifest or {})
         inspection = LiveEvidenceBundleService(self.root_dir).inspect(
             str(live_evidence_bundle or ""),
@@ -45,6 +44,23 @@ class VerificationExecutionReportService:
         )
         live_controller_validation = bool(inspection.valid)
         live_reason = inspection.reason
+        runtime_readiness_payload = readiness_snapshot
+        runtime_readiness_path = str(readiness_manifest_path or '')
+        if live_evidence_bundle:
+            runtime_readiness_payload = {
+                'summary_state': inspection.readiness_summary_state,
+                'verification': {
+                    'verification_boundary': inspection.readiness_verification_boundary,
+                    'evidence_tier': inspection.readiness_evidence_tier,
+                    'sandbox_validation_possible': inspection.readiness_evidence_tier in {'static_and_sandbox', 'sandbox'},
+                    'live_runtime_ready': inspection.readiness_live_runtime_ready,
+                    'live_runtime_verified': inspection.readiness_live_runtime_verified,
+                },
+            } if inspection.readiness_summary_state or inspection.readiness_verification_boundary or inspection.readiness_evidence_tier or inspection.readiness_live_runtime_ready or inspection.readiness_live_runtime_verified else {}
+            runtime_readiness_path = ''
+        readiness_verification = dict((runtime_readiness_payload or {}).get('verification') or {})
+        sandbox_validation_possible = bool(readiness_verification.get('sandbox_validation_possible', False)) or str(readiness_verification.get('evidence_tier', '')) in {'static_and_sandbox', 'sandbox'}
+        profile_gate_proof = bool(profile_phases and sandbox_validation_possible)
         safe_summary = self._build_safe_summary(
             phases=phases,
             repository_proof=repository_proof,
@@ -58,8 +74,8 @@ class VerificationExecutionReportService:
             "verification_boundary_ref": self.VERIFICATION_BOUNDARY_REF,
             "executed_phases": phases,
             "reported_tiers": {
-                "已静态确认": bool(repository_proof or profile_gate_proof),
-                "已沙箱验证": bool(repository_proof or profile_gate_proof),
+                "已静态确认": bool(repository_proof),
+                "已沙箱验证": bool(profile_gate_proof),
                 "未真实环境验证": not live_controller_validation,
             },
             "proof_scope": {
@@ -67,6 +83,7 @@ class VerificationExecutionReportService:
                 "profile_gate_proof": profile_gate_proof,
                 "profile_phases": profile_phases,
                 "live_controller_validation": live_controller_validation,
+                "sandbox_validation_possible": sandbox_validation_possible,
             },
             "bindings": {
                 "sdk_binding_requested": bool(sdk_binding_requested),
@@ -74,11 +91,14 @@ class VerificationExecutionReportService:
                 "binding_mode": binding_mode,
             },
             "runtime_readiness": {
-                "manifest_path": str(readiness_manifest_path or ""),
-                "summary_state": str((readiness_snapshot or {}).get("summary_state", "")),
-                "verification_boundary": str(((readiness_snapshot or {}).get("verification") or {}).get("verification_boundary", "")),
-                "live_runtime_ready": bool(((readiness_snapshot or {}).get("verification") or {}).get("live_runtime_ready", False)),
-                "live_runtime_verified": bool(((readiness_snapshot or {}).get("verification") or {}).get("live_runtime_verified", False)),
+                "manifest_path": runtime_readiness_path,
+                "source": "embedded_live_bundle" if live_evidence_bundle else "linked_manifest",
+                "summary_state": str((runtime_readiness_payload or {}).get("summary_state", "")),
+                "verification_boundary": str(((runtime_readiness_payload or {}).get("verification") or {}).get("verification_boundary", "")),
+                "evidence_tier": str(((runtime_readiness_payload or {}).get("verification") or {}).get("evidence_tier", "")),
+                "sandbox_validation_possible": bool(((runtime_readiness_payload or {}).get("verification") or {}).get("sandbox_validation_possible", False)),
+                "live_runtime_ready": bool(((runtime_readiness_payload or {}).get("verification") or {}).get("live_runtime_ready", False)),
+                "live_runtime_verified": bool(((runtime_readiness_payload or {}).get("verification") or {}).get("live_runtime_verified", False)),
             },
             "real_environment": {
                 "validated": live_controller_validation,
@@ -123,10 +143,10 @@ class VerificationExecutionReportService:
         if repository_proof:
             parts.append("repository proof closed")
         if profile_gate_proof:
-            parts.append("profile gate proof closed")
+            parts.append("artifact-backed sandbox proof closed")
         parts.append(f"binding mode: {binding_mode}")
         if live_controller_validation:
             parts.append("live-controller validation closed by archived controller evidence bundle")
         else:
-            parts.append(f"treat result as 已静态确认 + 已沙箱验证 only; 未真实环境验证 remains true ({live_reason})")
+            parts.append(f"treat result as artifact-backed 已静态确认/已沙箱验证 only when readiness evidence exists; 未真实环境验证 remains true ({live_reason})")
         return "; ".join(parts)

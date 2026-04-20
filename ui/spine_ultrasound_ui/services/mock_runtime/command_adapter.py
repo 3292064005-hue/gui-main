@@ -402,7 +402,16 @@ class MockRuntimeCommandAdapterMixin:
             self.last_recovery_action = "contact_stable"
             return ReplyEnvelope(ok=True, message="seek_contact accepted")
 
+        def _cmd_start_procedure(self, payload: dict) -> ReplyEnvelope:
+            if str(payload.get("procedure", "")).strip().lower() != "scan":
+                return ReplyEnvelope(ok=False, message="start_procedure requires procedure=scan")
+            self.last_recovery_action = "start_procedure"
+            return ReplyEnvelope(ok=True, message="start_procedure accepted")
+
         def _cmd_start_scan(self, payload: dict) -> ReplyEnvelope:
+            payload = dict(payload)
+            payload.setdefault("procedure", "scan")
+            return self._cmd_start_procedure(payload)
             del payload
             if self.execution_state not in {SystemState.CONTACT_STABLE, SystemState.PAUSED_HOLD}:
                 return ReplyEnvelope(ok=False, message="cannot start scan before contact is stable")

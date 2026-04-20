@@ -1,0 +1,27 @@
+{
+  "bundle_id": "lamina_keypoint:lamina_keypoint",
+  "bundle_version": "v1",
+  "package_name": "lamina_keypoint",
+  "runtime_profile": "clinical_mainline",
+  "artifacts": {
+    "weights_path": "parameters.json",
+    "entrypoint": "spine_ultrasound_ui.training.runtime_adapters.lamina_keypoint",
+    "parameter_path": "parameters.json",
+    "meta_path": "model_meta.json"
+  },
+  "compatibility": {
+    "robot_models": [
+      "xmate3",
+      "xmate7",
+      "xmateer3pro",
+      "xmateer7pro"
+    ],
+    "runtime_modes": [
+      "core",
+      "headless_review"
+    ]
+  },
+  "preprocess": {},
+  "postprocess": {},
+  "metrics": {}
+}

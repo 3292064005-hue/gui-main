@@ -7,6 +7,7 @@ from spine_ultrasound_ui.utils import now_text
 
 from spine_ultrasound_ui.core.experiment_manager import ExperimentManager
 from spine_ultrasound_ui.services.session_intelligence_service import SessionIntelligenceService
+from spine_ultrasound_ui.utils.truth_ledger_service import refresh_live_truth_ledger_from_artifacts
 
 
 class SessionFinalizeService:
@@ -57,8 +58,15 @@ class SessionFinalizeService:
         }
         manifest_target = self._write_intelligence_manifest(session_dir, products, targets)
         targets["session_intelligence_manifest"] = manifest_target
+        live_truth_ledger = refresh_live_truth_ledger_from_artifacts(
+            session_dir,
+            existing=self.exp_manager.load_manifest(session_dir).get("live_truth_ledger", {}),
+        )
+        live_truth_target = self.exp_manager.save_json_artifact(session_dir, "meta/live_truth_ledger.json", live_truth_ledger)
+        targets["live_truth_ledger"] = live_truth_target
         for name, target in targets.items():
             self.exp_manager.append_artifact(session_dir, name, target)
+        self.exp_manager.sync_canonical_manifest_fields(session_dir, live_truth_ledger=live_truth_ledger)
         return targets
 
     def _write_intelligence_manifest(self, session_dir: Path, products: dict[str, Any], targets: dict[str, Path]) -> Path:

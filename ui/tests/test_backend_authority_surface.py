@@ -141,3 +141,15 @@ def test_backend_link_snapshot_does_not_fallback_top_level_authority_fields() ->
     assert snapshot['final_verdict'] == {}
     assert snapshot['projected_control_authority']['summary_label'] == 'projected'
     assert snapshot['projected_final_verdict']['source'] == 'projection'
+
+
+def test_authoritative_contract_service_does_not_fabricate_owner_for_partial_authority_payload() -> None:
+    service = BackendAuthoritativeContractService()
+    authority = service.normalize_control_authority(
+        {'summary_state': 'degraded', 'detail': 'missing runtime authority owner'},
+        authority_source='api_bridge',
+    )
+    assert authority['summary_state'] == 'degraded'
+    assert authority['owner'] == {}
+    assert authority['active_lease'] == {}
+

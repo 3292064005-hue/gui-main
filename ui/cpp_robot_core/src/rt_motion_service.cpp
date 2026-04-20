@@ -161,37 +161,51 @@ void RtMotionService::stop() {
   stopRtLoop();
 }
 
-void RtMotionService::controlledRetract() {
-  if (!startControlledRetractRt()) {
-    faultRtPhase("controlled_retract", "start_failed");
-    return;
+RtControlledRetractResult RtMotionService::controlledRetract() {
+  RtControlledRetractResult result{};
+  if (sdk_ == nullptr) {
+    result.status = RtControlledRetractStatus::StartRejected;
+    result.reason = "no_sdk_facade";
+    faultRtPhase("controlled_retract", result.reason);
+    return result;
   }
 
-  double wait_seconds = 0.25;
-  if (sdk_ != nullptr) {
-    const auto config = sdk_->rtControlPort().runtimeConfig();
-    const auto retreat_speed = std::max(1.0, config.retreat_speed_mm_s);
-    wait_seconds = std::clamp(config.retract_timeout_ms / 1000.0,
-                              config.retract_travel_mm / retreat_speed + 0.15,
-                              3.0);
+  std::string start_reason;
+  if (!startRtPhase("controlled_retract", &start_reason)) {
+    result.status = RtControlledRetractStatus::StartRejected;
+    result.reason = start_reason.empty() ? "start_failed" : start_reason;
+    faultRtPhase("controlled_retract", result.reason);
+    return result;
   }
+  result.phase_started = true;
+
+  const auto config = sdk_->rtControlPort().runtimeConfig();
+  const auto retreat_speed = std::max(1.0, config.retreat_speed_mm_s);
+  const double wait_seconds = std::clamp(config.retract_timeout_ms / 1000.0,
+                                         config.retract_travel_mm / retreat_speed + 0.15,
+                                         3.0);
 
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(wait_seconds);
-  bool completed = false;
   while (std::chrono::steady_clock::now() < deadline) {
-    if (sdk_ != nullptr && sdk_->rtControlPort().activeRtPhase() == "idle") {
-      completed = true;
+    if (sdk_->rtControlPort().activeRtPhase() == "idle") {
+      result.phase_completed = true;
       break;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
-  std::string reason;
-  if (completed) {
-    completeRtPhase("controlled_retract", &reason);
-  } else {
-    faultRtPhase("controlled_retract", "timeout_waiting_phase_completion");
+  if (result.phase_completed) {
+    std::string complete_reason;
+    completeRtPhase("controlled_retract", &complete_reason);
+    result.status = RtControlledRetractStatus::Completed;
+    result.reason = complete_reason.empty() ? "phase_completed:controlled_retract" : complete_reason;
+    return result;
   }
+
+  result.status = RtControlledRetractStatus::TimedOut;
+  result.reason = "timeout_waiting_phase_completion";
+  faultRtPhase("controlled_retract", result.reason);
+  return result;
 }
 
 SensorHealthDecision RtMotionService::evaluateSensorFreshnessMs(double age_ms) const {

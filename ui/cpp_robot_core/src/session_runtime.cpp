@@ -4,99 +4,14 @@
 
 #include "json_utils.h"
 #include "robot_core/robot_identity_contract.h"
+#include "robot_core/generated_runtime_config_apply_snapshot.inc"
 
 namespace robot_core {
 
 
 void CoreRuntime::applyConfigSnapshotLocked(const std::string& config_snapshot_json) {
   const auto& source = config_snapshot_json.empty() ? std::string("{}") : config_snapshot_json;
-  config_.pressure_target = json::extractDouble(source, "pressure_target", config_.pressure_target);
-  config_.pressure_upper = json::extractDouble(source, "pressure_upper", config_.pressure_upper);
-  config_.pressure_lower = json::extractDouble(source, "pressure_lower", config_.pressure_lower);
-  config_.scan_speed_mm_s = json::extractDouble(source, "scan_speed_mm_s", config_.scan_speed_mm_s);
-  config_.sample_step_mm = json::extractDouble(source, "sample_step_mm", config_.sample_step_mm);
-  config_.segment_length_mm = json::extractDouble(source, "segment_length_mm", config_.segment_length_mm);
-  config_.strip_width_mm = json::extractDouble(source, "strip_width_mm", config_.strip_width_mm);
-  config_.strip_overlap_mm = json::extractDouble(source, "strip_overlap_mm", config_.strip_overlap_mm);
-  config_.contact_seek_speed_mm_s = json::extractDouble(source, "contact_seek_speed_mm_s", config_.contact_seek_speed_mm_s);
-  config_.retreat_speed_mm_s = json::extractDouble(source, "retreat_speed_mm_s", config_.retreat_speed_mm_s);
-  config_.seek_contact_max_travel_mm = json::extractDouble(source, "seek_contact_max_travel_mm", config_.seek_contact_max_travel_mm);
-  config_.retract_travel_mm = json::extractDouble(source, "retract_travel_mm", config_.retract_travel_mm);
-  config_.scan_follow_lateral_amplitude_mm = json::extractDouble(source, "scan_follow_lateral_amplitude_mm", config_.scan_follow_lateral_amplitude_mm);
-  config_.scan_follow_frequency_hz = json::extractDouble(source, "scan_follow_frequency_hz", config_.scan_follow_frequency_hz);
-  config_.rt_stale_state_timeout_ms = json::extractDouble(source, "rt_stale_state_timeout_ms", config_.rt_stale_state_timeout_ms);
-  config_.rt_phase_transition_debounce_cycles = json::extractInt(source, "rt_phase_transition_debounce_cycles", config_.rt_phase_transition_debounce_cycles);
-  config_.rt_max_cart_step_mm = json::extractDouble(source, "rt_max_cart_step_mm", config_.rt_max_cart_step_mm);
-  config_.rt_max_cart_vel_mm_s = json::extractDouble(source, "rt_max_cart_vel_mm_s", config_.rt_max_cart_vel_mm_s);
-  config_.rt_max_cart_acc_mm_s2 = json::extractDouble(source, "rt_max_cart_acc_mm_s2", config_.rt_max_cart_acc_mm_s2);
-  config_.rt_max_pose_trim_deg = json::extractDouble(source, "rt_max_pose_trim_deg", config_.rt_max_pose_trim_deg);
-  config_.rt_max_force_error_n = json::extractDouble(source, "rt_max_force_error_n", config_.rt_max_force_error_n);
-  config_.rt_integrator_limit_n = json::extractDouble(source, "rt_integrator_limit_n", config_.rt_integrator_limit_n);
-  config_.contact_force_target_n = json::extractDouble(source, "contact_force_target_n", config_.contact_force_target_n);
-  config_.contact_force_tolerance_n = json::extractDouble(source, "contact_force_tolerance_n", config_.contact_force_tolerance_n);
-  config_.contact_establish_cycles = json::extractInt(source, "contact_establish_cycles", config_.contact_establish_cycles);
-  config_.normal_admittance_gain = json::extractDouble(source, "normal_admittance_gain", config_.normal_admittance_gain);
-  config_.normal_damping_gain = json::extractDouble(source, "normal_damping_gain", config_.normal_damping_gain);
-  config_.seek_contact_max_step_mm = json::extractDouble(source, "seek_contact_max_step_mm", config_.seek_contact_max_step_mm);
-  config_.normal_velocity_quiet_threshold_mm_s = json::extractDouble(source, "normal_velocity_quiet_threshold_mm_s", config_.normal_velocity_quiet_threshold_mm_s);
-  config_.scan_force_target_n = json::extractDouble(source, "scan_force_target_n", config_.scan_force_target_n);
-  config_.scan_force_tolerance_n = json::extractDouble(source, "scan_force_tolerance_n", config_.scan_force_tolerance_n);
-  config_.scan_normal_pi_kp = json::extractDouble(source, "scan_normal_pi_kp", config_.scan_normal_pi_kp);
-  config_.scan_normal_pi_ki = json::extractDouble(source, "scan_normal_pi_ki", config_.scan_normal_pi_ki);
-  config_.scan_tangent_speed_min_mm_s = json::extractDouble(source, "scan_tangent_speed_min_mm_s", config_.scan_tangent_speed_min_mm_s);
-  config_.scan_tangent_speed_max_mm_s = json::extractDouble(source, "scan_tangent_speed_max_mm_s", config_.scan_tangent_speed_max_mm_s);
-  config_.scan_pose_trim_gain = json::extractDouble(source, "scan_pose_trim_gain", config_.scan_pose_trim_gain);
-  config_.scan_follow_enable_lateral_modulation = json::extractBool(source, "scan_follow_enable_lateral_modulation", config_.scan_follow_enable_lateral_modulation);
-  config_.pause_hold_position_guard_mm = json::extractDouble(source, "pause_hold_position_guard_mm", config_.pause_hold_position_guard_mm);
-  config_.pause_hold_force_guard_n = json::extractDouble(source, "pause_hold_force_guard_n", config_.pause_hold_force_guard_n);
-  config_.pause_hold_drift_kp = json::extractDouble(source, "pause_hold_drift_kp", config_.pause_hold_drift_kp);
-  config_.pause_hold_drift_ki = json::extractDouble(source, "pause_hold_drift_ki", config_.pause_hold_drift_ki);
-  config_.pause_hold_integrator_leak = json::extractDouble(source, "pause_hold_integrator_leak", config_.pause_hold_integrator_leak);
-  config_.retract_release_force_n = json::extractDouble(source, "retract_release_force_n", config_.retract_release_force_n);
-  config_.retract_release_cycles = json::extractInt(source, "retract_release_cycles", config_.retract_release_cycles);
-  config_.retract_safe_gap_mm = json::extractDouble(source, "retract_safe_gap_mm", config_.retract_safe_gap_mm);
-  config_.retract_max_travel_mm = json::extractDouble(source, "retract_max_travel_mm", config_.retract_max_travel_mm);
-  config_.retract_jerk_limit_mm_s3 = json::extractDouble(source, "retract_jerk_limit_mm_s3", config_.retract_jerk_limit_mm_s3);
-  config_.retract_timeout_ms = json::extractDouble(source, "retract_timeout_ms", config_.retract_timeout_ms);
-  config_.image_quality_threshold = json::extractDouble(source, "image_quality_threshold", config_.image_quality_threshold);
-  config_.smoothing_factor = json::extractDouble(source, "smoothing_factor", config_.smoothing_factor);
-  config_.reconstruction_step = json::extractDouble(source, "reconstruction_step", config_.reconstruction_step);
-  config_.feature_threshold = json::extractDouble(source, "feature_threshold", config_.feature_threshold);
-  config_.roi_mode = json::extractString(source, "roi_mode", config_.roi_mode);
-  config_.network_stale_ms = json::extractInt(source, "network_stale_ms", config_.network_stale_ms);
-  config_.pressure_stale_ms = json::extractInt(source, "pressure_stale_ms", config_.pressure_stale_ms);
-  config_.telemetry_rate_hz = json::extractInt(source, "telemetry_rate_hz", config_.telemetry_rate_hz);
-  config_.tool_name = json::extractString(source, "tool_name", config_.tool_name);
-  config_.tcp_name = json::extractString(source, "tcp_name", config_.tcp_name);
-  config_.load_kg = json::extractDouble(source, "load_kg", config_.load_kg);
-  config_.rt_mode = json::extractString(source, "rt_mode", config_.rt_mode);
-  config_.remote_ip = json::extractString(source, "remote_ip", config_.remote_ip);
-  config_.local_ip = json::extractString(source, "local_ip", config_.local_ip);
-  config_.force_sensor_provider = json::extractString(source, "force_sensor_provider", config_.force_sensor_provider);
-  const auto contact_control = json::extractObject(source, "contact_control", "{}");
-  config_.contact_control.mode = json::extractString(contact_control, "mode", config_.contact_control.mode);
-  config_.contact_control.virtual_mass = json::extractDouble(contact_control, "virtual_mass", config_.contact_control.virtual_mass);
-  config_.contact_control.virtual_damping = json::extractDouble(contact_control, "virtual_damping", config_.contact_control.virtual_damping);
-  config_.contact_control.virtual_stiffness = json::extractDouble(contact_control, "virtual_stiffness", config_.contact_control.virtual_stiffness);
-  config_.contact_control.force_deadband_n = json::extractDouble(contact_control, "force_deadband_n", config_.contact_control.force_deadband_n);
-  config_.contact_control.max_normal_step_mm = json::extractDouble(contact_control, "max_normal_step_mm", config_.contact_control.max_normal_step_mm);
-  config_.contact_control.max_normal_velocity_mm_s = json::extractDouble(contact_control, "max_normal_velocity_mm_s", config_.contact_control.max_normal_velocity_mm_s);
-  config_.contact_control.max_normal_acc_mm_s2 = json::extractDouble(contact_control, "max_normal_acc_mm_s2", config_.contact_control.max_normal_acc_mm_s2);
-  config_.contact_control.max_normal_travel_mm = json::extractDouble(contact_control, "max_normal_travel_mm", config_.contact_control.max_normal_travel_mm);
-  config_.contact_control.anti_windup_limit_n = json::extractDouble(contact_control, "anti_windup_limit_n", config_.contact_control.anti_windup_limit_n);
-  config_.contact_control.integrator_leak = json::extractDouble(contact_control, "integrator_leak", config_.contact_control.integrator_leak);
-  const auto force_estimator = json::extractObject(source, "force_estimator", "{}");
-  config_.force_estimator.preferred_source = json::extractString(force_estimator, "preferred_source", config_.force_estimator.preferred_source);
-  config_.force_estimator.pressure_weight = json::extractDouble(force_estimator, "pressure_weight", config_.force_estimator.pressure_weight);
-  config_.force_estimator.wrench_weight = json::extractDouble(force_estimator, "wrench_weight", config_.force_estimator.wrench_weight);
-  config_.force_estimator.stale_timeout_ms = json::extractInt(force_estimator, "stale_timeout_ms", config_.force_estimator.stale_timeout_ms);
-  config_.force_estimator.timeout_ms = json::extractInt(force_estimator, "timeout_ms", config_.force_estimator.timeout_ms);
-  config_.force_estimator.auto_bias_zero = json::extractBool(force_estimator, "auto_bias_zero", config_.force_estimator.auto_bias_zero);
-  config_.force_estimator.min_confidence = json::extractDouble(force_estimator, "min_confidence", config_.force_estimator.min_confidence);
-  const auto orientation_trim = json::extractObject(source, "orientation_trim", "{}");
-  config_.orientation_trim.gain = json::extractDouble(orientation_trim, "gain", config_.orientation_trim.gain);
-  config_.orientation_trim.max_trim_deg = json::extractDouble(orientation_trim, "max_trim_deg", config_.orientation_trim.max_trim_deg);
-  config_.orientation_trim.lowpass_hz = json::extractDouble(orientation_trim, "lowpass_hz", config_.orientation_trim.lowpass_hz);
+  ROBOT_CORE_APPLY_RUNTIME_CONFIG_SNAPSHOT(config_, source);
   config_.normal_damping_gain = config_.contact_control.virtual_damping * 1e-6;
   config_.normal_admittance_gain = config_.contact_control.virtual_mass > 0.0
                                        ? (1.0 / config_.contact_control.virtual_mass) * 1e-4
@@ -107,41 +22,14 @@ void CoreRuntime::applyConfigSnapshotLocked(const std::string& config_snapshot_j
   config_.rt_integrator_limit_n = config_.contact_control.anti_windup_limit_n;
   config_.scan_pose_trim_gain = config_.orientation_trim.gain;
   config_.rt_max_pose_trim_deg = config_.orientation_trim.max_trim_deg;
-  config_.robot_model = ROBOT_CORE_DEFAULT_ROBOT_MODEL;
-  config_.axis_count = ROBOT_CORE_DEFAULT_AXIS_COUNT;
-  config_.sdk_robot_class = ROBOT_CORE_DEFAULT_SDK_CLASS;
-  config_.preferred_link = ROBOT_CORE_DEFAULT_PREFERRED_LINK;
-  config_.requires_single_control_source = json::extractBool(source, "requires_single_control_source", config_.requires_single_control_source);
-  config_.allow_contract_shell_writes = json::extractBool(source, "allow_contract_shell_writes", config_.allow_contract_shell_writes);
-  config_.build_id = json::extractString(source, "build_id", config_.build_id);
-  config_.software_version = json::extractString(source, "software_version", config_.software_version);
-  config_.rt_network_tolerance_percent = json::extractInt(source, "rt_network_tolerance_percent", config_.rt_network_tolerance_percent);
-  config_.joint_filter_hz = json::extractDouble(source, "joint_filter_hz", config_.joint_filter_hz);
-  config_.cart_filter_hz = json::extractDouble(source, "cart_filter_hz", config_.cart_filter_hz);
-  config_.torque_filter_hz = json::extractDouble(source, "torque_filter_hz", config_.torque_filter_hz);
-  config_.collision_detection_enabled = json::extractBool(source, "collision_detection_enabled", config_.collision_detection_enabled);
-  config_.collision_sensitivity = json::extractInt(source, "collision_sensitivity", config_.collision_sensitivity);
-  config_.collision_behavior = json::extractString(source, "collision_behavior", config_.collision_behavior);
-  config_.collision_fallback_mm = json::extractDouble(source, "collision_fallback_mm", config_.collision_fallback_mm);
-  config_.soft_limit_enabled = json::extractBool(source, "soft_limit_enabled", config_.soft_limit_enabled);
-  config_.joint_soft_limit_margin_deg = json::extractDouble(source, "joint_soft_limit_margin_deg", config_.joint_soft_limit_margin_deg);
-  config_.singularity_avoidance_enabled = json::extractBool(source, "singularity_avoidance_enabled", config_.singularity_avoidance_enabled);
-  config_.rl_project_name = json::extractString(source, "rl_project_name", config_.rl_project_name);
-  config_.rl_task_name = json::extractString(source, "rl_task_name", config_.rl_task_name);
-  config_.xpanel_vout_mode = json::extractString(source, "xpanel_vout_mode", config_.xpanel_vout_mode);
-  config_.fc_frame_type = json::extractString(source, "fc_frame_type", config_.fc_frame_type);
-  const auto cartesian_impedance = json::extractDoubleArray(source, "cartesian_impedance", config_.cartesian_impedance);
-  if (!cartesian_impedance.empty()) config_.cartesian_impedance = cartesian_impedance;
-  const auto desired_wrench_n = json::extractDoubleArray(source, "desired_wrench_n", config_.desired_wrench_n);
-  if (!desired_wrench_n.empty()) config_.desired_wrench_n = desired_wrench_n;
-  const auto fc_frame_matrix = json::extractDoubleArray(source, "fc_frame_matrix", config_.fc_frame_matrix);
-  if (!fc_frame_matrix.empty()) config_.fc_frame_matrix = fc_frame_matrix;
-  const auto tcp_frame_matrix = json::extractDoubleArray(source, "tcp_frame_matrix", config_.tcp_frame_matrix);
-  if (!tcp_frame_matrix.empty()) config_.tcp_frame_matrix = tcp_frame_matrix;
-  const auto load_com_mm = json::extractDoubleArray(source, "load_com_mm", config_.load_com_mm);
-  if (!load_com_mm.empty()) config_.load_com_mm = load_com_mm;
-  const auto load_inertia = json::extractDoubleArray(source, "load_inertia", config_.load_inertia);
-  if (!load_inertia.empty()) config_.load_inertia = load_inertia;
+  const auto& identity = resolveRobotIdentity(config_.robot_model, config_.sdk_robot_class, config_.axis_count);
+  config_.robot_model = identity.robot_model;
+  config_.axis_count = identity.axis_count;
+  config_.sdk_robot_class = identity.sdk_robot_class;
+  if (config_.preferred_link.empty()) {
+    config_.preferred_link = identity.preferred_link;
+  }
+  config_.requires_single_control_source = identity.requires_single_control_source && config_.requires_single_control_source;
 }
 
 
@@ -149,21 +37,56 @@ void CoreRuntime::applyConfigSnapshotLocked(const std::string& config_snapshot_j
 void CoreRuntime::loadPlanLocked(const std::string& scan_plan_json, const std::string& scan_plan_hash) {
   const auto plan = scan_plan_parser_.parseJsonEnvelope(scan_plan_json.empty() ? std::string("{}") : scan_plan_json);
   std::string error;
-  if (!scan_plan_validator_.validate(plan, &error)) {
+  if (!scan_plan_validator_.validate(plan, &config_, &error)) {
+    clearExecutionPlanRuntimeLocked();
     plan_loaded_ = false;
-    state_reason_ = error;
+    state_reason_ = error.empty() ? std::string("scan plan validation failed") : error;
+    return;
+  }
+  const auto authoritative_precheck = sdk_robot_.validatePlanAuthoritativeKinematics(plan);
+  if (authoritative_precheck.available && !authoritative_precheck.passed) {
+    clearExecutionPlanRuntimeLocked();
+    plan_loaded_ = false;
+    state_reason_ = authoritative_precheck.reason.empty() ? std::string("authoritative xMateModel precheck failed") : authoritative_precheck.reason;
+    return;
+  }
+  for (const auto& warning : authoritative_precheck.warnings) {
+    sdk_robot_.appendLog(std::string("authoritative_precheck_warning:") + warning);
+  }
+  if (!rebuildExecutionPlanRuntimeLocked(plan, &error)) {
+    clearExecutionPlanRuntimeLocked();
+    plan_loaded_ = false;
+    state_reason_ = error.empty() ? std::string("scan plan validation failed") : error;
     return;
   }
   plan_id_ = plan.plan_id;
   plan_hash_ = !plan.plan_hash.empty() ? plan.plan_hash : scan_plan_hash;
-  total_segments_ = static_cast<int>(plan.segments.size());
-  total_points_ = std::max(total_segments_ * std::max(static_cast<int>(config_.segment_length_mm / std::max(config_.sample_step_mm, 0.1)), 2), 0);
+  total_segments_ = static_cast<int>(execution_plan_runtime_.segments.size());
+  total_points_ = execution_plan_runtime_.total_waypoints;
   path_index_ = 0;
   active_waypoint_index_ = 0;
   progress_pct_ = 0.0;
-  active_segment_ = total_segments_ > 0 ? plan.segments.front().segment_id : 0;
+  active_segment_ = total_segments_ > 0 ? execution_plan_runtime_.segments.front().segment.segment_id : 0;
   sdk_robot_.updateSessionRegisters(active_segment_, frame_id_);
+  NrtSessionTargets targets{};
+  targets.home_joint_rad = config_.home_joint_rad;
+  targets.approach_pose = execution_plan_runtime_.approach_pose;
+  targets.retreat_pose = execution_plan_runtime_.retreat_pose;
+  targets.approach_pose_valid = true;
+  targets.retreat_pose_valid = true;
+  if (!execution_plan_runtime_.segments.empty() && !execution_plan_runtime_.segments.front().segment.waypoints.empty()) {
+    targets.entry_pose = execution_plan_runtime_.segments.front().segment.waypoints.front();
+    targets.entry_pose_valid = true;
+  }
+  nrt_motion_service_.configureSessionTargets(targets);
+  NrtFallbackTargets fallback{};
+  fallback.home_joint_rad = config_.emergency_home_joint_rad;
+  fallback.approach_pose_xyzabc = config_.emergency_approach_pose_xyzabc;
+  fallback.entry_pose_xyzabc = config_.emergency_entry_pose_xyzabc;
+  fallback.retreat_pose_xyzabc = config_.emergency_retreat_pose_xyzabc;
+  nrt_motion_service_.configureFallbackTargets(fallback);
   plan_loaded_ = total_segments_ > 0;
+  scan_procedure_active_ = false;
 }
 
 
@@ -181,7 +104,7 @@ FinalVerdict CoreRuntime::compileScanPlanVerdictLocked(const std::string& config
   verdict.evidence_id = std::string("cpp-final-verdict:") + (plan.plan_hash.empty() ? std::string("no-plan") : plan.plan_hash) + ":" + (session_id_.empty() ? std::string("unlocked") : session_id_);
 
   std::string error;
-  if (!scan_plan_validator_.validate(plan, &error)) {
+  if (!scan_plan_validator_.validate(plan, &config_, &error)) {
     verdict.accepted = false;
     verdict.reason = error;
     verdict.detail = error;
@@ -190,6 +113,18 @@ FinalVerdict CoreRuntime::compileScanPlanVerdictLocked(const std::string& config
     verdict.next_state = "replan_required";
     verdict.blockers.push_back(error);
     return verdict;
+  }
+
+  const auto authoritative_precheck = sdk_robot_.validatePlanAuthoritativeKinematics(plan);
+  if (authoritative_precheck.available) {
+    if (!authoritative_precheck.passed) {
+      verdict.blockers.push_back(authoritative_precheck.reason.empty() ? std::string("kinematic_valid: authoritative xMateModel feasibility failed") : authoritative_precheck.reason);
+    }
+    for (const auto& warning : authoritative_precheck.warnings) {
+      verdict.warnings.push_back(std::string("kinematic_valid: ") + warning);
+    }
+  } else if (!authoritative_precheck.reason.empty()) {
+    verdict.warnings.push_back(std::string("kinematic_valid advisory degraded: ") + authoritative_precheck.reason);
   }
 
   appendMainlineContractIssuesLocked(&verdict.blockers, &verdict.warnings);
@@ -292,19 +227,6 @@ void CoreRuntime::appendMainlineContractIssuesLocked(std::vector<std::string>* b
 }
 
 
-
-bool CoreRuntime::sessionFreezeConsistentLocked() const {
-  if (session_id_.empty() || session_dir_.empty()) {
-    return false;
-  }
-  if (!(tool_ready_ && tcp_ready_ && load_ready_)) {
-    return false;
-  }
-  if (!locked_scan_plan_hash_.empty() && !plan_hash_.empty() && locked_scan_plan_hash_ != plan_hash_) {
-    return false;
-  }
-  return true;
-}
 
 
 }  // namespace robot_core

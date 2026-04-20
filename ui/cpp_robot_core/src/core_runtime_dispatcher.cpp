@@ -64,6 +64,13 @@ std::string CoreRuntimeDispatcher::handleCommandJson(const std::string& line) {
 
   auto dispatch_with_contract = [&](std::mutex& lane_mutex) -> std::string {
     std::lock_guard<std::mutex> lane_lock(lane_mutex);
+    {
+      std::lock_guard<std::mutex> state_lock(owner_.state_mutex_);
+      std::string authority_error;
+      if (!owner_.authorizeInvocationLocked(invocation, &authority_error)) {
+        return owner_.replyJson(invocation.request_id, false, authority_error.empty() ? "runtime authority rejected request" : authority_error);
+      }
+    }
     auto reply = owner_.dispatchTypedCommand(invocation);
     std::string response_error;
     if (!validateRuntimeCommandReplyEnvelope(invocation.command, reply, &response_error)) {

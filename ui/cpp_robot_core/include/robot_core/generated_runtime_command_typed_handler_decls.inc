@@ -1,5 +1,6 @@
 // Generated from schemas/runtime_command_manifest.json via runtime_command_contracts.py. Do not edit manually.
 
+  std::string handleAcquireControlLeaseTyped(const RuntimeCommandContext& context, const AcquireControlLeaseRequest& request);
   std::string handleApproachPrescanTyped(const RuntimeCommandContext& context, const ApproachPrescanRequest& request);
   std::string handleCancelRecordPathTyped(const RuntimeCommandContext& context, const CancelRecordPathRequest& request);
   std::string handleClearFaultTyped(const RuntimeCommandContext& context, const ClearFaultRequest& request);
@@ -49,6 +50,8 @@
   std::string handleQueryFinalVerdictTyped(const RuntimeCommandContext& context, const QueryFinalVerdictRequest& request);
   std::string handleQueryPathListsTyped(const RuntimeCommandContext& context, const QueryPathListsRequest& request);
   std::string handleQueryRlProjectsTyped(const RuntimeCommandContext& context, const QueryRlProjectsRequest& request);
+  std::string handleReleaseControlLeaseTyped(const RuntimeCommandContext& context, const ReleaseControlLeaseRequest& request);
+  std::string handleRenewControlLeaseTyped(const RuntimeCommandContext& context, const RenewControlLeaseRequest& request);
   std::string handleReplayPathTyped(const RuntimeCommandContext& context, const ReplayPathRequest& request);
   std::string handleResumeScanTyped(const RuntimeCommandContext& context, const ResumeScanRequest& request);
   std::string handleRunRlProjectTyped(const RuntimeCommandContext& context, const RunRlProjectRequest& request);
@@ -57,6 +60,7 @@
   std::string handleSeekContactTyped(const RuntimeCommandContext& context, const SeekContactRequest& request);
   std::string handleSetAutoModeTyped(const RuntimeCommandContext& context, const SetAutoModeRequest& request);
   std::string handleSetManualModeTyped(const RuntimeCommandContext& context, const SetManualModeRequest& request);
+  std::string handleStartProcedureTyped(const RuntimeCommandContext& context, const StartProcedureRequest& request);
   std::string handleStartRecordPathTyped(const RuntimeCommandContext& context, const StartRecordPathRequest& request);
   std::string handleStartScanTyped(const RuntimeCommandContext& context, const StartScanRequest& request);
   std::string handleStopRecordPathTyped(const RuntimeCommandContext& context, const StopRecordPathRequest& request);

@@ -3,16 +3,19 @@ from __future__ import annotations
 
 """Write a machine-readable acceptance summary for the current audit run.
 
-This script intentionally performs only lightweight validation and does not
-claim that any referenced report has been produced by a real controller or HIL
-run. It is the final report-linking step of the acceptance chain and must stay
-parseable/executable because repository gates depend on it.
+This script intentionally keeps claim boundaries conservative, but it is strict
+about the presence of the upstream reports it links. Final acceptance artifacts
+must not materialize from missing or invalid required evidence.
 """
 
 import argparse
 import json
 import os
 from pathlib import Path
+
+
+class EvidenceLoadError(RuntimeError):
+    """Raised when a required evidence file is missing or malformed."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--output', required=True, help='target JSON path for the acceptance summary')
     parser.add_argument('--build-dir', required=True, help='root build directory used by the acceptance run')
     parser.add_argument('--verification-report', required=True, help='verification execution report JSON path')
-    parser.add_argument('--readiness-manifest', required=True, help='runtime readiness manifest JSON path')
+    parser.add_argument('--readiness-manifest', default='', help='optional runtime readiness manifest JSON path; omit when verification evidence comes from an archived live bundle')
     parser.add_argument('--build-evidence-report', required=True, help='C++ build evidence report JSON path')
     parser.add_argument('--with-sdk', action='store_true', help='record that live SDK bindings were requested')
     parser.add_argument('--with-model', action='store_true', help='record that live model bindings were requested')
@@ -53,48 +56,36 @@ def _portable_path(raw: str, *, base_dir: Path) -> str:
 
 
 
-def _load_json_dict(raw: str) -> dict:
-    """Load an optional JSON object without turning summary emission into a hard gate.
+def _load_json_dict(raw: str, *, label: str, required: bool) -> dict:
+    """Load a JSON object from disk.
 
-    Args:
-        raw: User-provided path string.
-
-    Returns:
-        Parsed JSON object when available and valid; otherwise an empty dict.
-
-    Boundary behavior:
-        Missing files, invalid JSON, or non-object payloads are intentionally
-        treated as absent evidence because upstream generators own semantic
-        validation. The acceptance summary only mirrors linked proof metadata.
+    Required evidence fails closed. Optional readiness evidence may be omitted
+    for live-bundle flows that intentionally do not materialize a standalone
+    local readiness manifest.
     """
     if not raw:
+        if required:
+            raise EvidenceLoadError(f'{label} path is required')
+        return {}
+    candidate = Path(raw)
+    if not candidate.is_file():
+        if required:
+            raise EvidenceLoadError(f'{label} file does not exist: {raw}')
         return {}
     try:
-        candidate = Path(raw)
         payload = json.loads(candidate.read_text(encoding='utf-8'))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    except json.JSONDecodeError as exc:
+        raise EvidenceLoadError(f'{label} is not valid JSON: {raw} ({exc.msg})') from exc
+    except OSError as exc:
+        raise EvidenceLoadError(f'{label} could not be read: {raw} ({exc})') from exc
+    if not isinstance(payload, dict):
+        raise EvidenceLoadError(f'{label} must be a JSON object: {raw}')
+    return payload
 
 
 
 def _validated_profiles(*, verification_report: dict, requested_profiles: list[str]) -> list[str]:
-    """Return only profiles that are actually closed by verification evidence.
-
-    Args:
-        verification_report: Parsed verification execution report payload.
-        requested_profiles: Profiles the caller says were intended for acceptance.
-
-    Returns:
-        Profiles that are both requested and present in
-        ``proof_scope.profile_phases`` when ``profile_gate_proof`` is true.
-
-    Boundary behavior:
-        When the linked verification report does not close profile-gate proof,
-        this function returns an empty list even if callers passed profile names.
-        This prevents acceptance summaries from overstating repository-only runs
-        as if mock/HIL/prod acceptance had completed.
-    """
+    """Return only profiles that are actually closed by verification evidence."""
     proof_scope = dict(verification_report.get('proof_scope') or {})
     if not bool(proof_scope.get('profile_gate_proof', False)):
         return []
@@ -104,20 +95,22 @@ def _validated_profiles(*, verification_report: dict, requested_profiles: list[s
         return proven
     return [item for item in requested if item in proven]
 
-def _verification_snapshot(*, verification_report: dict, readiness_manifest: dict, build_evidence_report: dict) -> dict:
-    """Summarize linked verification evidence inside the acceptance payload.
 
-    This prevents callers from needing to dereference three separate JSON files
-    before they can understand the current claim boundary.
-    """
+def _verification_snapshot(*, verification_report: dict, readiness_manifest: dict, build_evidence_report: dict) -> dict:
+    """Summarize linked verification evidence inside the acceptance payload."""
     readiness_verification = dict(readiness_manifest.get('verification') or {})
+    verification_runtime = dict(verification_report.get('runtime_readiness') or {})
     reported_tiers = dict(verification_report.get('reported_tiers') or {})
+    summary_state = str(readiness_manifest.get('summary_state', '') or verification_runtime.get('summary_state', ''))
+    verification_boundary = str(readiness_verification.get('verification_boundary', '') or verification_runtime.get('verification_boundary', ''))
+    evidence_tier = str(readiness_verification.get('evidence_tier', '') or verification_runtime.get('evidence_tier', ''))
     return {
-        'summary_state': str(readiness_manifest.get('summary_state', '')),
-        'verification_boundary': str(readiness_verification.get('verification_boundary', '')),
-        'evidence_tier': str(readiness_verification.get('evidence_tier', '')),
-        'live_runtime_ready': bool(readiness_verification.get('live_runtime_ready', False)),
-        'live_runtime_verified': bool(readiness_verification.get('live_runtime_verified', False)),
+        'summary_state': summary_state,
+        'verification_boundary': verification_boundary,
+        'evidence_tier': evidence_tier,
+        'live_runtime_ready': bool(readiness_verification.get('live_runtime_ready', verification_runtime.get('live_runtime_ready', False))),
+        'live_runtime_verified': bool(readiness_verification.get('live_runtime_verified', verification_runtime.get('live_runtime_verified', False))),
+        'runtime_readiness_source': 'linked_manifest' if readiness_manifest else 'verification_report',
         'reported_tiers': reported_tiers,
         'claim_boundary': str(build_evidence_report.get('claim_boundary') or verification_report.get('claim_guardrails', {}).get('safe_summary', '')),
         'build_evidence_mode': str(build_evidence_report.get('evidence_mode', '')),
@@ -125,22 +118,17 @@ def _verification_snapshot(*, verification_report: dict, readiness_manifest: dic
 
 
 def main() -> int:
-    """Build and persist the acceptance summary payload.
-
-    Returns:
-        ``0`` when the summary file is written successfully.
-
-    Boundary behavior:
-        The script records package-local references relative to the summary file
-        directory. Existence/semantic validation of the referenced reports
-        belongs to the upstream acceptance steps that generated them.
-    """
+    """Build and persist the acceptance summary payload."""
     args = parse_args()
     output = Path(args.output)
     base_dir = output.parent
-    verification_report_payload = _load_json_dict(args.verification_report)
-    readiness_manifest_payload = _load_json_dict(args.readiness_manifest)
-    build_evidence_payload = _load_json_dict(args.build_evidence_report)
+    try:
+        verification_report_payload = _load_json_dict(args.verification_report, label='verification report', required=True)
+        readiness_manifest_payload = _load_json_dict(args.readiness_manifest, label='runtime readiness manifest', required=False)
+        build_evidence_payload = _load_json_dict(args.build_evidence_report, label='build evidence report', required=True)
+    except EvidenceLoadError as exc:
+        print(f'[FAIL] {exc}', file=os.sys.stderr)
+        return 2
     validated_profiles = _validated_profiles(
         verification_report=verification_report_payload,
         requested_profiles=list(args.profiles),
