@@ -5,7 +5,6 @@
   std::string handleCancelRecordPathTyped(const RuntimeCommandContext& context, const CancelRecordPathRequest& request);
   std::string handleClearFaultTyped(const RuntimeCommandContext& context, const ClearFaultRequest& request);
   std::string handleClearInjectedFaultsTyped(const RuntimeCommandContext& context, const ClearInjectedFaultsRequest& request);
-  std::string handleCompileScanPlanTyped(const RuntimeCommandContext& context, const CompileScanPlanRequest& request);
   std::string handleConnectRobotTyped(const RuntimeCommandContext& context, const ConnectRobotRequest& request);
   std::string handleDisableDragTyped(const RuntimeCommandContext& context, const DisableDragRequest& request);
   std::string handleDisconnectRobotTyped(const RuntimeCommandContext& context, const DisconnectRobotRequest& request);
@@ -62,7 +61,7 @@
   std::string handleSetManualModeTyped(const RuntimeCommandContext& context, const SetManualModeRequest& request);
   std::string handleStartProcedureTyped(const RuntimeCommandContext& context, const StartProcedureRequest& request);
   std::string handleStartRecordPathTyped(const RuntimeCommandContext& context, const StartRecordPathRequest& request);
-  std::string handleStartScanTyped(const RuntimeCommandContext& context, const StartScanRequest& request);
   std::string handleStopRecordPathTyped(const RuntimeCommandContext& context, const StopRecordPathRequest& request);
+  std::string handleStopScanTyped(const RuntimeCommandContext& context, const StopScanRequest& request);
   std::string handleValidateScanPlanTyped(const RuntimeCommandContext& context, const ValidateScanPlanRequest& request);
   std::string handleValidateSetupTyped(const RuntimeCommandContext& context, const ValidateSetupRequest& request);

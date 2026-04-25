@@ -75,7 +75,7 @@ def test_session_intelligence_materializes_governance_snapshots(tmp_path: Path) 
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     session_service = controller.session_service
     assert session_service.current_session_dir is not None
@@ -103,8 +103,8 @@ def test_session_intelligence_materializes_governance_snapshots(tmp_path: Path) 
 
 def test_validate_and_query_final_verdict_commands_are_manifest_backed_read_contracts() -> None:
     assert canonical_command_name('validate_scan_plan') == 'validate_scan_plan'
-    assert canonical_command_name('compile_scan_plan') == 'validate_scan_plan'
-    assert command_alias_kind('compile_scan_plan') == 'deprecated_alias'
+    assert canonical_command_name('compile_scan_plan') == 'compile_scan_plan'
+    assert command_alias_kind('compile_scan_plan') == ''
     assert canonical_command_name('query_final_verdict') == 'query_final_verdict'
     assert is_write_command('validate_scan_plan') is False
     assert is_write_command('compile_scan_plan') is False

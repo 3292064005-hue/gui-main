@@ -65,11 +65,14 @@ public:
    */
   void reset();
 
-  const AdmittanceControllerConfig& config() const { return config_; }
+  const AdmittanceControllerConfig& config() const { return state_store_.config; }
   const AdmittanceState& state() const { return state_; }
 
 private:
-  AdmittanceControllerConfig config_{};
+  struct LocalStateStore {
+    AdmittanceControllerConfig config{};
+  };
+  LocalStateStore state_store_{};
   AdmittanceState state_{};
 };
 

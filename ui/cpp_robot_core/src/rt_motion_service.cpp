@@ -9,14 +9,14 @@
 
 namespace robot_core {
 
-AdaptiveTimer::AdaptiveTimer(double min_period_ms, double max_period_ms, double target_cpu)
-    : min_period_ms_(min_period_ms), max_period_ms_(max_period_ms), target_cpu_(target_cpu), current_period_ms_(min_period_ms) {}
+RtLoopTelemetryTracker::RtLoopTelemetryTracker(double fixed_period_ms, double telemetry_budget_ms, double target_cpu)
+    : fixed_period_ms_(fixed_period_ms), telemetry_budget_ms_(telemetry_budget_ms), target_cpu_(target_cpu), current_period_ms_(fixed_period_ms) {}
 
-void AdaptiveTimer::start() {
+void RtLoopTelemetryTracker::start() {
   last_time_ = std::chrono::steady_clock::now();
 }
 
-void AdaptiveTimer::wait() {
+void RtLoopTelemetryTracker::wait() {
   const auto now = std::chrono::steady_clock::now();
   const auto elapsed = std::chrono::duration<double, std::milli>(now - last_time_).count();
   max_observed_cycle_ms_ = std::max(max_observed_cycle_ms_, elapsed);
@@ -28,15 +28,15 @@ void AdaptiveTimer::wait() {
   last_time_ = std::chrono::steady_clock::now();
 }
 
-double AdaptiveTimer::getCpuUsage() {
+double RtLoopTelemetryTracker::getCpuUsage() {
   return target_cpu_;
 }
 
-void AdaptiveTimer::adjustPeriod(double cpu_usage) {
+void RtLoopTelemetryTracker::adjustPeriod(double cpu_usage) {
   if (cpu_usage > target_cpu_) {
-    current_period_ms_ = std::min(max_period_ms_, current_period_ms_ + 0.1);
+    current_period_ms_ = std::min(telemetry_budget_ms_, current_period_ms_ + 0.1);
   } else {
-    current_period_ms_ = std::max(min_period_ms_, current_period_ms_ - 0.05);
+    current_period_ms_ = std::max(fixed_period_ms_, current_period_ms_ - 0.05);
   }
 }
 
@@ -44,7 +44,7 @@ RtMotionService::RtMotionService(std::shared_ptr<rokae::xMateRobot> robot, SdkRo
     : robot_(std::move(robot)),
       sdk_(sdk),
       impedance_manager_(std::make_unique<robot_core::ImpedanceControlManager>()),
-      adaptive_timer_(std::make_unique<AdaptiveTimer>(1.0, 1.0, 70.0)) {
+      loop_telemetry_tracker_(std::make_unique<RtLoopTelemetryTracker>(1.0, 1.0, 70.0)) {
   snapshot_.degraded_without_sdk = (sdk_ == nullptr);
   snapshot_.nominal_loop_hz = 1000;
   snapshot_.fixed_period_enforced = true;
@@ -251,9 +251,9 @@ void RtMotionService::updateSnapshot(const std::string& phase, const std::string
 }
 
 void RtMotionService::syncSnapshotTelemetry() {
-  snapshot_.current_period_ms = adaptive_timer_->getCurrentPeriodMs();
-  snapshot_.max_cycle_ms = std::max(snapshot_.max_cycle_ms, adaptive_timer_->getMaxObservedCycleMs());
-  snapshot_.overrun_count = std::max(snapshot_.overrun_count, adaptive_timer_->getOverrunCount());
+  snapshot_.current_period_ms = loop_telemetry_tracker_->getCurrentPeriodMs();
+  snapshot_.max_cycle_ms = std::max(snapshot_.max_cycle_ms, loop_telemetry_tracker_->getMaxObservedCycleMs());
+  snapshot_.overrun_count = std::max(snapshot_.overrun_count, loop_telemetry_tracker_->getOverrunCount());
   if (sdk_ != nullptr) {
     snapshot_.network_healthy = sdk_->rtControlPort().networkHealthy();
     snapshot_.nominal_loop_hz = std::max(1, sdk_->rtControlPort().nominalRtLoopHz());

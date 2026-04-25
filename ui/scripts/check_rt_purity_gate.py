@@ -29,7 +29,7 @@ RT_SENSITIVE_RULES: dict[Path, dict[str, object]] = {
         'allowed_line_patterns': [
             r'RtMotionService::RtMotionService',
             r'impedance_manager_\(',
-            r'adaptive_timer_\(',
+            r'loop_telemetry_tracker_\(',
         ],
     },
     ROOT / 'cpp_robot_core' / 'src' / 'sdk_robot_facade_rt.cpp': {
@@ -47,6 +47,26 @@ RT_SENSITIVE_RULES: dict[Path, dict[str, object]] = {
         },
         'required_tokens': {
             'startLoop(false)': 'RT facade must keep non-blocking fixed-period loop startup on the RT path',
+        },
+        'allowed_line_patterns': [],
+    },
+    ROOT / 'cpp_robot_core' / 'src' / 'sdk_robot_facade_rt_phase.cpp': {
+        'forbidden_tokens': {
+            'json::': 'RT phase planner must not emit JSON on the hot path',
+            'std::ofstream': 'RT phase planner must not write files on the hot path',
+            'std::ifstream': 'RT phase planner must not read files on the hot path',
+            'appendRecord': 'RT phase planner must not touch recorder append APIs on the hot path',
+            'std::cout': 'RT phase planner must not log to stdout on the hot path',
+            'printf(': 'RT phase planner must not use formatted stdout on the hot path',
+            'fmt::': 'RT phase planner must not perform formatting-heavy work on the hot path',
+            'std::make_unique': 'RT phase planner must not allocate dynamic objects on the hot path',
+            'std::make_shared': 'RT phase planner must not allocate shared dynamic objects on the hot path',
+            'new ': 'RT phase planner must not allocate heap objects on the hot path',
+        },
+        'required_tokens': {
+            'stepSeekContact': 'RT phase planner split must preserve seek-contact step handling',
+            'stepScanFollow': 'RT phase planner split must preserve scan-follow step handling',
+            'stepControlledRetract': 'RT phase planner split must preserve retract step handling',
         },
         'allowed_line_patterns': [],
     },
@@ -87,7 +107,7 @@ RT_SENSITIVE_RULES: dict[Path, dict[str, object]] = {
         },
         'allowed_line_patterns': [],
     },
-    ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_contracts.cpp': {
+    ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_contract_safety.cpp': {
         'forbidden_tokens': {},
         'required_tokens': {
             'field("overrun_count"': 'Runtime contracts must publish overrun_count to the governance surface',

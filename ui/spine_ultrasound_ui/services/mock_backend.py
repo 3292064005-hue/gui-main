@@ -110,7 +110,7 @@ class MockBackend(QObject, BackendBase):
             "mode": "mock",
             "summary_state": "ready",
             "summary_label": "本地 mock 内联",
-            "detail": "桌面与 mock runtime 进程内直连。",
+            "detail": "桌面与 mock contract-replay runtime 进程内直连。",
             "command_success_rate": 100,
             "telemetry_connected": True,
             "camera_connected": True,

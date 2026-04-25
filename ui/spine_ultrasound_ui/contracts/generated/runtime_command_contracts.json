@@ -544,138 +544,6 @@
       }
     },
     {
-      "name": "compile_scan_plan",
-      "canonical_command": "validate_scan_plan",
-      "alias_kind": "deprecated_alias",
-      "write_command": false,
-      "capability_claim": "plan_compile",
-      "handler_group": "handleValidationCommand",
-      "state_preconditions": [
-        "AUTO_READY",
-        "SESSION_LOCKED",
-        "PATH_VALIDATED",
-        "SCAN_COMPLETE"
-      ],
-      "fields": [
-        {
-          "name": "config_snapshot",
-          "required": false,
-          "field_type": "object",
-          "nested_required_fields": [],
-          "array_item_type": "",
-          "array_item_required_fields": []
-        },
-        {
-          "name": "scan_plan",
-          "required": true,
-          "field_type": "object",
-          "nested_required_fields": [
-            "plan_id",
-            "segments",
-            "plan_hash"
-          ],
-          "array_item_type": "",
-          "array_item_required_fields": []
-        },
-        {
-          "name": "scan_plan_hash",
-          "required": false,
-          "field_type": "string",
-          "nested_required_fields": [],
-          "array_item_type": "",
-          "array_item_required_fields": []
-        }
-      ],
-      "deprecation_stage": "warn_only",
-      "removal_target": "2026-Q4",
-      "replacement_command": "validate_scan_plan",
-      "compatibility_note": "Deprecated alias retained for compatibility; new code must call validate_scan_plan.",
-      "request_contract": {
-        "required_fields": [
-          "scan_plan"
-        ],
-        "fields": [
-          {
-            "name": "config_snapshot",
-            "required": false,
-            "field_type": "object",
-            "nested_required_fields": [],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          },
-          {
-            "name": "scan_plan",
-            "required": true,
-            "field_type": "object",
-            "nested_required_fields": [
-              "plan_id",
-              "segments",
-              "plan_hash"
-            ],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          },
-          {
-            "name": "scan_plan_hash",
-            "required": false,
-            "field_type": "string",
-            "nested_required_fields": [],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          },
-          {
-            "name": "_command_context",
-            "required": false,
-            "field_type": "object",
-            "nested_required_fields": [],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          }
-        ]
-      },
-      "response_contract": {
-        "envelope_fields": [
-          "ok",
-          "message",
-          "request_id",
-          "data",
-          "protocol_version"
-        ],
-        "data_contract_token": "final_verdict",
-        "data_required_fields": [
-          "final_verdict"
-        ],
-        "data_fields": [
-          {
-            "name": "final_verdict",
-            "required": true,
-            "field_type": "object",
-            "nested_required_fields": [
-              "accepted",
-              "authoritative",
-              "reason"
-            ],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          }
-        ],
-        "read_only": true
-      },
-      "guard_contract": {
-        "allowed_states": [
-          "AUTO_READY",
-          "SESSION_LOCKED",
-          "PATH_VALIDATED",
-          "SCAN_COMPLETE"
-        ],
-        "lane": "query"
-      },
-      "dispatch_contract": {
-        "canonical_command": "validate_scan_plan",
-        "handler_group": "handleValidationCommand"
-      }
-    },
-    {
       "name": "connect_robot",
       "canonical_command": "connect_robot",
       "alias_kind": "canonical",
@@ -1257,7 +1125,7 @@
           {
             "name": "clinical_mainline_mode",
             "required": true,
-            "field_type": "boolean",
+            "field_type": "string",
             "nested_required_fields": [],
             "array_item_type": "",
             "array_item_required_fields": []
@@ -1265,6 +1133,14 @@
           {
             "name": "required_sequence",
             "required": true,
+            "field_type": "array",
+            "nested_required_fields": [],
+            "array_item_type": "string",
+            "array_item_required_fields": []
+          },
+          {
+            "name": "runtime_owned_phase_sequence",
+            "required": false,
             "field_type": "array",
             "nested_required_fields": [],
             "array_item_type": "string",
@@ -5161,73 +5037,6 @@
       }
     },
     {
-      "name": "start_scan",
-      "canonical_command": "start_procedure",
-      "alias_kind": "compatibility_alias",
-      "write_command": true,
-      "capability_claim": "rt_motion_write",
-      "handler_group": "handleExecutionCommand",
-      "state_preconditions": [
-        "PATH_VALIDATED",
-        "CONTACT_STABLE",
-        "PAUSED_HOLD"
-      ],
-      "fields": [],
-      "deprecation_stage": "deprecated",
-      "removal_target": "after start_procedure migration completes",
-      "replacement_command": "start_procedure",
-      "compatibility_note": "Compatibility alias for legacy scan start requests; use start_procedure with procedure=scan.",
-      "request_contract": {
-        "required_fields": [],
-        "fields": [
-          {
-            "name": "_command_context",
-            "required": false,
-            "field_type": "object",
-            "nested_required_fields": [],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          }
-        ]
-      },
-      "response_contract": {
-        "envelope_fields": [
-          "ok",
-          "message",
-          "request_id",
-          "data",
-          "protocol_version"
-        ],
-        "data_contract_token": "rt_command_ack",
-        "data_required_fields": [
-          "rt_command_ack"
-        ],
-        "data_fields": [
-          {
-            "name": "rt_command_ack",
-            "required": true,
-            "field_type": "",
-            "nested_required_fields": [],
-            "array_item_type": "",
-            "array_item_required_fields": []
-          }
-        ],
-        "read_only": false
-      },
-      "guard_contract": {
-        "allowed_states": [
-          "PATH_VALIDATED",
-          "CONTACT_STABLE",
-          "PAUSED_HOLD"
-        ],
-        "lane": "rt_control"
-      },
-      "dispatch_contract": {
-        "canonical_command": "start_procedure",
-        "handler_group": "handleExecutionCommand"
-      }
-    },
-    {
       "name": "stop_record_path",
       "canonical_command": "stop_record_path",
       "alias_kind": "canonical",
@@ -5287,6 +5096,79 @@
       },
       "dispatch_contract": {
         "canonical_command": "stop_record_path",
+        "handler_group": "handleExecutionCommand"
+      }
+    },
+    {
+      "name": "stop_scan",
+      "canonical_command": "stop_scan",
+      "alias_kind": "canonical",
+      "write_command": true,
+      "capability_claim": "rt_motion_write",
+      "handler_group": "handleExecutionCommand",
+      "state_preconditions": [
+        "APPROACHING",
+        "CONTACT_SEEKING",
+        "CONTACT_STABLE",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT"
+      ],
+      "fields": [],
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": "",
+      "request_contract": {
+        "required_fields": [],
+        "fields": [
+          {
+            "name": "_command_context",
+            "required": false,
+            "field_type": "object",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ]
+      },
+      "response_contract": {
+        "envelope_fields": [
+          "ok",
+          "message",
+          "request_id",
+          "data",
+          "protocol_version"
+        ],
+        "data_contract_token": "rt_command_ack",
+        "data_required_fields": [
+          "rt_command_ack"
+        ],
+        "data_fields": [
+          {
+            "name": "rt_command_ack",
+            "required": true,
+            "field_type": "",
+            "nested_required_fields": [],
+            "array_item_type": "",
+            "array_item_required_fields": []
+          }
+        ],
+        "read_only": false
+      },
+      "guard_contract": {
+        "allowed_states": [
+          "APPROACHING",
+          "CONTACT_SEEKING",
+          "CONTACT_STABLE",
+          "SCANNING",
+          "PAUSED_HOLD",
+          "RECOVERY_RETRACT"
+        ],
+        "lane": "rt_control"
+      },
+      "dispatch_contract": {
+        "canonical_command": "stop_scan",
         "handler_group": "handleExecutionCommand"
       }
     },

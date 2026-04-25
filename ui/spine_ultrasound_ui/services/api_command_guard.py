@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
 from spine_ultrasound_ui.services.ipc_protocol import is_write_command
+from spine_ultrasound_ui.services.runtime_command_catalog import is_retired_alias, retired_alias_rejection
 
 
 @dataclass(frozen=True)
@@ -32,9 +33,11 @@ class ApiCommandGuardService:
         if payload is not None and not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="payload must be a JSON object")
         profile = self.deployment_profile_service.resolve(None)
+        if is_retired_alias(command):
+            raise HTTPException(status_code=410, detail=retired_alias_rejection(command))
         write_command = is_write_command(command)
-        if write_command and (getattr(adapter, 'read_only_mode', False) or not profile.allows_write_commands):
-            raise HTTPException(status_code=403, detail='adapter is running in read-only review mode')
+        if write_command:
+            raise HTTPException(status_code=403, detail='HTTP API is read-only evidence surface; use the desktop operator console for write commands')
         self._enforce_token(profile, headers.api_token)
         role = (headers.role or 'operator').strip().lower()
         self._enforce_role(adapter, role, command, profile, write_command=write_command)

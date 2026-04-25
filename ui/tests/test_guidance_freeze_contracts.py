@@ -49,7 +49,7 @@ def test_locked_session_materializes_guidance_bundle(tmp_path: Path) -> None:
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None
@@ -103,7 +103,7 @@ def test_locked_session_uses_canonical_guidance_hashes(tmp_path: Path) -> None:
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None
@@ -213,7 +213,7 @@ def test_source_frame_set_schema_accepts_device_fact_sources(tmp_path: Path) -> 
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None
@@ -274,7 +274,7 @@ def test_locked_session_guidance_artifacts_match_declared_schemas(tmp_path: Path
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None

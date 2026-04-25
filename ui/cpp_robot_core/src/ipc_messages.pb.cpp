@@ -376,7 +376,7 @@ bool RobotTelemetry::SerializeToString(std::string* output) const {
   appendPackedDoubleField(encoded, 6, joint_torque_);
   appendDoubleField(encoded, 7, actual_force_z_);
   appendInt32Field(encoded, 8, safety_status_);
-  appendDoubleField(encoded, 9, quality_score_);
+  appendDoubleField(encoded, 9, state_store_.quality_score);
   *output = std::move(encoded);
   return true;
 }
@@ -390,7 +390,7 @@ bool RobotTelemetry::ParseFromString(const std::string& input) {
   joint_torque_.clear();
   actual_force_z_ = 0.0;
   safety_status_ = 0;
-  quality_score_ = 0.0;
+  state_store_.quality_score = 0.0;
   std::string_view view(input);
   size_t offset = 0;
   while (offset < view.size()) {
@@ -462,7 +462,7 @@ bool RobotTelemetry::ParseFromString(const std::string& input) {
         break;
       }
       case 9:
-        if (wire != 1 || !readDouble(view, offset, quality_score_)) return false;
+        if (wire != 1 || !readDouble(view, offset, state_store_.quality_score)) return false;
         break;
       default:
         if (!skipField(view, offset, wire)) return false;

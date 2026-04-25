@@ -24,7 +24,7 @@ class MockCoreRuntime(
     MockRuntimeContractSurfaceMixin,
     MockRuntimeCommandAdapterMixin,
 ):
-    """State-owning mock runtime façade.
+    """Contract-replay mock runtime façade.
 
     The runtime keeps external construction and public method names stable while
     delegating scenario evolution, contract surface generation, and command
@@ -64,7 +64,7 @@ class MockCoreRuntime(
         self.last_event = "-"
         self.last_controller_log = "-"
         self.controller_logs: list[dict[str, Any]] = [
-            {"level": "INFO", "message": "mock runtime booted", "source": "runtime"},
+            {"level": "INFO", "message": "mock contract-replay runtime booted", "source": "runtime"},
         ]
         self.rl_projects: list[dict[str, Any]] = [
             {"name": "spine_mainline", "tasks": ["scan", "prep", "retreat"]},
@@ -84,6 +84,7 @@ class MockCoreRuntime(
             "registers": {"spine.session.segment": 0, "spine.session.frame": 0},
         }
         self.retreat_ticks_remaining = 0
+        self.retreat_completion_state = SystemState.AUTO_READY
         self.dropped_samples = 0
         self.last_flush_ns = 0
         self.recorders: dict[str, JsonlRecorder] = {}
@@ -125,6 +126,9 @@ class MockCoreRuntime(
         self.session_locked_ts_ns = 0
         self.locked_scan_plan_hash = ""
         self.injected_faults: set[str] = set()
+        self.procedure_active = False
+        self.procedure_subphase = "idle"
+        self.procedure_subphase_ticks = 0
 
     def update_runtime_config(self, config: RuntimeConfig) -> None:
         """Update the runtime configuration and refresh force-sensor bindings.

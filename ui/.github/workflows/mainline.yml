@@ -78,6 +78,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python scripts/check_artifact_lifecycle_registry.py
+      - run: python scripts/check_mainline_claim_boundary.py
       - run: python scripts/check_algorithm_plugin_contracts.py
       - run: python scripts/check_verification_boundary.py
 

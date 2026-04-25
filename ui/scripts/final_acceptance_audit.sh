@@ -27,12 +27,23 @@ CPP_TEST_TARGETS=(
 CPP_BUILD_TARGETS=(spine_robot_core_runtime spine_robot_core "${CPP_TEST_TARGETS[@]}")
 EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"
 
-cpp_test_targets_for_profile() {
-  local profile="$1"
+build_profile_for_phase() {
+  case "$1" in
+    dev) echo mock ;;
+    research) echo hil ;;
+    clinical) echo prod ;;
+    *) return 1 ;;
+  esac
+}
+
+cpp_test_targets_for_phase() {
+  local phase="$1"
+  local build_profile
+  build_profile=$(build_profile_for_phase "$phase")
   local targets=("${CPP_TEST_TARGETS[@]}")
   local with_sdk="${ROBOT_CORE_WITH_XCORE_SDK:-OFF}"
   local with_model="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"
-  if [[ "$profile" == "mock" || "$with_sdk" != "ON" || "$with_model" != "ON" ]]; then
+  if [[ "$build_profile" == "mock" || "$with_sdk" != "ON" || "$with_model" != "ON" ]]; then
     local filtered=()
     local target
     for target in "${targets[@]}"; do
@@ -44,12 +55,16 @@ cpp_test_targets_for_profile() {
   printf '%s\n' "${targets[@]}"
 }
 
-cpp_build_targets_for_profile() {
-  local profile="$1"
+cpp_test_targets_for_profile() {
+  cpp_test_targets_for_phase "$@"
+}
+
+cpp_build_targets_for_phase() {
+  local phase="$1"
   local targets=(spine_robot_core_runtime spine_robot_core)
   while IFS= read -r target; do
     [[ -n "$target" ]] && targets+=("$target")
-  done < <(cpp_test_targets_for_profile "$profile")
+  done < <(cpp_test_targets_for_phase "$phase")
   printf '%s\n' "${targets[@]}"
 }
 
@@ -106,6 +121,7 @@ section "RT quality gates"
 "$PYTHON_BIN" scripts/check_model_bundle_contract.py
 section "Verification boundary"
 "$PYTHON_BIN" scripts/check_verification_boundary.py
+"$PYTHON_BIN" scripts/check_mainline_claim_boundary.py
 section "P2 acceptance artifact generation"
 P2_ACCEPTANCE_OUTPUT_ROOT="$BUILD_DIR/p2_acceptance" "$PYTHON_BIN" scripts/generate_p2_acceptance_artifacts.py
 section "P2 acceptance artifact validation"
@@ -118,10 +134,15 @@ run_pytest_batch() {
   section "Critical regression suite: ${label}"
   "$PYTHON_BIN" scripts/run_pytest_mainline.py -q "$@"
 }
-run_pytest_batch control-plane   tests/test_runtime_refactor_guards.py tests/test_backend_link_and_api_bridge.py tests/test_api_bridge_verdict_service.py tests/test_control_ownership.py   tests/test_runtime_verdict.py tests/test_headless_adapter_surface_refactor.py
-run_pytest_batch release-state   tests/test_runtime_verdict_authority_contract.py tests/test_control_authority_claims.py tests/test_guidance_freeze_contracts.py tests/test_runtime_mode_policy.py
-run_pytest_batch sdk-and-doctor   tests/test_vendor_sdk_and_identity.py tests/test_sdk_runtime_assets_and_model_precheck.py tests/test_mainline_runtime_doctor.py tests/test_architecture_fitness.py
-run_pytest_batch xmate-mainline   tests/test_xmate_mainline.py
+run_pytest_batch control-plane \
+  tests/test_runtime_refactor_guards.py tests/test_backend_link_and_api_bridge.py tests/test_api_bridge_verdict_service.py tests/test_control_ownership.py \
+  tests/test_runtime_verdict.py tests/test_headless_adapter_surface_refactor.py
+run_pytest_batch release-state \
+  tests/test_runtime_verdict_authority_contract.py tests/test_control_authority_claims.py tests/test_guidance_freeze_contracts.py tests/test_runtime_mode_policy.py
+run_pytest_batch sdk-and-doctor \
+  tests/test_vendor_sdk_and_identity.py tests/test_sdk_runtime_assets_and_model_precheck.py tests/test_mainline_runtime_doctor.py tests/test_architecture_fitness.py
+run_pytest_batch xmate-mainline \
+  tests/test_xmate_mainline.py
 if [[ "$INCLUDE_ARCHIVE_COMPAT" == "1" ]]; then
   section "Archive compatibility suite"
   "$PYTHON_BIN" scripts/run_pytest_mainline.py -q \
@@ -132,28 +153,29 @@ fi
 section "C++ preflight"
 bash scripts/check_cpp_prereqs.sh
 section "C++ build and test"
-for PROFILE in mock hil prod; do
-  PROFILE_BUILD_DIR="$BUILD_DIR/$PROFILE"
+for PHASE in dev research clinical; do
+  PROFILE_BUILD_DIR="$BUILD_DIR/$PHASE"
   mkdir -p "$PROFILE_BUILD_DIR"
+  BUILD_PROFILE=$(build_profile_for_phase "$PHASE")
   PROFILE_WITH_SDK="${ROBOT_CORE_WITH_XCORE_SDK}"
   PROFILE_WITH_MODEL="${ROBOT_CORE_WITH_XMATE_MODEL}"
-  if [[ "$PROFILE" == "mock" ]]; then
+  if [[ "$BUILD_PROFILE" == "mock" ]]; then
     PROFILE_WITH_SDK=OFF
     PROFILE_WITH_MODEL=OFF
   fi
-  cmake -S cpp_robot_core -B "$PROFILE_BUILD_DIR" -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DROBOT_CORE_PROFILE="${PROFILE}" -DROBOT_CORE_WITH_XCORE_SDK="${PROFILE_WITH_SDK}" -DROBOT_CORE_WITH_XMATE_MODEL="${PROFILE_WITH_MODEL}" >"$PROFILE_BUILD_DIR.cmake.log" 2>&1 || { tail -n 80 "$PROFILE_BUILD_DIR.cmake.log" || true; fail "C++ configure failed"; }
-  mapfile -t PROFILE_CPP_BUILD_TARGETS < <(cpp_build_targets_for_profile "$PROFILE")
-  mapfile -t PROFILE_CPP_TEST_TARGETS < <(cpp_test_targets_for_profile "$PROFILE")
+  cmake -S cpp_robot_core -B "$PROFILE_BUILD_DIR" -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DROBOT_CORE_PROFILE="${BUILD_PROFILE}" -DROBOT_CORE_WITH_XCORE_SDK="${PROFILE_WITH_SDK}" -DROBOT_CORE_WITH_XMATE_MODEL="${PROFILE_WITH_MODEL}" >"$PROFILE_BUILD_DIR.cmake.log" 2>&1 || { tail -n 80 "$PROFILE_BUILD_DIR.cmake.log" || true; fail "C++ configure failed"; }
+  mapfile -t PROFILE_CPP_BUILD_TARGETS < <(cpp_build_targets_for_phase "$PHASE")
+  mapfile -t PROFILE_CPP_TEST_TARGETS < <(cpp_test_targets_for_phase "$PHASE")
   "$PYTHON_BIN" scripts/build_cpp_targets.py --build-dir "$PROFILE_BUILD_DIR" --jobs "${CMAKE_BUILD_PARALLEL_LEVEL:-1}" "${PROFILE_CPP_BUILD_TARGETS[@]}"
   REGISTERED_CPP_TESTS=$(count_registered_cpp_tests "$PROFILE_BUILD_DIR")
   EXPECTED_PROFILE_CPP_TEST_COUNT="${#PROFILE_CPP_TEST_TARGETS[@]}"
   if [[ "$REGISTERED_CPP_TESTS" != "$EXPECTED_PROFILE_CPP_TEST_COUNT" ]]; then
-    fail "C++ test registration mismatch for profile=$PROFILE: expected $EXPECTED_PROFILE_CPP_TEST_COUNT but ctest registered $REGISTERED_CPP_TESTS"
+    fail "C++ test registration mismatch for phase=$PHASE: expected $EXPECTED_PROFILE_CPP_TEST_COUNT but ctest registered $REGISTERED_CPP_TESTS"
   fi
   ctest --test-dir "$PROFILE_BUILD_DIR" --output-on-failure || fail "C++ tests failed"
   DESTDIR="$PROFILE_BUILD_DIR/install-root" cmake --install "$PROFILE_BUILD_DIR"
   [[ -x "$PROFILE_BUILD_DIR/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core" ]] || fail "Installed spine_robot_core binary missing"
-  if [[ "$PROFILE" == "prod" ]]; then SPINE_DEPLOYMENT_PROFILE=clinical "$PYTHON_BIN" scripts/deployment_smoke_test.py || fail "Prod deployment profile smoke failed"; fi
+  if [[ "$PHASE" == "clinical" ]]; then SPINE_DEPLOYMENT_PROFILE=clinical "$PYTHON_BIN" scripts/deployment_smoke_test.py || fail "Clinical deployment profile smoke failed"; fi
 done
 section "Verification boundary report"
 READINESS_MANIFEST_REPORT="$BUILD_DIR/runtime_readiness_manifest.json"
@@ -161,7 +183,7 @@ VERIFICATION_REPORT="$BUILD_DIR/verification_execution_report.json"
 BUILD_EVIDENCE_REPORT="$BUILD_DIR/build_evidence_report.json"
 ACCEPTANCE_SUMMARY_REPORT="$BUILD_DIR/acceptance_summary.json"
 RELEASE_LEDGER_REPORT="$BUILD_DIR/release_ledger.json"
-WRITE_ARGS=(--phase python --phase mock --phase hil --phase prod --output "$VERIFICATION_REPORT")
+WRITE_ARGS=(--phase python --phase dev --phase research --phase clinical --output "$VERIFICATION_REPORT")
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then WRITE_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then WRITE_ARGS+=(--with-model); fi
 if [[ -n "$LIVE_EVIDENCE_BUNDLE" ]]; then
@@ -171,7 +193,7 @@ else
 fi
 "$PYTHON_BIN" scripts/write_verification_report.py "${WRITE_ARGS[@]}" || fail "verification report generation failed"
 section "C++ build evidence report"
-EVIDENCE_ARGS=(--profile hil --report "$BUILD_EVIDENCE_REPORT")
+EVIDENCE_ARGS=(--profile clinical --report "$BUILD_EVIDENCE_REPORT")
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then EVIDENCE_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then EVIDENCE_ARGS+=(--with-model); fi
 "$PYTHON_BIN" scripts/verify_cpp_build_evidence.py "${EVIDENCE_ARGS[@]}" || fail "build evidence report generation failed"
@@ -180,9 +202,9 @@ SUMMARY_ARGS=(--output "$ACCEPTANCE_SUMMARY_REPORT" --build-dir "$BUILD_DIR" --v
 if [[ -z "$LIVE_EVIDENCE_BUNDLE" ]]; then SUMMARY_ARGS+=(--readiness-manifest "$READINESS_MANIFEST_REPORT"); fi
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then SUMMARY_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then SUMMARY_ARGS+=(--with-model); fi
-for PROFILE in mock hil prod; do
-  SUMMARY_ARGS+=(--profile "$PROFILE")
-  SUMMARY_ARGS+=(--installed-binary "$BUILD_DIR/$PROFILE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
+for PHASE in dev research clinical; do
+  SUMMARY_ARGS+=(--profile "$PHASE")
+  SUMMARY_ARGS+=(--installed-binary "$BUILD_DIR/$PHASE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
 done
 "$PYTHON_BIN" scripts/write_acceptance_summary.py "${SUMMARY_ARGS[@]}" || fail "acceptance summary generation failed"
 section "Release ledger"
@@ -194,9 +216,9 @@ else
 fi
 if [[ "${ROBOT_CORE_WITH_XCORE_SDK:-OFF}" == "ON" ]]; then LEDGER_ARGS+=(--with-sdk); fi
 if [[ "${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}" == "ON" ]]; then LEDGER_ARGS+=(--with-model); fi
-for PROFILE in mock hil prod; do
-  LEDGER_ARGS+=(--profile "$PROFILE")
-  LEDGER_ARGS+=(--installed-binary "$BUILD_DIR/$PROFILE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
+for PHASE in dev research clinical; do
+  LEDGER_ARGS+=(--profile "$PHASE")
+  LEDGER_ARGS+=(--installed-binary "$BUILD_DIR/$PHASE/install-root/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core")
 done
 "$PYTHON_BIN" scripts/write_release_ledger.py "${LEDGER_ARGS[@]}" || fail "release ledger generation failed"
 section "Post-run payload hygiene"

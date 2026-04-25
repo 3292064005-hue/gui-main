@@ -178,7 +178,7 @@ public:
 
   bool enableDrag(const std::string& space, const std::string& type, std::string* reason) {
     if (!owner_.ensureConnected(reason)) return false;
-    if (owner_.powered_ || owner_.auto_mode_) {
+    if (owner_.state_store_.powered || owner_.auto_mode_) {
       owner_.captureFailure("enableDrag", "manual_mode_and_power_off_required", reason);
       return false;
     }

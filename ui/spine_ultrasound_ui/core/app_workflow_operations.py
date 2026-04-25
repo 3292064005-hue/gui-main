@@ -204,7 +204,7 @@ def generate_path(host: AppWorkflowHost) -> None:
     host._emit_status()
 
 
-def start_scan(host: AppWorkflowHost) -> None:
+def start_scan_procedure(host: AppWorkflowHost) -> None:
     if host.preview_scan_plan is None:
         host._log("WARN", "请先完成路径生成与预览。")
         return

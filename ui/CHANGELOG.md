@@ -92,7 +92,7 @@
 
 - 新增 `BridgeObservabilityService`，把前端对后端 runtime 的观测证据纳入正式治理，而不是只看链路和控制面声明
 - 正式检查关键 topic 新鲜度、执行态一致性、最近关键命令是否被前端观测确认
-- `AppController.start_scan()` 新增桥接观测门禁；topic 陈旧、状态不一致、命令未被观测确认都会阻止启动
+- `AppController.start_procedure()` 新增桥接观测门禁；topic 陈旧、状态不一致、命令未被观测确认都会阻止启动
 - 总览页、系统准备、机器人监控、实验回放、系统设置新增桥接观测摘要
 - 新增 `docs/BRIDGE_OBSERVABILITY_MAINLINE.md` 与对应测试
 
@@ -121,14 +121,14 @@
 - Extended runtime config with robot/local IP fields and richer SDK parameters
 - Upgraded config form to preserve non-edited SDK fields and expose robot class/link/filters/tolerance/tool/TCP/load
 - Added SDK alignment views to Prepare and Settings pages
-- Block start_scan when SDK mainline blockers exist
+- Block start_procedure when SDK mainline blockers exist
 - Added SDK alignment tests and architecture note
 
 ## 2026-03-30 (rewrite pass 6)
 - Added `ClinicalConfigService` so runtime configuration now has a formal baseline check separate from SDK alignment and model precheck.
 - Added `SessionGovernanceService` to summarize release gate, integrity, resume viability, incidents, and selected execution into a desktop-facing governance digest.
 - Added explicit desktop operations for applying the xMate clinical baseline, exporting a governance snapshot, and refreshing session governance.
-- Extended readiness to include config-baseline status, and block `start_scan` when configuration blockers exist.
+- Extended readiness to include config-baseline status, and block `start_procedure` when configuration blockers exist.
 - Surfaced config/session governance summaries in Overview, Prepare, Robot Monitor, Replay, and Settings views.
 - Added tests covering baseline normalization, config-blocked scan prevention, governance export, and session governance summarization.
 

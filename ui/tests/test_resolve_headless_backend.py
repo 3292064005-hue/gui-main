@@ -20,20 +20,19 @@ def test_resolve_headless_backend_script_uses_runtime_policy_default(tmp_path: P
     assert payload['mode'] == 'mock'
 
 
-def test_resolve_headless_backend_script_preserves_explicit_mode() -> None:
+def test_resolve_headless_backend_script_ignores_low_level_headless_env_override() -> None:
     script = Path('scripts/resolve_headless_backend.py')
     env = dict(os.environ)
-    env['SPINE_DEPLOYMENT_PROFILE'] = 'lab'
-    env['SPINE_HEADLESS_BACKEND'] = 'core'
+    env['SPINE_DEPLOYMENT_PROFILE'] = 'research'
+    env['SPINE_HEADLESS_BACKEND'] = 'mock'
     result = subprocess.run([sys.executable, str(script)], check=False, capture_output=True, text=True, env=env)
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload['mode'] == 'core'
-    assert payload['resolution_source'] == 'explicit'
+    assert payload['resolution_source'] == 'profile_default'
 
 
-
-def test_resolve_headless_backend_review_defaults_to_core_and_allows_explicit_mock() -> None:
+def test_resolve_headless_backend_review_defaults_to_core_even_with_stale_headless_env() -> None:
     script = Path('scripts/resolve_headless_backend.py')
 
     default_env = dict(os.environ)
@@ -45,10 +44,10 @@ def test_resolve_headless_backend_review_defaults_to_core_and_allows_explicit_mo
     assert default_payload['mode'] == 'core'
     assert default_payload['profile_name'] == 'review'
 
-    mock_env = dict(default_env)
-    mock_env['SPINE_HEADLESS_BACKEND'] = 'mock'
-    mock_result = subprocess.run([sys.executable, str(script)], check=False, capture_output=True, text=True, env=mock_env)
-    assert mock_result.returncode == 0, mock_result.stderr
-    mock_payload = json.loads(mock_result.stdout)
-    assert mock_payload['mode'] == 'mock'
-    assert mock_payload['resolution_source'] == 'explicit'
+    stale_env = dict(default_env)
+    stale_env['SPINE_HEADLESS_BACKEND'] = 'mock'
+    stale_result = subprocess.run([sys.executable, str(script)], check=False, capture_output=True, text=True, env=stale_env)
+    assert stale_result.returncode == 0, stale_result.stderr
+    stale_payload = json.loads(stale_result.stdout)
+    assert stale_payload['mode'] == 'core'
+    assert stale_payload['resolution_source'] == 'profile_default'

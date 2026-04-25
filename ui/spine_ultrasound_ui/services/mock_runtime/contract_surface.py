@@ -59,6 +59,7 @@ class MockRuntimeContractSurfaceMixin:
                 "detail": "Mock runtime keeps a narrow vendor boundary and does not claim direct live SDK ownership.",
                 "binding_mode": "contract_only",
                 "runtime_source": "mock_runtime_contract",
+                "runtime_source_semantics": "contract_replay_only",
                 "single_control_source_required": bool(self.config.requires_single_control_source),
                 "control_source_exclusive": bool(self.config.requires_single_control_source),
                 "fixed_period_enforced": True,
@@ -71,7 +72,8 @@ class MockRuntimeContractSurfaceMixin:
             return {
                 "robot_model": identity.robot_model,
                 "clinical_mainline_mode": identity.rt_mode,
-                "required_sequence": ["connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "safe_retreat"],
+                "required_sequence": ["connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "start_procedure", "safe_retreat"],
+                "runtime_owned_phase_sequence": ["approach_prescan", "seek_contact", "contact_hold", "scan_follow", "controlled_retract"],
                 "single_control_source_required": identity.requires_single_control_source,
                 "preferred_link": identity.preferred_link,
                 "rt_loop_hz": 1000,
@@ -274,12 +276,13 @@ class MockRuntimeContractSurfaceMixin:
             return {
                 'summary_state': authority_state,
                 'summary_label': authority_label,
-                'detail': 'mock runtime authoritative contract surface',
+                'detail': 'mock runtime contract-replay authority surface',
                 'authority_source': 'mock_runtime_contract',
+                'authority_semantics': 'contract_replay_only',
                 'control_authority': {
                     'summary_state': authority_state,
                     'summary_label': authority_label,
-                    'detail': 'mock runtime owns the in-process authoritative state surface',
+                    'detail': 'mock runtime owns the in-process contract-replay state surface',
                     'owner': {
                         'actor_id': 'mock-runtime',
                         'workspace': 'runtime',
@@ -627,6 +630,7 @@ class MockRuntimeContractSurfaceMixin:
                 {"name": "rt_jitter_high", "effect": "marks RT jitter interlock active", "phase_scope": ["CONTACT_SEEKING", "SCANNING", "PAUSED_HOLD"], "recoverable": True},
                 {"name": "overpressure", "effect": "forces pressure above upper bound and pause/retreat logic", "phase_scope": ["CONTACT_STABLE", "SCANNING"], "recoverable": True},
                 {"name": "collision_event", "effect": "injects recoverable collision alarm and retreat", "phase_scope": ["APPROACHING", "CONTACT_SEEKING", "SCANNING"], "recoverable": True},
+                {"name": "start_procedure_phase_fault", "effect": "forces runtime-owned recovery during start_procedure(scan)", "phase_scope": ["PATH_VALIDATED", "APPROACHING", "CONTACT_SEEKING"], "recoverable": True},
                 {"name": "plan_hash_mismatch", "effect": "breaks locked plan hash consistency", "phase_scope": ["SESSION_LOCKED", "PATH_VALIDATED"], "recoverable": True},
                 {"name": "estop_latch", "effect": "forces ESTOP latched state", "phase_scope": ["*"], "recoverable": False},
             ]

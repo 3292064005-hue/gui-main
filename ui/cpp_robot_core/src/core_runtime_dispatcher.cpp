@@ -65,7 +65,7 @@ std::string CoreRuntimeDispatcher::handleCommandJson(const std::string& line) {
   auto dispatch_with_contract = [&](std::mutex& lane_mutex) -> std::string {
     std::lock_guard<std::mutex> lane_lock(lane_mutex);
     {
-      std::lock_guard<std::mutex> state_lock(owner_.state_mutex_);
+      std::lock_guard<std::mutex> state_lock(owner_.state_store_.mutex);
       std::string authority_error;
       if (!owner_.authorizeInvocationLocked(invocation, &authority_error)) {
         return owner_.replyJson(invocation.request_id, false, authority_error.empty() ? "runtime authority rejected request" : authority_error);
@@ -80,12 +80,12 @@ std::string CoreRuntimeDispatcher::handleCommandJson(const std::string& line) {
   };
 
   if (lane == CoreRuntime::RuntimeLane::Query) {
-    return dispatch_with_contract(owner_.query_lane_mutex_);
+    return dispatch_with_contract(owner_.lanes_.query);
   }
   if (lane == CoreRuntime::RuntimeLane::RtControl) {
-    return dispatch_with_contract(owner_.rt_lane_mutex_);
+    return dispatch_with_contract(owner_.lanes_.rt);
   }
-  return dispatch_with_contract(owner_.command_lane_mutex_);
+  return dispatch_with_contract(owner_.lanes_.command);
 }
 
 }  // namespace robot_core

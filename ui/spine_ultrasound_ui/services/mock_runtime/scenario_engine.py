@@ -26,11 +26,48 @@ class MockRuntimeScenarioEngineMixin:
                 self.force_sensor_stale_ticks = max(self.force_sensor_stale_ticks, 1)
             if 'rt_jitter_high' in self.injected_faults:
                 self.rt_jitter_ok = False
+            self._advance_runtime_owned_procedure()
             self._update_contact_and_progress()
             ts_ns = now_ns()
             self._refresh_device_health(ts_ns)
             self._record_core_streams(ts_ns)
             return self.telemetry_snapshot(ts_ns=ts_ns)
+
+        def _advance_runtime_owned_procedure(self) -> None:
+            """Advance the mock runtime-owned procedure graph one tick."""
+            if not getattr(self, "procedure_active", False):
+                return
+            self.procedure_subphase_ticks += 1
+            if self.execution_state == SystemState.APPROACHING and self.procedure_subphase_ticks >= 2:
+                self.execution_state = SystemState.CONTACT_SEEKING
+                self.contact_mode = "SEEKING_CONTACT"
+                self.recommended_action = "RUNTIME_TAKEOVER"
+                self.procedure_subphase = "seek_contact"
+                self.procedure_subphase_ticks = 0
+                self.last_event = "runtime_seek_contact"
+                return
+            if self.execution_state == SystemState.CONTACT_SEEKING and self.procedure_subphase_ticks >= 2:
+                self.execution_state = SystemState.CONTACT_STABLE
+                self.contact_mode = "STABLE_CONTACT"
+                self.contact_stable = True
+                self.recommended_action = "RUNTIME_TAKEOVER"
+                self.procedure_subphase = "contact_hold"
+                self.procedure_subphase_ticks = 0
+                self.last_event = "runtime_contact_stable"
+                return
+            if self.execution_state == SystemState.CONTACT_STABLE and self.procedure_subphase_ticks >= 1:
+                self.execution_state = SystemState.SCANNING
+                self.contact_mode = "STABLE_CONTACT"
+                self.contact_stable = True
+                self.recommended_action = "SCAN"
+                self.procedure_subphase = "scan_follow"
+                self.procedure_subphase_ticks = 0
+                self.last_event = "runtime_scan_follow"
+                return
+            if self.execution_state in {SystemState.RETREATING, SystemState.SCAN_COMPLETE, SystemState.FAULT, SystemState.ESTOP}:
+                self.procedure_active = False
+                self.procedure_subphase = "idle"
+                self.procedure_subphase_ticks = 0
 
         def telemetry_snapshot(self, ts_ns: Optional[int] = None) -> list[TelemetryEnvelope]:
             ts_ns = ts_ns or now_ns()
@@ -209,13 +246,22 @@ class MockRuntimeScenarioEngineMixin:
                 self.contact_confidence = 0.0
                 self.contact_mode = "NO_CONTACT"
                 self.contact_stable = False
-                self.recommended_action = "WAIT_RETREAT_COMPLETE"
+                self.recommended_action = "WAIT_SCAN_COMPLETE" if self.retreat_completion_state == SystemState.SCAN_COMPLETE else "WAIT_RETREAT_COMPLETE"
                 self.retreat_ticks_remaining -= 1
                 if self.retreat_ticks_remaining <= 0:
-                    self.execution_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
+                    completion_state = self.retreat_completion_state
+                    self.execution_state = completion_state
                     self.recovery_reason = ""
                     self.last_recovery_action = "retreat_complete"
-                    self.recommended_action = "IDLE"
+                    self.procedure_active = False
+                    self.procedure_subphase = "idle"
+                    self.procedure_subphase_ticks = 0
+                    if completion_state == SystemState.SCAN_COMPLETE:
+                        self.recommended_action = "POSTPROCESS"
+                        self.last_event = "scan_complete"
+                    else:
+                        self.recommended_action = "IDLE"
+                    self.retreat_completion_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
             else:
                 self.pressure_current = max(0.0, measured_pressure)
                 self.contact_confidence = 0.0

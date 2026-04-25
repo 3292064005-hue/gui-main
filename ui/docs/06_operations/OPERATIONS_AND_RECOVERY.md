@@ -29,7 +29,7 @@ python scripts/doctor_runtime.py
 ```
 
 ### Launcher rule
-- `scripts/start_mainline.py` is the single operator-facing launcher for desktop/headless surfaces.
+- `scripts/start_mainline.py` is the single operator-facing launcher for desktop/headless surfaces. Desktop is the real operator station; research/clinical execution must stay on the core backend.
 - Launcher wrappers must forward into it instead of re-implementing runtime backend policy.
 
 ### Runtime boundaries

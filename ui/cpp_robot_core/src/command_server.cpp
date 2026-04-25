@@ -244,6 +244,7 @@ void CommandServer::spin() {
   state_poll_thread_ = std::thread(&CommandServer::statePollLoop, this);
   watchdog_thread_ = std::thread(&CommandServer::watchdogLoop, this);
   telemetry_thread_ = std::thread(&CommandServer::telemetryLoop, this);
+  telemetry_broadcast_thread_ = std::thread(&CommandServer::telemetryBroadcastLoop, this);
 
   command_thread_.join();
   telemetry_accept_thread_.join();
@@ -251,10 +252,12 @@ void CommandServer::spin() {
   state_poll_thread_.join();
   watchdog_thread_.join();
   telemetry_thread_.join();
+  telemetry_broadcast_thread_.join();
 }
 
 void CommandServer::stop() {
   stop_requested_.store(true);
+  telemetry_queue_cv_.notify_all();
   if (command_server_fd_ >= 0) {
     ::shutdown(command_server_fd_, SHUT_RDWR);
     ::close(command_server_fd_);
@@ -303,9 +306,7 @@ void CommandServer::commandAcceptLoop() {
     sendLengthPrefixedSSL(ssl, reply);
     closeTlsSocket(client_fd, ssl);
 
-    const auto snapshot = telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot());
-    std::lock_guard<std::mutex> lock(telemetry_clients_mutex_);
-    broadcastProtobufLocked(snapshot);
+    enqueueTelemetryMessages(telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot()));
   }
 }
 
@@ -333,8 +334,7 @@ void CommandServer::telemetryAcceptLoop() {
     {
       std::lock_guard<std::mutex> lock(telemetry_clients_mutex_);
       telemetry_clients_.push_back(TelemetryClient{client_fd, ssl});
-      const auto snapshot = telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot());
-      broadcastProtobufLocked(snapshot);
+      enqueueTelemetryMessages(telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot()));
     }
   }
 }
@@ -365,11 +365,39 @@ void CommandServer::telemetryLoop() {
   PeriodicLoopController controller(std::chrono::milliseconds(50));
   while (!stop_requested_.load()) {
     controller.runOnce([this]() {
-      const auto messages = telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot());
-      std::lock_guard<std::mutex> lock(telemetry_clients_mutex_);
-      broadcastProtobufLocked(messages);
+      enqueueTelemetryMessages(telemetry_publisher_.buildProtobufMessages(runtime_.takeTelemetrySnapshot()));
     });
   }
+}
+
+void CommandServer::telemetryBroadcastLoop() {
+  while (!stop_requested_.load()) {
+    std::vector<spine_core::TelemetryEnvelope> messages;
+    {
+      std::unique_lock<std::mutex> lock(telemetry_queue_mutex_);
+      telemetry_queue_cv_.wait(lock, [this]() { return stop_requested_.load() || !telemetry_queue_.empty(); });
+      if (stop_requested_.load() && telemetry_queue_.empty()) {
+        return;
+      }
+      messages = std::move(telemetry_queue_.back());
+      telemetry_queue_.clear();
+    }
+    std::lock_guard<std::mutex> lock(telemetry_clients_mutex_);
+    broadcastProtobufLocked(messages);
+  }
+}
+
+void CommandServer::enqueueTelemetryMessages(std::vector<spine_core::TelemetryEnvelope> messages) {
+  if (messages.empty()) return;
+  {
+    std::lock_guard<std::mutex> lock(telemetry_queue_mutex_);
+    constexpr std::size_t kMaxQueuedTelemetryBatches = 8;
+    if (telemetry_queue_.size() >= kMaxQueuedTelemetryBatches) {
+      telemetry_queue_.pop_front();
+    }
+    telemetry_queue_.push_back(std::move(messages));
+  }
+  telemetry_queue_cv_.notify_one();
 }
 
 void CommandServer::broadcastProtobufLocked(const std::vector<spine_core::TelemetryEnvelope>& messages) {

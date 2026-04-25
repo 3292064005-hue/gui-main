@@ -83,11 +83,14 @@ public:
    */
   void reset();
 
-  const NormalForceEstimatorConfig& config() const { return config_; }
+  const NormalForceEstimatorConfig& config() const { return state_store_.config; }
   const NormalForceEstimate& lastEstimate() const { return last_estimate_; }
 
 private:
-  NormalForceEstimatorConfig config_{};
+  struct LocalStateStore {
+    NormalForceEstimatorConfig config{};
+  };
+  LocalStateStore state_store_{};
   double bias_n_{0.0};
   NormalForceEstimate last_estimate_{};
 };

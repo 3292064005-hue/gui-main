@@ -39,6 +39,11 @@ This repository uses a layered documentation system. Read by role from this page
 1. [`07_repo_governance/REPOSITORY_GOVERNANCE.md`](./07_repo_governance/REPOSITORY_GOVERNANCE.md)
 2. [`07_repo_governance/CANONICAL_MODULES_AND_DEPENDENCIES.md`](./07_repo_governance/CANONICAL_MODULES_AND_DEPENDENCIES.md)
 
+## Active-only reading boundary
+- Current implementation claims must be made from active source files, `schemas/runtime_command_manifest.json`, and canonical docs only.
+- Retired runtime command aliases are recorded in `schemas/runtime_command_compat_manifest.json`; they are migration evidence and must not be treated as active dispatch surface.
+- `tests/archive/` and `archive/` are historical evidence only; they are not mainline requirements.
+
 ## Documentation rules
 - Canonical documents are the only source of truth for current behavior.
 - Redirect stubs are not kept in the active tree.
@@ -46,7 +51,7 @@ This repository uses a layered documentation system. Read by role from this page
 - Known open gaps must be tracked in [`05_verification/CURRENT_KNOWN_GAPS.md`](./05_verification/CURRENT_KNOWN_GAPS.md).
 
 ## Operational notes
-- `scripts/start_mainline.py` is the single launcher contract for desktop/headless bringup.
+- `scripts/start_mainline.py` is the single launcher contract for desktop/headless bringup. Operator-facing profiles are `dev/lab/research/clinical/review`; legacy `mock/hil/prod` names remain compatibility aliases only. In `--backend auto`, launcher policy ignores stale `SPINE_UI_BACKEND` / `SPINE_HEADLESS_BACKEND` values so deployment profile remains authoritative. `start_headless.sh` likewise resolves its default backend from runtime policy instead of promoting `SPINE_HEADLESS_BACKEND` into launcher intent.
 - `spine_ultrasound_ui.core` and `spine_ultrasound_ui.utils` keep GUI-heavy exports lazy so repository scripts and headless services do not require PySide6 at import time.
 - xMateModel compile proof is profile-aware: mock builds do not claim the gate, while SDK/model-enabled profiles must compile `test_xmate_model_compile_contract`.
 - `scripts/final_acceptance_audit.sh` emits `release_ledger.json` so release consumers can inspect one claim-safe proof index instead of stitching together multiple JSON reports by hand.

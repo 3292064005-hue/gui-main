@@ -59,21 +59,17 @@ def main() -> int:
     record(
         'protocol-plan-compile-command',
         file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"validate_scan_plan"')
-        and file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"compile_scan_plan"')
+        and not file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"compile_scan_plan"')
+        and file_contains('schemas/runtime_command_compat_manifest.json', r'"name"\s*:\s*"compile_scan_plan"')
         and file_contains('schemas/runtime_command_manifest.json', r'"canonical_command"\s*:\s*"validate_scan_plan"')
         and file_contains('schemas/runtime_command_manifest.json', r'"name"\s*:\s*"query_final_verdict"'),
-        'validate/query contract commands registered in canonical manifest; compile alias retained for compatibility',
+        'validate/query contract commands registered in canonical manifest; compile alias retired into compat manifest',
     )
     runtime_final_verdict_patterns = {
         'validate_scan_plan': [
             r'command == "validate_scan_plan"',
             r'"validate_scan_plan"\s*,\s*&CoreRuntime::handleValidationCommand',
             r'"validate_scan_plan"\s*,\s*\[\]\(CoreRuntime\* self',
-        ],
-        'compile_scan_plan_alias': [
-            r'command == "compile_scan_plan"',
-            r'"compile_scan_plan"\s*,\s*&CoreRuntime::handleValidationCommand',
-            r'"compile_scan_plan"\s*,\s*\[\]\(CoreRuntime\* self',
         ],
         'query_final_verdict': [
             r'command == "query_final_verdict"',
@@ -91,17 +87,13 @@ def main() -> int:
         for rel in runtime_final_verdict_files
         for pattern in runtime_final_verdict_patterns['validate_scan_plan']
     )
-    compile_alias_present = any(
-        file_contains(rel, pattern)
-        for rel in runtime_final_verdict_files
-        for pattern in runtime_final_verdict_patterns['compile_scan_plan_alias']
-    )
+    compile_alias_present = not any(file_contains(rel, 'compile_scan_plan') for rel in runtime_final_verdict_files)
     query_present = any(
         file_contains(rel, pattern)
         for rel in runtime_final_verdict_files
         for pattern in runtime_final_verdict_patterns['query_final_verdict']
     )
-    record('core-runtime-final-verdict', validate_present and compile_alias_present and query_present, 'cpp core runtime handles validate/query final verdict with compile compatibility alias across split handler files')
+    record('core-runtime-final-verdict', validate_present and compile_alias_present and query_present, 'cpp core runtime handles validate/query final verdict without active compile_scan_plan alias')
     record('protocol-sync-script', (ROOT / 'scripts/check_protocol_sync.py').exists(), 'protocol sync script present')
     record('protocol-proto-source', (ROOT / 'cpp_robot_core/proto/ipc_messages.proto').exists(), 'canonical proto source present')
     record('protocol-python-pb2', (ROOT / 'spine_ultrasound_ui/services/ipc_messages_pb2.py').exists(), 'python pb2 asset present')
@@ -129,6 +121,76 @@ def main() -> int:
     record('tests-stable-surface', stable_tests.issubset(root_test_names), f'missing={sorted(stable_tests - root_test_names)}')
     record('tests-root-clean', not versioned_root_tests, f'leaks={versioned_root_tests}')
     record('event-bus-canonical-names', (ROOT / 'spine_ultrasound_ui/core/ui_local_bus.py').exists() and (ROOT / 'spine_ultrasound_ui/services/event_bus.py').exists() and (ROOT / 'spine_ultrasound_ui/services/event_replay_bus.py').exists(), 'canonical ui/runtime bus modules available without shim wrappers')
+
+
+    api_bridge_text = (ROOT / 'spine_ultrasound_ui/services/api_bridge_backend.py').read_text(encoding='utf-8')
+    api_component_files = [
+        'spine_ultrasound_ui/services/api_bridge_transport_client.py',
+        'spine_ultrasound_ui/services/api_bridge_authority_projection_reader.py',
+        'spine_ultrasound_ui/services/api_bridge_telemetry_client.py',
+        'spine_ultrasound_ui/services/api_bridge_media_client.py',
+    ]
+    record('api-bridge-component-files', all((ROOT / rel).exists() for rel in api_component_files), f'components={api_component_files}')
+    forbidden_api_backend_methods = ['def _health_loop', 'def _telemetry_ws_loop', 'def _media_ws_loop', 'def _pull_snapshot_once', 'def _capture_reply_contracts', 'def _push_runtime_config']
+    leaks = [name for name in forbidden_api_backend_methods if name in api_bridge_text]
+    record('api-bridge-facade-thin', not leaks, f'backend_method_leaks={leaks}')
+
+    core_runtime_header = (ROOT / 'cpp_robot_core/include/robot_core/core_runtime.h').read_text(encoding='utf-8')
+    required_runtime_components = [
+        'RuntimeStateStore state_store_',
+        'RuntimeAuthorityKernel authority_kernel_',
+        'RuntimeEvidenceProjector evidence_projector_',
+        'RuntimeProcedureExecutor procedure_executor_',
+        'RuntimeQueryProjector query_projector_',
+    ]
+    record('core-runtime-kernel-components', all(token in core_runtime_header for token in required_runtime_components), f'required={required_runtime_components}')
+    direct_runtime_member_leaks = [
+        'RuntimeAuthorityLease authority_lease_',
+        'RecordingService recording_service_',
+        'NrtMotionService nrt_motion_service_',
+        'RtMotionService rt_motion_service_',
+        'RecoveryManager recovery_manager_',
+        'SdkRobotFacade sdk_robot_',
+    ]
+    leaks = [token for token in direct_runtime_member_leaks if token in core_runtime_header]
+    record('core-runtime-direct-member-retired', not leaks, f'direct_member_leaks={leaks}')
+
+
+    helper_text = (ROOT / 'cpp_robot_core/src/core_runtime_command_helpers.h').read_text(encoding='utf-8')
+    command_sources = [
+        ROOT / 'cpp_robot_core/src/core_runtime_session_commands.cpp',
+        ROOT / 'cpp_robot_core/src/core_runtime_execution_commands.cpp',
+        ROOT / 'cpp_robot_core/src/core_runtime_authority.cpp',
+    ]
+    command_source_text = '\n'.join(path.read_text(encoding='utf-8') for path in command_sources)
+    helper_contract_ok = (
+        'normalizeAuthorityToken' in helper_text
+        and 'joinClaims' in helper_text
+        and 'Pure helper' in helper_text
+        and command_source_text.count('normalizeAuthorityToken(') >= 5
+        and 'std::string normalizeAuthorityToken' not in command_source_text
+    )
+    record('core-runtime-command-helper-closure', helper_contract_ok, 'authority token and claim formatting helpers centralized outside command handlers')
+
+    artifact_registry_text = (ROOT / 'spine_ultrasound_ui/core/artifact_lifecycle_registry.py').read_text(encoding='utf-8')
+    formal_placeholder_leak = 'materialized_or_declared_placeholder' in artifact_registry_text
+    artifact_gate_text = (ROOT / 'scripts/check_artifact_lifecycle_registry.py').read_text(encoding='utf-8')
+    record(
+        'formal-evidence-chain-no-placeholder-policy',
+        not formal_placeholder_leak and 'formal evidence-chain artifact must not use placeholder materialization policy' in artifact_gate_text,
+        f'formal_placeholder_leak={formal_placeholder_leak}',
+    )
+
+    claim_boundary_script = ROOT / 'scripts/check_mainline_claim_boundary.py'
+    claim_boundary_wired = all(
+        token in (ROOT / rel).read_text(encoding='utf-8')
+        for rel, token in (
+            ('.github/workflows/mainline.yml', 'scripts/check_mainline_claim_boundary.py'),
+            ('scripts/verify_mainline.sh', 'scripts/check_mainline_claim_boundary.py'),
+            ('scripts/final_acceptance_audit.sh', 'scripts/check_mainline_claim_boundary.py'),
+        )
+    )
+    record('mainline-claim-boundary-gate-wired', claim_boundary_script.exists() and claim_boundary_wired, 'claim boundary gate is present in workflow, verify_mainline, and final acceptance audit')
 
     failures = 0
     for name, ok, detail in CHECKS:

@@ -6,7 +6,8 @@ def test_permissions_follow_core_state():
     sm = WorkflowStateMachine()
     perms = sm.permissions(WorkflowContext(core_state=SystemState.AUTO_READY, has_experiment=False, session_locked=False, localization_ready=False, preview_plan_ready=False))
     assert perms["create_experiment"] is True
-    assert perms["start_scan"] is False
+    assert perms["start_procedure"] is False
+    assert "start_scan" not in perms
 
 
 def test_permissions_require_localization_for_path_generation():
@@ -27,7 +28,8 @@ def test_permissions_allow_scan_start_from_auto_ready_once_preview_exists():
             preview_plan_ready=True,
         )
     )
-    assert perms["start_scan"] is True
+    assert perms["start_procedure"] is True
+    assert "start_scan" not in perms
 
 
 def test_permissions_expose_canonical_start_procedure_alongside_compat_alias():
@@ -42,5 +44,5 @@ def test_permissions_expose_canonical_start_procedure_alongside_compat_alias():
         )
     )
     assert perms["start_procedure"]["enabled"] is True
-    assert perms["start_scan"]["enabled"] is True
+    assert "start_scan" not in perms
     assert sm.ACTION_LABELS["start_procedure"] == "开始扫查"

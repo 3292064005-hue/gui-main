@@ -8,6 +8,19 @@ from spine_ultrasound_ui.utils.sdk_unit_contract import build_sdk_boundary_contr
 from spine_ultrasound_ui.utils.session_freeze_policy import normalize_strict_runtime_freeze_gate
 
 
+FORBIDDEN_LEGACY_RUNTIME_CONFIG_KEYS = frozenset({
+    "fallback_home_joint_rad",
+    "fallback_approach_pose_xyzabc",
+    "fallback_entry_pose_xyzabc",
+    "fallback_retreat_pose_xyzabc",
+    "emergency_home_joint_rad",
+    "emergency_approach_pose_xyzabc",
+    "emergency_entry_pose_xyzabc",
+    "emergency_retreat_pose_xyzabc",
+    "allow_contract_shell_writes",
+})
+
+
 @dataclass
 class ContactControlConfig:
     mode: str = "normal_axis_admittance"
@@ -115,7 +128,6 @@ class RuntimeConfig:
     sdk_robot_class: str = MAINLINE_IDENTITY_DEFAULTS.sdk_robot_class
     preferred_link: str = MAINLINE_IDENTITY_DEFAULTS.preferred_link
     requires_single_control_source: bool = True
-    allow_contract_shell_writes: bool = False
     build_id: str = "dev"
     software_version: str = "0.3.0"
     runtime_config_contract_digest: str = ""
@@ -159,10 +171,6 @@ class RuntimeConfig:
     load_com_mm: List[float] = field(default_factory=lambda: [0.0, 0.0, 62.0])
     load_inertia: List[float] = field(default_factory=lambda: [0.0012, 0.0012, 0.0008, 0.0, 0.0, 0.0])
     home_joint_rad: List[float] = field(default_factory=lambda: [0.0, 0.30, 0.60, 0.0, 1.20, 0.0, 0.0])
-    emergency_home_joint_rad: List[float] = field(default_factory=lambda: [0.0, 0.30, 0.60, 0.0, 1.20, 0.0, 0.0])
-    emergency_approach_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.205, 3.1415926535, 0.0, 1.5707963267])
-    emergency_entry_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.190, 3.1415926535, 0.0, 1.5707963267])
-    emergency_retreat_pose_xyzabc: List[float] = field(default_factory=lambda: [0.118, 0.015, 0.230, 3.1415926535, 0.0, 1.5707963267])
 
 
     def build_rt_phase_contract(self) -> Dict[str, Any]:
@@ -220,22 +228,6 @@ class RuntimeConfig:
             },
         }
 
-    def legacy_compatibility_projection(self) -> Dict[str, Any]:
-        return {
-            "flat_field_projection": {
-                "normal_admittance_gain": self.normal_admittance_gain,
-                "normal_damping_gain": self.normal_damping_gain,
-                "scan_normal_pi_kp": self.scan_normal_pi_kp,
-                "scan_normal_pi_ki": self.scan_normal_pi_ki,
-                "pause_hold_drift_kp": self.pause_hold_drift_kp,
-                "pause_hold_drift_ki": self.pause_hold_drift_ki,
-                "pause_hold_integrator_leak": self.pause_hold_integrator_leak,
-            },
-            "warnings": [
-                "Legacy flat RT contact-control fields remain for compatibility and are projected from nested contact_control / force_estimator / orientation_trim.",
-            ],
-        }
-
     def to_dict(self) -> Dict[str, Any]:
         from spine_ultrasound_ui.utils.runtime_config_contract import runtime_config_contract_metadata
 
@@ -249,7 +241,6 @@ class RuntimeConfig:
             load_com_mm=self.load_com_mm,
         )
         payload["rt_phase_contract"] = self.build_rt_phase_contract()
-        payload["legacy_compatibility"] = self.legacy_compatibility_projection()
         payload["strict_runtime_freeze_gate"] = normalize_strict_runtime_freeze_gate(self.strict_runtime_freeze_gate)
         contract_metadata = runtime_config_contract_metadata()
         payload["runtime_config_contract"] = contract_metadata
@@ -281,14 +272,12 @@ class RuntimeConfig:
             payload.setdefault("runtime_config_schema_version", str(runtime_config_contract.get("schema_version", "")))
         else:
             payload.pop("runtime_config_contract", None)
-        if "fallback_home_joint_rad" in payload and "emergency_home_joint_rad" not in payload:
-            payload["emergency_home_joint_rad"] = payload.pop("fallback_home_joint_rad")
-        if "fallback_approach_pose_xyzabc" in payload and "emergency_approach_pose_xyzabc" not in payload:
-            payload["emergency_approach_pose_xyzabc"] = payload.pop("fallback_approach_pose_xyzabc")
-        if "fallback_entry_pose_xyzabc" in payload and "emergency_entry_pose_xyzabc" not in payload:
-            payload["emergency_entry_pose_xyzabc"] = payload.pop("fallback_entry_pose_xyzabc")
-        if "fallback_retreat_pose_xyzabc" in payload and "emergency_retreat_pose_xyzabc" not in payload:
-            payload["emergency_retreat_pose_xyzabc"] = payload.pop("fallback_retreat_pose_xyzabc")
+        forbidden_legacy_keys = sorted(FORBIDDEN_LEGACY_RUNTIME_CONFIG_KEYS.intersection(payload))
+        if forbidden_legacy_keys:
+            raise ValueError(
+                "runtime config contains forbidden legacy keys that are no longer supported: "
+                + ", ".join(forbidden_legacy_keys)
+            )
 
         rt_phase_contract = payload.get("rt_phase_contract")
         if isinstance(rt_phase_contract, dict):
@@ -312,7 +301,7 @@ class RuntimeConfig:
         else:
             payload["orientation_trim"] = OrientationTrimConfig()
 
-        # legacy flat-field compatibility projection
+        # synchronize derived flat-field values from the canonical nested sections
         cc = payload["contact_control"]
         if not isinstance(contact_control_payload, dict) or not contact_control_payload:
             cc.mode = str(payload.get("contact_control_mode", cc.mode))
@@ -320,12 +309,12 @@ class RuntimeConfig:
             cc.max_normal_travel_mm = float(payload.get("seek_contact_max_travel_mm", cc.max_normal_travel_mm))
             cc.anti_windup_limit_n = float(payload.get("rt_integrator_limit_n", cc.anti_windup_limit_n))
             cc.integrator_leak = float(payload.get("pause_hold_integrator_leak", cc.integrator_leak))
-            legacy_gain = payload.get("normal_admittance_gain")
-            legacy_damping = payload.get("normal_damping_gain")
-            if legacy_gain is not None:
-                cc.virtual_mass = max(0.05, 1.0 / max(float(legacy_gain), 1e-6) / 10000.0)
-            if legacy_damping is not None:
-                cc.virtual_damping = max(5.0, 1.0 / max(float(legacy_damping), 1e-6) / 10000.0)
+            flat_gain = payload.get("normal_admittance_gain")
+            flat_damping = payload.get("normal_damping_gain")
+            if flat_gain is not None:
+                cc.virtual_mass = max(0.05, 1.0 / max(float(flat_gain), 1e-6) / 10000.0)
+            if flat_damping is not None:
+                cc.virtual_damping = max(5.0, 1.0 / max(float(flat_damping), 1e-6) / 10000.0)
             cc.max_normal_velocity_mm_s = float(payload.get("rt_max_cart_vel_mm_s", cc.max_normal_velocity_mm_s if cc.max_normal_velocity_mm_s > 0 else 2.0))
             cc.max_normal_acc_mm_s2 = float(payload.get("rt_max_cart_acc_mm_s2", cc.max_normal_acc_mm_s2 if cc.max_normal_acc_mm_s2 > 0 else 30.0))
         fe = payload["force_estimator"]

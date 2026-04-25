@@ -16,7 +16,7 @@ def _build_session(tmp_path: Path) -> Path:
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.pause_scan()
     controller.resume_scan()
     controller.safe_retreat()

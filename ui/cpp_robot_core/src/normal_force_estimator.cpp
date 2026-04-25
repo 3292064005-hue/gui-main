@@ -18,16 +18,16 @@ bool sourceFresh(bool valid, double age_ms, double stale_timeout_ms, double time
 }  // namespace
 
 void NormalForceEstimator::configure(const NormalForceEstimatorConfig& config) {
-  config_ = config;
-  config_.pressure_weight = clamp01(config.pressure_weight);
-  config_.wrench_weight = clamp01(config.wrench_weight);
-  if (config_.pressure_weight == 0.0 && config_.wrench_weight == 0.0) {
-    config_.pressure_weight = 0.7;
-    config_.wrench_weight = 0.3;
+  state_store_.config = config;
+  state_store_.config.pressure_weight = clamp01(config.pressure_weight);
+  state_store_.config.wrench_weight = clamp01(config.wrench_weight);
+  if (state_store_.config.pressure_weight == 0.0 && state_store_.config.wrench_weight == 0.0) {
+    state_store_.config.pressure_weight = 0.7;
+    state_store_.config.wrench_weight = 0.3;
   }
-  config_.stale_timeout_ms = std::max(1.0, config.stale_timeout_ms);
-  config_.timeout_ms = std::max(config_.stale_timeout_ms, config.timeout_ms);
-  config_.min_confidence = clamp01(config.min_confidence);
+  state_store_.config.stale_timeout_ms = std::max(1.0, config.stale_timeout_ms);
+  state_store_.config.timeout_ms = std::max(state_store_.config.stale_timeout_ms, config.timeout_ms);
+  state_store_.config.min_confidence = clamp01(config.min_confidence);
 }
 
 NormalForceEstimate NormalForceEstimator::estimate(const NormalForceEstimatorInput& input) {
@@ -35,16 +35,16 @@ NormalForceEstimate NormalForceEstimator::estimate(const NormalForceEstimatorInp
   out.pressure_force_n = input.pressure_force_n;
   out.wrench_force_n = input.wrench_force_n;
 
-  const bool pressure_fresh = sourceFresh(input.pressure_valid, input.pressure_age_ms, config_.stale_timeout_ms, config_.timeout_ms);
-  const bool wrench_fresh = sourceFresh(input.wrench_valid, input.wrench_age_ms, config_.stale_timeout_ms, config_.timeout_ms);
+  const bool pressure_fresh = sourceFresh(input.pressure_valid, input.pressure_age_ms, state_store_.config.stale_timeout_ms, state_store_.config.timeout_ms);
+  const bool wrench_fresh = sourceFresh(input.wrench_valid, input.wrench_age_ms, state_store_.config.stale_timeout_ms, state_store_.config.timeout_ms);
 
-  if (config_.auto_bias_zero && pressure_fresh && std::abs(input.pressure_force_n) < 0.25) {
+  if (state_store_.config.auto_bias_zero && pressure_fresh && std::abs(input.pressure_force_n) < 0.25) {
     bias_n_ = input.pressure_force_n;
   }
 
   const double pressure_force = input.pressure_force_n - bias_n_;
   const double wrench_force = input.wrench_force_n * (input.contact_direction_sign == 0.0 ? 1.0 : input.contact_direction_sign);
-  const std::string preferred = config_.preferred_source.empty() ? std::string("fused") : config_.preferred_source;
+  const std::string preferred = state_store_.config.preferred_source.empty() ? std::string("fused") : state_store_.config.preferred_source;
 
   const auto set_pressure = [&]() {
     out.estimated_force_n = pressure_force;
@@ -59,8 +59,8 @@ NormalForceEstimate NormalForceEstimator::estimate(const NormalForceEstimatorInp
     out.valid = true;
   };
   const auto set_fused = [&]() {
-    const double total = std::max(1e-9, config_.pressure_weight + config_.wrench_weight);
-    out.estimated_force_n = (config_.pressure_weight * pressure_force + config_.wrench_weight * wrench_force) / total;
+    const double total = std::max(1e-9, state_store_.config.pressure_weight + state_store_.config.wrench_weight);
+    out.estimated_force_n = (state_store_.config.pressure_weight * pressure_force + state_store_.config.wrench_weight * wrench_force) / total;
     out.source = "fused";
     out.confidence = 1.0;
     out.valid = true;
@@ -95,7 +95,7 @@ NormalForceEstimate NormalForceEstimator::estimate(const NormalForceEstimatorInp
 
   out.bias_compensated_force_n = out.estimated_force_n;
   out.stale = !out.valid;
-  if (out.confidence < config_.min_confidence) {
+  if (out.confidence < state_store_.config.min_confidence) {
     out.valid = false;
     out.stale = true;
     out.source = "invalid";

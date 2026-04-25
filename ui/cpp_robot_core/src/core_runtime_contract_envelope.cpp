@@ -37,10 +37,10 @@ std::string CoreRuntime::faultInjectionContractJsonLocked() const {
       object({field("name", quote("estop_latch")), field("effect", quote("forces ESTOP latched state")), field("phase_scope", stringArray({"*"})), field("recoverable", boolLiteral(false))}),
   };
   return object({
-      field("runtime_source", quote(sdk_robot_.runtimeSource())),
+      field("runtime_source", quote(procedure_executor_.sdk_robot.runtimeSource())),
       field("enabled", boolLiteral(true)),
       field("simulation_only", boolLiteral(true)),
-      field("active_injections", stringArray([&](){ std::vector<std::string> items(injected_faults_.begin(), injected_faults_.end()); return items; }())),
+      field("active_injections", stringArray([&](){ std::vector<std::string> items(authority_kernel_.injected_faults.begin(), authority_kernel_.injected_faults.end()); return items; }())),
       field("catalog", objectArray(catalog))
   });
 }
@@ -53,41 +53,41 @@ bool CoreRuntime::applyFaultInjectionLocked(const std::string& fault_name, std::
     return false;
   }
 
-  injected_faults_.insert(fault_name);
+  authority_kernel_.injected_faults.insert(fault_name);
   if (fault_name == "pressure_stale") {
-    pressure_fresh_ = false;
-    devices_[2].fresh = false;
+    state_store_.pressure_fresh = false;
+    evidence_projector_.devices[2].fresh = false;
     queueAlarmLocked("FAULT", "fault_injection", "压力遥测已被注入为 stale", "fault_injection");
     return true;
   }
   if (fault_name == "rt_jitter_high") {
-    rt_jitter_ok_ = false;
+    state_store_.rt_jitter_ok = false;
     queueAlarmLocked("WARNING", "fault_injection", "RT jitter interlock injected", "fault_injection");
     return true;
   }
   if (fault_name == "overpressure") {
-    pressure_current_ = std::max(config_.pressure_upper + 0.5, force_limits_.max_z_force_n + 0.5);
+    state_store_.pressure_current = std::max(state_store_.config.pressure_upper + 0.5, procedure_executor_.force_limits.max_z_force_n + 0.5);
     queueAlarmLocked("WARNING", "fault_injection", "Overpressure injected", "fault_injection", "", "safe_retreat");
     return true;
   }
   if (fault_name == "collision_event") {
-    execution_state_ = RobotCoreState::Retreating;
-    retreat_ticks_remaining_ = std::max(retreat_ticks_remaining_, 10);
+    state_store_.execution_state = RobotCoreState::Retreating;
+    state_store_.retreat_ticks_remaining = std::max(state_store_.retreat_ticks_remaining, 10);
     queueAlarmLocked("RECOVERABLE_FAULT", "collision", "模拟碰撞事件", "fault_injection", "", "safe_retreat");
     return true;
   }
   if (fault_name == "plan_hash_mismatch") {
-    plan_hash_ = std::string("mismatch:") + (plan_hash_.empty() ? "empty" : plan_hash_);
+    state_store_.plan_hash = std::string("mismatch:") + (state_store_.plan_hash.empty() ? "empty" : state_store_.plan_hash);
     return true;
   }
   if (fault_name == "estop_latch") {
-    execution_state_ = RobotCoreState::Estop;
-    fault_code_ = "ESTOP_INJECTED";
+    state_store_.execution_state = RobotCoreState::Estop;
+    state_store_.fault_code = "ESTOP_INJECTED";
     queueAlarmLocked("FAULT", "fault_injection", "ESTOP latched by fault injection", "fault_injection");
     return true;
   }
 
-  injected_faults_.erase(fault_name);
+  authority_kernel_.injected_faults.erase(fault_name);
   if (error_message != nullptr) {
     *error_message = std::string("unsupported fault injection: ") + fault_name;
   }
@@ -95,21 +95,21 @@ bool CoreRuntime::applyFaultInjectionLocked(const std::string& fault_name, std::
 }
 
 void CoreRuntime::clearInjectedFaultsLocked() {
-  injected_faults_.clear();
-  rt_jitter_ok_ = true;
-  pressure_fresh_ = true;
-  devices_[2].fresh = devices_[2].online;
-  if (execution_state_ == RobotCoreState::Estop && fault_code_ == "ESTOP_INJECTED") {
-    if (automatic_mode_ && powered_) {
-      execution_state_ = RobotCoreState::AutoReady;
-    } else if (powered_) {
-      execution_state_ = RobotCoreState::Powered;
-    } else if (controller_online_) {
-      execution_state_ = RobotCoreState::Connected;
+  authority_kernel_.injected_faults.clear();
+  state_store_.rt_jitter_ok = true;
+  state_store_.pressure_fresh = true;
+  evidence_projector_.devices[2].fresh = evidence_projector_.devices[2].online;
+  if (state_store_.execution_state == RobotCoreState::Estop && state_store_.fault_code == "ESTOP_INJECTED") {
+    if (state_store_.automatic_mode && state_store_.powered) {
+      state_store_.execution_state = RobotCoreState::AutoReady;
+    } else if (state_store_.powered) {
+      state_store_.execution_state = RobotCoreState::Powered;
+    } else if (state_store_.controller_online) {
+      state_store_.execution_state = RobotCoreState::Connected;
     } else {
-      execution_state_ = RobotCoreState::Disconnected;
+      state_store_.execution_state = RobotCoreState::Disconnected;
     }
-    fault_code_.clear();
+    state_store_.fault_code.clear();
   }
   queueAlarmLocked("INFO", "fault_injection", "fault injections cleared", "fault_injection");
 }
@@ -120,45 +120,45 @@ std::string CoreRuntime::controlAuthorityJsonLocked() const {
   std::vector<std::string> blockers;
   std::vector<std::string> warnings;
   appendMainlineContractIssuesLocked(&blockers, &warnings);
-  const std::string authority_state = controller_online_ ? (blockers.empty() ? std::string("ready") : std::string("blocked")) : std::string("degraded");
+  const std::string authority_state = state_store_.controller_online ? (blockers.empty() ? std::string("ready") : std::string("blocked")) : std::string("degraded");
   std::vector<std::string> blocker_entries;
   blocker_entries.reserve(blockers.size());
   for (const auto& item : blockers) blocker_entries.push_back(summaryEntry("runtime_authority", item));
   std::vector<std::string> warning_entries;
   warning_entries.reserve(warnings.size());
   for (const auto& item : warnings) warning_entries.push_back(summaryEntry("runtime_authority", item));
-  const bool has_owner = authority_lease_.active && !authority_lease_.actor_id.empty();
+  const bool has_owner = authority_kernel_.lease.active && !authority_kernel_.lease.actor_id.empty();
   const auto owner = has_owner
                          ? object({
-                               field("actor_id", quote(authority_lease_.actor_id)),
-                               field("workspace", quote(authority_lease_.workspace)),
-                               field("role", quote(authority_lease_.role)),
-                               field("session_id", quote(authority_lease_.session_id)),
+                               field("actor_id", quote(authority_kernel_.lease.actor_id)),
+                               field("workspace", quote(authority_kernel_.lease.workspace)),
+                               field("role", quote(authority_kernel_.lease.role)),
+                               field("session_id", quote(authority_kernel_.lease.session_id)),
                            })
                          : object({});
-  const auto active_lease = authority_lease_.active
+  const auto active_lease = authority_kernel_.lease.active
                                 ? object({
-                                      field("lease_id", quote(authority_lease_.lease_id)),
-                                      field("actor_id", quote(authority_lease_.actor_id)),
-                                      field("workspace", quote(authority_lease_.workspace)),
-                                      field("role", quote(authority_lease_.role)),
-                                      field("session_id", quote(authority_lease_.session_id)),
-                                      field("acquired_ts_ns", std::to_string(authority_lease_.acquired_ts_ns)),
-                                      field("refreshed_ts_ns", std::to_string(authority_lease_.refreshed_ts_ns)),
-                                      field("source", quote(authority_lease_.source.empty() ? std::string("cpp_robot_core") : authority_lease_.source)),
-                                      field("deployment_profile", quote(authority_lease_.deployment_profile)),
+                                      field("lease_id", quote(authority_kernel_.lease.lease_id)),
+                                      field("actor_id", quote(authority_kernel_.lease.actor_id)),
+                                      field("workspace", quote(authority_kernel_.lease.workspace)),
+                                      field("role", quote(authority_kernel_.lease.role)),
+                                      field("session_id", quote(authority_kernel_.lease.session_id)),
+                                      field("acquired_ts_ns", std::to_string(authority_kernel_.lease.acquired_ts_ns)),
+                                      field("refreshed_ts_ns", std::to_string(authority_kernel_.lease.refreshed_ts_ns)),
+                                      field("source", quote(authority_kernel_.lease.source.empty() ? std::string("cpp_robot_core") : authority_kernel_.lease.source)),
+                                      field("deployment_profile", quote(authority_kernel_.lease.deployment_profile)),
                                   })
                                 : object({});
-  const auto summary_label = authority_lease_.active
+  const auto summary_label = authority_kernel_.lease.active
                                  ? std::string("runtime authority lease active")
                                  : (authority_state == "ready" ? std::string("runtime authority ready")
                                                                 : (authority_state == "blocked" ? std::string("runtime authority blocked")
                                                                                                  : std::string("runtime authority degraded")));
-  const auto detail = authority_lease_.active
+  const auto detail = authority_kernel_.lease.active
                           ? std::string("cpp_robot_core publishes the active authoritative control lease")
                           : std::string("cpp_robot_core runtime is the single authority source; no active external lease is currently bound");
-  const std::vector<std::string> granted_claims = authority_lease_.active
-                                                      ? std::vector<std::string>(authority_lease_.granted_claims.begin(), authority_lease_.granted_claims.end())
+  const std::vector<std::string> granted_claims = authority_kernel_.lease.active
+                                                      ? std::vector<std::string>(authority_kernel_.lease.granted_claims.begin(), authority_kernel_.lease.granted_claims.end())
                                                       : std::vector<std::string>{};
   return object({
       field("summary_state", quote(authority_state)),
@@ -168,8 +168,8 @@ std::string CoreRuntime::controlAuthorityJsonLocked() const {
       field("active_lease", active_lease),
       field("owner_provenance", object({field("source", quote("cpp_robot_core"))})),
       field("granted_claims", stringArray(granted_claims)),
-      field("workspace_binding", quote(authority_lease_.active ? authority_lease_.workspace : std::string("runtime"))),
-      field("session_binding", quote(authority_lease_.active ? authority_lease_.session_id : session_id_)),
+      field("workspace_binding", quote(authority_kernel_.lease.active ? authority_kernel_.lease.workspace : std::string("runtime"))),
+      field("session_binding", quote(authority_kernel_.lease.active ? authority_kernel_.lease.session_id : state_store_.session_id)),
       field("blockers", objectArray(blocker_entries)),
       field("warnings", objectArray(warning_entries))
   });

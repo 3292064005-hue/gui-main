@@ -154,7 +154,6 @@ _RESPONSE_REQUIRED_FIELDS_BY_COMMAND: dict[str, tuple[str, ...]] = {
     "query_path_lists": ("paths", "drag"),
     "query_final_verdict": ("final_verdict",),
     "validate_scan_plan": ("final_verdict",),
-    "compile_scan_plan": ("final_verdict",),
     "get_authoritative_runtime_envelope": ("authoritative_runtime_envelope_present", "control_authority", "final_verdict"),
     "acquire_control_lease": ("summary_state", "detail", "lease"),
     "renew_control_lease": ("summary_state", "detail", "lease"),
@@ -197,7 +196,6 @@ _RESPONSE_FIELD_SPECS_BY_COMMAND: dict[str, tuple[RuntimeCommandFieldContract, .
     ),
     "query_final_verdict": (RuntimeCommandFieldContract("final_verdict", True, "object", ("accepted", "authoritative", "reason")),),
     "validate_scan_plan": (RuntimeCommandFieldContract("final_verdict", True, "object", ("accepted", "authoritative", "reason")),),
-    "compile_scan_plan": (RuntimeCommandFieldContract("final_verdict", True, "object", ("accepted", "authoritative", "reason")),),
     "get_authoritative_runtime_envelope": (
         RuntimeCommandFieldContract("authoritative_runtime_envelope_present", True, "boolean", ()),
         RuntimeCommandFieldContract("control_authority", True, "object", ("summary_state", "detail")),
@@ -264,8 +262,9 @@ _RESPONSE_FIELD_SPECS_BY_COMMAND: dict[str, tuple[RuntimeCommandFieldContract, .
     ),
     "get_clinical_mainline_contract": (
         RuntimeCommandFieldContract("robot_model", True, "string", ()),
-        RuntimeCommandFieldContract("clinical_mainline_mode", True, "boolean", ()),
+        RuntimeCommandFieldContract("clinical_mainline_mode", True, "string", ()),
         RuntimeCommandFieldContract("required_sequence", True, "array", (), array_item_type="string"),
+        RuntimeCommandFieldContract("runtime_owned_phase_sequence", False, "array", (), array_item_type="string"),
     ),
     "get_session_freeze": (
         RuntimeCommandFieldContract("session_locked", True, "boolean", ()),
@@ -304,7 +303,6 @@ def _response_field_contracts(name: str, data_required_fields: tuple[str, ...]) 
 _DATA_CONTRACT_BY_COMMAND: dict[str, str] = {
     "query_final_verdict": "final_verdict",
     "validate_scan_plan": "final_verdict",
-    "compile_scan_plan": "final_verdict",
     "get_authoritative_runtime_envelope": "authoritative_runtime_envelope",
     "acquire_control_lease": "control_authority",
     "renew_control_lease": "control_authority",

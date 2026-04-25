@@ -1,0 +1,38 @@
+{
+  "schema_version": "rt.fixed_host_contract.v2",
+  "profiles": {
+    "research_clinical_mainline": {
+      "description": "Fixed single-workstation RT host contract for mainline architecture convergence.",
+      "scheduler_policy": "fifo",
+      "scheduler_priority": 90,
+      "cpu_set": [
+        0,
+        1
+      ],
+      "require_scheduler": true,
+      "require_affinity": true,
+      "require_memory_lock": true,
+      "require_preempt_rt": true,
+      "grub_cpu_isolation_required": true,
+      "fixed_host_id": "spine-rt-workstation-01",
+      "require_fixed_host_id": true,
+      "deployment_topology": "single_fixed_workstation"
+    },
+    "dev_mock": {
+      "description": "Non-authoritative developer reference profile for mock/dev bring-up.",
+      "scheduler_policy": "fifo",
+      "scheduler_priority": 90,
+      "cpu_set": [
+        0,
+        1
+      ],
+      "require_scheduler": true,
+      "require_affinity": true,
+      "require_memory_lock": true,
+      "require_preempt_rt": false,
+      "grub_cpu_isolation_required": false,
+      "deployment_topology": "non_authoritative_dev_mock",
+      "require_fixed_host_id": false
+    }
+  }
+}

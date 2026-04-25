@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from spine_ultrasound_ui.services.runtime_command_catalog import capability_claims, command_capability_claim
+from spine_ultrasound_ui.services.runtime_command_catalog import capability_claims, command_capability_claim, is_shim_only_alias
 
 
 @dataclass(frozen=True)
@@ -32,8 +32,8 @@ class RoleMatrix:
     """
 
     COMMAND_GROUPS: dict[str, set[str]] = {
-        "control": {"connect_robot", "disconnect_robot", "power_on", "power_off", "set_auto_mode", "set_manual_mode", "validate_setup", "acquire_control_lease", "renew_control_lease", "release_control_lease", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "start_scan", "go_home", "run_rl_project", "pause_rl_project", "enable_drag", "disable_drag", "replay_path", "start_record_path", "stop_record_path", "cancel_record_path", "save_record_path", "compile_scan_plan", "validate_scan_plan"},
-        "recovery": {"pause_scan", "resume_scan", "safe_retreat", "clear_fault", "emergency_stop", "inject_fault", "clear_injected_faults"},
+        "control": {"connect_robot", "disconnect_robot", "power_on", "power_off", "set_auto_mode", "set_manual_mode", "validate_setup", "acquire_control_lease", "renew_control_lease", "release_control_lease", "lock_session", "load_scan_plan", "approach_prescan", "seek_contact", "start_procedure", "go_home", "run_rl_project", "pause_rl_project", "enable_drag", "disable_drag", "replay_path", "start_record_path", "stop_record_path", "cancel_record_path", "save_record_path", "validate_scan_plan"},
+        "recovery": {"pause_scan", "resume_scan", "stop_scan", "safe_retreat", "clear_fault", "emergency_stop", "inject_fault", "clear_injected_faults"},
         "review": set(),
         "export": set(),
     }
@@ -81,6 +81,8 @@ class RoleMatrix:
         return cleaned_claim in self.allowed_capability_claims(role)
 
     def can_issue_command(self, role: str, command: str) -> bool:
+        if is_shim_only_alias(command):
+            return False
         policy = self.policy_for(role)
         allowed = set().union(*(self.COMMAND_GROUPS.get(group, set()) for group in policy.command_groups))
         if command in allowed:

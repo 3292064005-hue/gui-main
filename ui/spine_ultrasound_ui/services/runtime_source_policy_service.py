@@ -101,8 +101,7 @@ class RuntimeSourcePolicyService:
         camera_mode = provider_mode or getattr(config, 'camera_guidance_input_mode', '')
         camera_tier = self.classify_camera_source(camera_mode)
         guidance_tier = self.guidance_source_tier(guidance_source_type) if guidance_source_type else camera_tier
-        shell_allowed = bool(getattr(config, 'allow_contract_shell_writes', False))
-        shell_write_tier = 'contract_shell_allowed' if shell_allowed else 'live_binding_only'
+        shell_write_tier = 'contract_shell_forbidden'
 
         blockers: list[str] = []
         warnings: list[str] = []
@@ -143,9 +142,6 @@ class RuntimeSourcePolicyService:
         elif profile.name == 'dev' and force_tier == 'simulated':
             warnings.append('dev profile is using simulated force inputs')
 
-        if shell_allowed and not profile.allow_contract_shell_writes:
-            execution_write_ready = False
-            blockers.append(f'{profile.name} profile forbids contract-shell write override')
 
         return RuntimeSourcePolicySnapshot(
             deployment_profile=profile.name,

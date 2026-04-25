@@ -42,7 +42,6 @@ struct SdkRobotRuntimeConfig {
   std::string sdk_robot_class{ROBOT_CORE_DEFAULT_SDK_CLASS};
   std::string preferred_link{"wired_direct"};
   bool requires_single_control_source{true};
-  bool allow_contract_shell_writes{false};
   std::string clinical_mainline_mode{ROBOT_CORE_DEFAULT_CLINICAL_MAINLINE_MODE};
   std::string remote_ip{"192.168.0.160"};
   std::string local_ip{"192.168.0.100"};
@@ -574,7 +573,7 @@ public:
    * @brief Enforce that a hardware-mutating SDK call has a live binding.
    * @param prefix Human-readable operation label written into controller logs on failure.
    * @param reason Optional output string receiving the blocking reason.
-   * @return True when the façade currently owns a live binding or when contract-shell writes were explicitly enabled in the frozen runtime config.
+   * @return True only when the façade currently owns an authoritative live binding.
    * @throws No exceptions are thrown. Failure is reported through controller logs and the optional reason output.
    * @boundary Prevents contract-shell/local-cache state mutation from masquerading as a real controller-side write.
    */
@@ -588,8 +587,12 @@ public:
   void captureException(const std::string& prefix, const std::exception& ex, std::string* reason = nullptr);
   void captureFailure(const std::string& prefix, const std::string& detail, std::string* reason = nullptr);
 
+  struct LocalStateStore {
+    bool powered{false};
+  };
+
   bool connected_{false};
-  bool powered_{false};
+  LocalStateStore state_store_{};
   bool auto_mode_{false};
   bool rt_mainline_configured_{false};
   bool motion_channel_ready_{false};

@@ -21,16 +21,16 @@ def test_runtime_contract_parity_gate_is_wired_into_repo_scripts() -> None:
 
 
 def test_safe_retreat_requires_completed_rt_retract_before_nrt_retreat() -> None:
-    source = _read('cpp_robot_core/src/core_runtime_session_execution.cpp')
-    assert 'const auto rt_retract = self->rt_motion_service_.controlledRetract();' in source
+    source = _read('cpp_robot_core/src/core_runtime_execution_commands.cpp')
+    assert 'const auto rt_retract = self->procedure_executor_.rt_motion_service.controlledRetract();' in source
     assert 'if (!rt_retract.canProceedToNrtRetreat()) {' in source
     assert 'safe_retreat blocked before NRT retreat' in source
-    assert 'self->nrt_motion_service_.safeRetreat(&reason)' in source
+    assert 'self->procedure_executor_.nrt_motion_service.safeRetreat(&reason)' in source
 
 
 def test_runtime_state_store_blocks_recovery_chain_on_incomplete_rt_retract() -> None:
     source = _read('cpp_robot_core/src/runtime_state_store.cpp')
-    assert 'const auto rt_retract = rt_motion_service_.controlledRetract();' in source
+    assert 'const auto rt_retract = procedure_executor_.rt_motion_service.controlledRetract();' in source
     assert 'CONTROLLED_RETRACT_INCOMPLETE' in source
     assert 'RT受控回撤未完成，已阻断后续恢复链' in source
 
@@ -53,9 +53,9 @@ def test_generated_runtime_dispatcher_and_registry_close_p1_and_p0_contracts() -
     assert 'resolveHandler' in dispatcher
     assert 'validateRuntimeCommandGuard' in dispatcher
     assert 'dispatchTypedCommand(invocation)' in dispatcher
-    assert 'return dispatch_with_contract(owner_.command_lane_mutex_)' in dispatcher
-    assert 'return dispatch_with_contract(owner_.query_lane_mutex_)' in dispatcher
-    assert 'return dispatch_with_contract(owner_.rt_lane_mutex_)' in dispatcher
+    assert 'return dispatch_with_contract(owner_.lanes_.command)' in dispatcher
+    assert 'return dispatch_with_contract(owner_.lanes_.query)' in dispatcher
+    assert 'return dispatch_with_contract(owner_.lanes_.rt)' in dispatcher
     assert 'commandRegistry()' in registry
     assert 'findCommandRegistryEntry' in registry
     assert 'commandAllowedInState' in registry

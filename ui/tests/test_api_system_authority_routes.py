@@ -102,3 +102,15 @@ def test_system_routes_work_with_real_headless_adapter_surface() -> None:
         verdict = client.get('/api/v1/final-verdict').json()
         assert verdict['accepted'] is False
         assert verdict['source'] == 'cpp_robot_core'
+
+
+def test_system_routes_block_control_lease_and_runtime_config_mutations() -> None:
+    app = api_server.create_app(runtime_container=_StubContainer(), allowed_origins=['http://localhost:3000'])
+    with TestClient(app) as client:
+        lease = client.post('/api/v1/control-lease/acquire', json={'actor_id': 'api'})
+        assert lease.status_code == 403
+        assert 'read-only evidence surface' in lease.json()['detail']
+
+        runtime_config = client.post('/api/v1/runtime-config', json={'pressure_target': 9.5})
+        assert runtime_config.status_code == 403
+        assert 'read-only evidence surface' in runtime_config.json()['detail']

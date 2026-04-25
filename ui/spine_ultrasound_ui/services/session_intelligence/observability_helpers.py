@@ -15,7 +15,7 @@ def build_resume_state(session_id: str, manifest: dict[str, Any], scan_plan: dic
         if not bool(reply.get("ok", False)):
             continue
         command = str(data.get("command", ""))
-        if command in {"start_procedure", "start_scan", "resume_scan"}:
+        if command in {"start_procedure", "resume_scan"}:
             last_successful_segment = max(last_successful_segment, 1)
             last_successful_waypoint = max(last_successful_waypoint, 1)
     blocking_reasons: list[str] = []
@@ -44,7 +44,7 @@ def build_resume_attempts(session_id: str, journal: list[dict[str, Any]], resume
     for entry in journal:
         data = dict(entry.get("data", {}))
         command = str(data.get("command", ""))
-        if command not in {"resume_scan", "start_procedure", "start_scan"}:
+        if command not in {"resume_scan", "start_procedure"}:
             continue
         reply = dict(data.get("reply", {}))
         outcome = "success" if bool(reply.get("ok", False)) else ("blocked" if command == "resume_scan" else "failed")

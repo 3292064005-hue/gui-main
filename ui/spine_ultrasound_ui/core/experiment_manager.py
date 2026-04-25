@@ -283,6 +283,8 @@ class ExperimentManager:
         payload = descriptor.to_dict() if isinstance(descriptor, ArtifactDescriptor) else dict(descriptor)
         payload.setdefault("artifact_id", name)
         payload.setdefault("schema", schema_for_artifact(name))
+        if "path" in payload:
+            payload["path"] = str(payload["path"]).replace("\\", "/")
         self._validate_artifact_registration(session_dir=session_dir, name=name, payload=payload)
         artifacts[name] = payload["path"]
         artifact_registry[name] = payload
@@ -546,7 +548,7 @@ class ExperimentManager:
 
     def _build_artifact_descriptor(self, session_dir: Path, name: str, artifact_path: Path) -> ArtifactDescriptor:
         mime_type = mimetypes.guess_type(str(artifact_path))[0] or "application/octet-stream"
-        rel_path = str(artifact_path.relative_to(session_dir))
+        rel_path = artifact_path.relative_to(session_dir).as_posix()
         lifecycle = lifecycle_spec_for_artifact(name)
         return ArtifactDescriptor(
             artifact_type=name,
@@ -579,4 +581,3 @@ class ExperimentManager:
             for chunk in iter(lambda: handle.read(65536), b""):
                 digest.update(chunk)
         return digest.hexdigest()
-

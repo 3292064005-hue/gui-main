@@ -113,15 +113,15 @@ RecordingService::~RecordingService() {
 
 void RecordingService::openSession(const std::filesystem::path& session_dir, const std::string& session_id) {
   stopWorker(true);
-  session_dir_ = session_dir;
-  session_id_ = session_id;
+  state_store_.session_dir = session_dir;
+  state_store_.session_id = session_id;
   seq_ = 0;
   active_.store(true);
   recorder_status_.session_id = session_id;
   recorder_status_.recording = true;
   recorder_status_.dropped_samples = 0;
   recorder_status_.last_flush_ns = 0;
-  json::ensureDir(session_dir_ / "raw" / "core");
+  json::ensureDir(state_store_.session_dir / "raw" / "core");
   writeConsumerManifest();
   stop_worker_.store(false);
   recorder_thread_ = std::thread(&RecordingService::recorderLoop, this);
@@ -191,14 +191,14 @@ void RecordingService::append(const std::filesystem::path& path, const std::stri
       field("monotonic_ns", std::to_string(nowNs())),
       field("source_ts_ns", std::to_string(source_ts_ns > 0 ? source_ts_ns : recorder_status_.last_flush_ns)),
       field("seq", std::to_string(seq_)),
-      field("session_id", quote(session_id_)),
+      field("session_id", quote(state_store_.session_id)),
       field("data", payload_json),
   });
   appendLine(path, envelope);
 }
 
 std::filesystem::path RecordingService::samplePath(const QueuedSample& sample) const {
-  return session_dir_ / "raw" / "core" / (sampleStreamName(sample) + ".jsonl");
+  return state_store_.session_dir / "raw" / "core" / (sampleStreamName(sample) + ".jsonl");
 }
 
 std::string RecordingService::sampleStreamName(const QueuedSample& sample) const {
@@ -234,11 +234,11 @@ int64_t RecordingService::sampleSourceTimestampNs(const QueuedSample& sample) co
 
 void RecordingService::appendTimelineEntry(const QueuedSample& sample, const std::string& payload_json, int64_t source_ts_ns) {
   using namespace json;
-  appendLine(session_dir_ / "raw" / "core" / "event_timeline.jsonl",
+  appendLine(state_store_.session_dir / "raw" / "core" / "event_timeline.jsonl",
              object({
                  field("monotonic_ns", std::to_string(nowNs())),
                  field("source_ts_ns", std::to_string(source_ts_ns > 0 ? source_ts_ns : nowNs())),
-                 field("session_id", quote(session_id_)),
+                 field("session_id", quote(state_store_.session_id)),
                  field("stream", quote(sampleStreamName(sample))),
                  field("payload", payload_json),
              }));
@@ -289,21 +289,21 @@ void RecordingService::stopWorker(bool drain_pending) {
 
 
 std::filesystem::path RecordingService::derivedPath(const std::string& name) const {
-  return session_dir_ / "derived" / "core" / name;
+  return state_store_.session_dir / "derived" / "core" / name;
 }
 
 void RecordingService::materializeConsumerArtifacts() {
   using namespace json;
-  if (session_dir_.empty()) {
+  if (state_store_.session_dir.empty()) {
     return;
   }
-  ensureDir(session_dir_ / "derived" / "core");
+  ensureDir(state_store_.session_dir / "derived" / "core");
 
-  const auto robot_state_path = session_dir_ / "raw" / "core" / "robot_state.jsonl";
-  const auto contact_state_path = session_dir_ / "raw" / "core" / "contact_state.jsonl";
-  const auto scan_progress_path = session_dir_ / "raw" / "core" / "scan_progress.jsonl";
-  const auto alarm_path = session_dir_ / "raw" / "core" / "alarm_event.jsonl";
-  const auto timeline_path = session_dir_ / "raw" / "core" / "event_timeline.jsonl";
+  const auto robot_state_path = state_store_.session_dir / "raw" / "core" / "robot_state.jsonl";
+  const auto contact_state_path = state_store_.session_dir / "raw" / "core" / "contact_state.jsonl";
+  const auto scan_progress_path = state_store_.session_dir / "raw" / "core" / "scan_progress.jsonl";
+  const auto alarm_path = state_store_.session_dir / "raw" / "core" / "alarm_event.jsonl";
+  const auto timeline_path = state_store_.session_dir / "raw" / "core" / "event_timeline.jsonl";
 
   auto count_lines = [](const std::filesystem::path& path) -> int {
     if (!std::filesystem::exists(path)) {
@@ -325,7 +325,7 @@ void RecordingService::materializeConsumerArtifacts() {
   const int timeline_count = count_lines(timeline_path);
 
   appendLine(derivedPath("telemetry_replay_index.json"), object({
-      field("session_id", quote(session_id_)),
+      field("session_id", quote(state_store_.session_id)),
       field("consumer", quote("telemetry_replay")),
       field("ready", boolLiteral(robot_state_count > 0 && contact_state_count > 0 && scan_progress_count > 0)),
       field("event_timeline_path", quote("raw/core/event_timeline.jsonl")),
@@ -339,7 +339,7 @@ void RecordingService::materializeConsumerArtifacts() {
   }));
 
   appendLine(derivedPath("alarm_review_index.json"), object({
-      field("session_id", quote(session_id_)),
+      field("session_id", quote(state_store_.session_id)),
       field("consumer", quote("alarm_review")),
       field("ready", boolLiteral(alarm_count > 0 && timeline_count >= alarm_count)),
       field("alarm_event_path", quote("raw/core/alarm_event.jsonl")),
@@ -349,7 +349,7 @@ void RecordingService::materializeConsumerArtifacts() {
   }));
 
   appendLine(derivedPath("audit_timeline_index.json"), object({
-      field("session_id", quote(session_id_)),
+      field("session_id", quote(state_store_.session_id)),
       field("consumer", quote("audit_timeline")),
       field("ready", boolLiteral(timeline_count > 0)),
       field("event_timeline_path", quote("raw/core/event_timeline.jsonl")),
@@ -360,7 +360,7 @@ void RecordingService::materializeConsumerArtifacts() {
 void RecordingService::writeConsumerManifest() {
   using namespace json;
   const auto manifest = object({
-      field("session_id", quote(session_id_)),
+      field("session_id", quote(state_store_.session_id)),
       field("streams", object({
           field("robot_state", quote("raw/core/robot_state.jsonl")),
           field("contact_state", quote("raw/core/contact_state.jsonl")),
@@ -374,7 +374,7 @@ void RecordingService::writeConsumerManifest() {
           field("audit_timeline", object({field("reads", stringArray({"event_timeline"})), field("writes", stringArray({"derived/core/audit_timeline_index.json"}))}))
       }))
   });
-  appendLine(session_dir_ / "raw" / "core" / "recording_manifest.json", manifest);
+  appendLine(state_store_.session_dir / "raw" / "core" / "recording_manifest.json", manifest);
 }
 
 }  // namespace robot_core

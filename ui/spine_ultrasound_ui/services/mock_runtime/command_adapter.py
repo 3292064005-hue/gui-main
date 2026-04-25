@@ -235,6 +235,11 @@ class MockRuntimeCommandAdapterMixin:
                 })
                 self.execution_state = SystemState.RETREATING
                 self.retreat_ticks_remaining = max(self.retreat_ticks_remaining, 10)
+                self.retreat_completion_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
+                self.procedure_active = False
+                self.procedure_subphase = "recovery_retract"
+            elif fault == "start_procedure_phase_fault":
+                self._append_controller_log("WARN", "fault primed: start_procedure phase fault", source="fault_injection")
             elif fault == "plan_hash_mismatch":
                 self.plan_hash = f"mismatch:{self.plan_hash or 'empty'}"
             elif fault == "estop_latch":
@@ -250,6 +255,9 @@ class MockRuntimeCommandAdapterMixin:
             del payload
             self.injected_faults.clear()
             self.rt_jitter_ok = True
+            self.procedure_active = False
+            self.procedure_subphase = "idle"
+            self.procedure_subphase_ticks = 0
             self.force_sensor_stale_ticks = 0
             self.force_sensor_timeout_alarm = False
             self.force_sensor_estop_alarm = False
@@ -355,6 +363,9 @@ class MockRuntimeCommandAdapterMixin:
             self.recovery_reason = ""
             self.last_recovery_action = "session_locked"
             self.last_event = "session_locked"
+            self.procedure_active = False
+            self.procedure_subphase = "idle"
+            self.procedure_subphase_ticks = 0
             return ReplyEnvelope(ok=True, message="lock_session accepted", data={"session_id": self.session_id})
 
         def _cmd_load_scan_plan(self, payload: dict) -> ReplyEnvelope:
@@ -379,6 +390,9 @@ class MockRuntimeCommandAdapterMixin:
             self.recovery_reason = ""
             self.last_recovery_action = "load_scan_plan"
             self.last_event = "scan_plan_loaded"
+            self.procedure_active = False
+            self.procedure_subphase = "idle"
+            self.procedure_subphase_ticks = 0
             return ReplyEnvelope(ok=True, message="load_scan_plan accepted", data={"plan_id": plan_payload.get("plan_id", "")})
 
         def _cmd_approach_prescan(self, payload: dict) -> ReplyEnvelope:
@@ -405,25 +419,48 @@ class MockRuntimeCommandAdapterMixin:
         def _cmd_start_procedure(self, payload: dict) -> ReplyEnvelope:
             if str(payload.get("procedure", "")).strip().lower() != "scan":
                 return ReplyEnvelope(ok=False, message="start_procedure requires procedure=scan")
-            self.last_recovery_action = "start_procedure"
-            return ReplyEnvelope(ok=True, message="start_procedure accepted")
-
-        def _cmd_start_scan(self, payload: dict) -> ReplyEnvelope:
-            payload = dict(payload)
-            payload.setdefault("procedure", "scan")
-            return self._cmd_start_procedure(payload)
-            del payload
-            if self.execution_state not in {SystemState.CONTACT_STABLE, SystemState.PAUSED_HOLD}:
-                return ReplyEnvelope(ok=False, message="cannot start scan before contact is stable")
-            self.execution_state = SystemState.SCANNING
-            self.contact_mode = "STABLE_CONTACT"
-            self.contact_stable = True
+            if self.execution_state not in {SystemState.PATH_VALIDATED, SystemState.PAUSED_HOLD, SystemState.CONTACT_STABLE}:
+                return ReplyEnvelope(ok=False, message="cannot start procedure before plan is validated")
+            if "start_procedure_phase_fault" in self.injected_faults:
+                self.execution_state = SystemState.RETREATING
+                self.retreat_ticks_remaining = max(self.retreat_ticks_remaining, 10)
+                self.contact_mode = "NO_CONTACT"
+                self.contact_stable = False
+                self.recovery_reason = "procedure_phase_fault"
+                self.last_recovery_action = "safe_retreat"
+                self.last_event = "runtime_owned_recovery"
+                self.procedure_active = False
+                self.procedure_subphase = "recovery_retract"
+                self.procedure_subphase_ticks = 0
+                self.pending_alarms.append({
+                    "severity": "RECOVERABLE_FAULT",
+                    "source": "runtime_execution_graph",
+                    "message": "start_procedure(scan) internal phase fault; runtime engaged safe_retreat",
+                    "session_id": self.session_id,
+                    "segment_id": int(self.active_segment),
+                    "event_ts_ns": now_ns(),
+                    "workflow_step": "start_procedure",
+                    "request_id": "",
+                    "auto_action": "safe_retreat",
+                })
+                self._append_controller_log("WARN", "runtime-owned recovery engaged during start_procedure(scan)")
+                return ReplyEnvelope(
+                    ok=False,
+                    message="runtime-owned recovery engaged during start_procedure(scan)",
+                    data={"runtime_owned_recovery": True, "recovery_action": "safe_retreat", "execution_state": self.execution_state.value},
+                )
+            self.execution_state = SystemState.APPROACHING
+            self.contact_mode = "NO_CONTACT"
+            self.contact_stable = False
+            self.recommended_action = "RUNTIME_TAKEOVER"
             self.recovery_reason = ""
-            self.last_recovery_action = "start_scan"
-            self.recommended_action = "SCAN"
-            self.last_event = "scan_started"
-            self._append_controller_log("INFO", "scan started")
-            return ReplyEnvelope(ok=True, message="start_scan accepted")
+            self.last_recovery_action = "start_procedure"
+            self.last_event = "start_procedure"
+            self.procedure_active = True
+            self.procedure_subphase = "approach_prescan"
+            self.procedure_subphase_ticks = 0
+            self._append_controller_log("INFO", "start_procedure(scan) accepted; runtime execution graph took ownership")
+            return ReplyEnvelope(ok=True, message="start_procedure accepted", data={"procedure": "scan", "runtime_owned": True})
 
         def _cmd_pause_scan(self, payload: dict) -> ReplyEnvelope:
             del payload
@@ -433,6 +470,9 @@ class MockRuntimeCommandAdapterMixin:
             self.contact_mode = "HOLDING_CONTACT"
             self.contact_stable = True
             self.recovery_reason = "operator_pause"
+            self.procedure_active = False
+            self.procedure_subphase = "pause_hold"
+            self.procedure_subphase_ticks = 0
             self.last_recovery_action = "pause_hold"
             self.recommended_action = "RESUME_OR_RETREAT"
             return ReplyEnvelope(ok=True, message="pause_scan accepted")
@@ -449,12 +489,41 @@ class MockRuntimeCommandAdapterMixin:
             self.recommended_action = "SCAN"
             return ReplyEnvelope(ok=True, message="resume_scan accepted")
 
+        def _cmd_stop_scan(self, payload: dict) -> ReplyEnvelope:
+            del payload
+            allowed_states = {
+                SystemState.APPROACHING,
+                SystemState.CONTACT_SEEKING,
+                SystemState.CONTACT_STABLE,
+                SystemState.SCANNING,
+                SystemState.PAUSED_HOLD,
+                SystemState.RECOVERY_RETRACT,
+            }
+            if self.execution_state not in allowed_states:
+                return ReplyEnvelope(ok=False, message="cannot stop scan from current state")
+            completes_scan = self.execution_state in {SystemState.SCANNING, SystemState.PAUSED_HOLD}
+            self.execution_state = SystemState.RETREATING
+            self.retreat_ticks_remaining = 6
+            self.retreat_completion_state = SystemState.SCAN_COMPLETE if completes_scan else SystemState.PATH_VALIDATED
+            self.contact_mode = "NO_CONTACT"
+            self.contact_stable = False
+            self.recovery_reason = "requested_stop_scan" if completes_scan else "requested_stop_scan_before_scan_complete"
+            self.last_recovery_action = "stop_scan"
+            self.recommended_action = "WAIT_SCAN_COMPLETE" if completes_scan else "WAIT_RETREAT_COMPLETE"
+            self.last_event = "stop_scan"
+            self.procedure_active = False
+            self.procedure_subphase = "post_scan_home"
+            self.procedure_subphase_ticks = 0
+            self._append_controller_log("WARN", "stop scan requested")
+            return ReplyEnvelope(ok=True, message="stop_scan accepted" if completes_scan else "stop_scan accepted before scan completion")
+
         def _cmd_safe_retreat(self, payload: dict) -> ReplyEnvelope:
             del payload
             if self.execution_state in {SystemState.DISCONNECTED, SystemState.BOOT, SystemState.ESTOP}:
                 return ReplyEnvelope(ok=False, message="cannot retreat from current state")
             self.execution_state = SystemState.RETREATING
             self.retreat_ticks_remaining = 6
+            self.retreat_completion_state = SystemState.PATH_VALIDATED if self.scan_plan else SystemState.AUTO_READY
             self.contact_mode = "NO_CONTACT"
             self.contact_stable = False
             self.recovery_reason = "requested_safe_retreat"
@@ -491,11 +560,6 @@ class MockRuntimeCommandAdapterMixin:
         def _cmd_validate_scan_plan(self, payload: dict) -> ReplyEnvelope:
             verdict = self.compile_scan_plan_verdict(payload.get('scan_plan'), payload.get('config_snapshot'))
             return ReplyEnvelope(ok=bool(verdict.get('final_verdict', {}).get('accepted', False)), message=str(verdict.get('detail', 'validate_scan_plan evaluated')), data={'final_verdict': verdict, 'canonical_command': 'validate_scan_plan'})
-
-        def _cmd_compile_scan_plan(self, payload: dict) -> ReplyEnvelope:
-            reply = self._cmd_validate_scan_plan(payload)
-            reply.data.setdefault('deprecated_alias', True)
-            return reply
 
         def _cmd_query_final_verdict(self, payload: dict) -> ReplyEnvelope:
             del payload

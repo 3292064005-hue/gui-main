@@ -15,6 +15,6 @@ class HeadlessRuntimeHost:
     def command_policy_catalog(self) -> dict[str, Any]: return self._adapter.runtime_introspection.command_policy_catalog()
     def control_authority_status(self) -> dict[str, Any]: return self._adapter.runtime_introspection.control_authority_status()
     def recent_commands(self) -> dict[str, Any]: return self._adapter.command_service.recent_commands()
-    def command(self, command: str, payload: dict[str, Any] | None = None) -> dict[str, Any]: return self._adapter.command_service.command(command, payload)
+    def command(self, command: str, payload: dict[str, Any] | None = None) -> dict[str, Any]: return self._adapter.command(command, payload)
     def snapshot(self) -> dict[str, Any]: return self._adapter.surface.snapshot()
     def control_plane_status(self) -> dict[str, Any]: return self._adapter.surface.control_plane_status()

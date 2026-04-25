@@ -42,13 +42,6 @@ struct NrtProfileTemplate {
   bool delegates_to_sdk{true};
 };
 
-struct NrtFallbackTargets {
-  std::vector<double> home_joint_rad;
-  std::vector<double> approach_pose_xyzabc;
-  std::vector<double> entry_pose_xyzabc;
-  std::vector<double> retreat_pose_xyzabc;
-};
-
 struct NrtSessionTargets {
   std::vector<double> home_joint_rad;
   ScanWaypoint approach_pose{};
@@ -82,19 +75,18 @@ public:
 
   void bind(SdkRobotFacade* sdk);
   /**
-   * @brief Configure session-frozen NRT targets used by bring-up/retreat profiles.
-   * @param targets Session-owned home/approach/entry/retreat targets.
+   * @brief Configure session-frozen NRT targets used by approach/entry/retreat profiles.
+   * @param targets Session-owned home/approach/entry/retreat targets frozen during ``lock_session``.
    * @return void
    * @throws No exceptions are thrown.
-   * @boundary Replaces hard-coded NRT business poses with session-frozen plan/profile targets.
+   * @boundary Replaces the prior fallback/built-in emergency targets with the single authoritative session-owned source.
    */
   void configureSessionTargets(const NrtSessionTargets& targets);
-  void configureFallbackTargets(const NrtFallbackTargets& targets);
   /**
    * @brief Clear any previously bound session-frozen NRT targets.
    * @return void
    * @throws No exceptions are thrown.
-   * @boundary Forces subsequent NRT profile execution to use only emergency fallback profiles.
+   * @boundary Subsequent NRT profile execution must fail closed until a new frozen session target set is configured.
    */
   void clearSessionTargets();
   bool goHome(std::string* reason = nullptr);
@@ -106,7 +98,15 @@ public:
   NrtMotionSnapshot snapshot() const;
 
 private:
-  NrtMotionPlan buildProfile(const std::string& profile_name) const;
+  /**
+   * @brief Materialize the concrete SDK command batch for a canonical NRT profile.
+   * @param profile_name Canonical profile name.
+   * @param reason Optional output receiving the blocking reason when no frozen target exists.
+   * @return Session-owned motion plan. ``steps`` is empty when the profile must fail closed.
+   * @throws No exceptions are thrown.
+   * @boundary Enforces that all clinical/research NRT motions originate from the locked session freeze only.
+   */
+  NrtMotionPlan buildProfile(const std::string& profile_name, std::string* reason = nullptr) const;
   bool executeProfile(const NrtMotionPlan& plan, std::string* reason = nullptr);
   bool dispatchProfile(const NrtProfileTemplate& profile, std::string* reason = nullptr);
   NrtProfileTemplate profileTemplate(const std::string& profile) const;
@@ -115,7 +115,6 @@ private:
   SdkRobotFacade* sdk_{nullptr};
   NrtMotionSnapshot snapshot_{};
   NrtSessionTargets session_targets_{};
-  NrtFallbackTargets fallback_targets_{};
 };
 
 }  // namespace robot_core

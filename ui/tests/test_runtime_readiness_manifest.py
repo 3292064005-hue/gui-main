@@ -21,8 +21,21 @@ def test_runtime_readiness_manifest_separates_static_and_live_verification(tmp_p
         'spine_ultrasound_ui/services/ipc_messages_pb2.py',
         'cpp_robot_core/include/ipc_messages.pb.h',
         'cpp_robot_core/src/ipc_messages.pb.cpp',
+        'cpp_robot_core/include/robot_core/rt_host_bootstrap.h',
+        'cpp_robot_core/src/rt_host_bootstrap.cpp',
+        'cpp_robot_core/src/main_ubuntu_rt.cpp',
     ):
         _write(tmp_path / rel)
+
+    (tmp_path / 'configs' / 'systemd').mkdir(parents=True, exist_ok=True)
+    (tmp_path / 'configs' / 'systemd' / 'spine-cpp-core.service').write_text(
+        'CPUSchedulingPolicy=fifo\nCPUSchedulingPriority=90\nLimitMEMLOCK=infinity\nLimitRTPRIO=99\n',
+        encoding='utf-8',
+    )
+    (tmp_path / 'cpp_robot_core' / 'src' / 'main_ubuntu_rt.cpp').write_text(
+        'loadRtHostBootstrapConfigFromEnv(); applyRtHostBootstrap(loadRtHostBootstrapConfigFromEnv());',
+        encoding='utf-8',
+    )
     manifest = RuntimeReadinessManifestService(tmp_path).build(config=RuntimeConfig(), surface='desktop', env={'SPINE_PROFILE': 'research'})
     assert manifest['schema_version'] == 'runtime.environment_readiness_manifest.v1'
     assert manifest['verification']['static_contract_ready'] is True
@@ -31,6 +44,7 @@ def test_runtime_readiness_manifest_separates_static_and_live_verification(tmp_p
     assert manifest['verification']['live_runtime_ready'] is False
     assert manifest['summary_state'] == 'warning'
     assert manifest['verification']['verification_boundary'] == 'environment_blocked'
+    assert 'rt_host_bootstrap' in manifest['host_requirements']
 
 
 def test_runtime_readiness_manifest_reports_mode_and_profile_without_env_leak(tmp_path: Path, monkeypatch) -> None:

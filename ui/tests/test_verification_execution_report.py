@@ -59,7 +59,7 @@ def _write_bundle(tmp_path: Path, *, include_readiness: bool = True) -> Path:
 
 def test_verification_execution_report_defaults_to_static_only_without_readiness_evidence(tmp_path: Path) -> None:
     report = VerificationExecutionReportService(tmp_path).build(
-        executed_phases=['python', 'prod'],
+        executed_phases=['python', 'clinical'],
         sdk_binding_requested=False,
         model_binding_requested=False,
     )
@@ -86,7 +86,7 @@ def test_verification_execution_report_closes_sandbox_tier_with_readiness_eviden
         },
     }
     report = VerificationExecutionReportService(tmp_path).build(
-        executed_phases=['python', 'prod'],
+        executed_phases=['python', 'clinical'],
         sdk_binding_requested=False,
         model_binding_requested=False,
         readiness_manifest=readiness,
@@ -101,7 +101,7 @@ def test_verification_execution_report_closes_sandbox_tier_with_readiness_eviden
 
 def test_verification_execution_report_rejects_missing_bundle_even_with_live_flags(tmp_path: Path) -> None:
     report = VerificationExecutionReportService(tmp_path).build(
-        executed_phases=['hil'],
+        executed_phases=['research'],
         sdk_binding_requested=True,
         model_binding_requested=True,
         live_evidence_bundle='artifacts/hil_bundle.zip',
@@ -117,7 +117,7 @@ def test_verification_execution_report_rejects_missing_bundle_even_with_live_fla
 def test_verification_execution_report_only_closes_live_validation_with_real_bundle(tmp_path: Path, with_bindings: bool) -> None:
     bundle = _write_bundle(tmp_path)
     report = VerificationExecutionReportService(Path.cwd()).build(
-        executed_phases=['hil'],
+        executed_phases=['research'],
         sdk_binding_requested=with_bindings,
         model_binding_requested=with_bindings,
         live_evidence_bundle=str(bundle),
@@ -158,7 +158,7 @@ def test_live_evidence_bundle_service_rejects_external_readiness_for_archived_bu
 def test_verification_execution_report_rejects_bundle_missing_internal_readiness_manifest(tmp_path: Path) -> None:
     bundle = _write_bundle(tmp_path, include_readiness=False)
     report = VerificationExecutionReportService(Path.cwd()).build(
-        executed_phases=['hil'],
+        executed_phases=['research'],
         sdk_binding_requested=True,
         model_binding_requested=True,
         live_evidence_bundle=str(bundle),
@@ -180,7 +180,7 @@ def test_write_verification_report_script_writes_report_and_readiness_manifest(t
             sys.executable,
             str(script_path),
             '--phase', 'python',
-            '--phase', 'prod',
+            '--phase', 'clinical',
             '--output', str(output),
             '--write-readiness-manifest', str(readiness),
         ],
@@ -190,7 +190,7 @@ def test_write_verification_report_script_writes_report_and_readiness_manifest(t
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads(output.read_text(encoding='utf-8'))
-    assert payload['executed_phases'] == ['python', 'prod']
+    assert payload['executed_phases'] == ['python', 'clinical']
     assert payload['runtime_readiness']['manifest_path'] == 'runtime_readiness_manifest.json'
     assert readiness.exists()
 
@@ -205,7 +205,7 @@ def test_write_verification_report_script_rejects_invalid_live_bundle(tmp_path: 
         [
             sys.executable,
             str(script_path),
-            '--phase', 'hil',
+            '--phase', 'research',
             '--with-sdk',
             '--with-model',
             '--live-evidence-bundle', str(tmp_path / 'missing.zip'),
@@ -232,7 +232,7 @@ def test_write_verification_report_script_rejects_external_readiness_with_live_b
         [
             sys.executable,
             str(script_path),
-            '--phase', 'hil',
+            '--phase', 'research',
             '--with-sdk',
             '--with-model',
             '--live-evidence-bundle', str(bundle),
@@ -260,7 +260,7 @@ def test_write_verification_report_script_reports_argument_conflict_without_trac
         [
             sys.executable,
             str(script_path),
-            '--phase', 'hil',
+            '--phase', 'research',
             '--with-sdk',
             '--with-model',
             '--live-evidence-bundle', str(bundle),
@@ -311,7 +311,7 @@ def test_write_verification_report_script_returns_bundle_error_code_without_trac
         [
             sys.executable,
             str(script_path),
-            '--phase', 'hil',
+            '--phase', 'research',
             '--with-sdk',
             '--with-model',
             '--live-evidence-bundle', str(tmp_path / 'missing_live_bundle.zip'),
@@ -348,9 +348,9 @@ def test_acceptance_summary_script_writes_machine_readable_summary(tmp_path: Pat
             '--verification-report', str(verification),
             '--readiness-manifest', str(readiness),
             '--build-evidence-report', str(build_evidence),
-            '--profile', 'mock',
-            '--profile', 'hil',
-            '--installed-binary', str(tmp_path / 'mock/spine_robot_core'),
+            '--profile', 'dev',
+            '--profile', 'research',
+            '--installed-binary', str(tmp_path / 'dev/spine_robot_core'),
         ],
         check=False,
         capture_output=True,
@@ -361,7 +361,7 @@ def test_acceptance_summary_script_writes_machine_readable_summary(tmp_path: Pat
     assert payload['schema_version'] == 'acceptance.summary.v2'
     assert payload['verification_snapshot']['reported_tiers'] == {}
     assert payload['profiles'] == []
-    assert payload['requested_profiles'] == ['mock', 'hil']
+    assert payload['requested_profiles'] == ['dev', 'research']
     assert payload['acceptance_scope']['profile_gate_proof'] is False
 
 
@@ -380,7 +380,7 @@ def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_p
             sys.executable,
             str(verification_script),
             '--phase', 'python',
-            '--phase', 'mock',
+            '--phase', 'dev',
             '--output', str(verification),
             '--write-readiness-manifest', str(readiness),
         ],
@@ -390,7 +390,7 @@ def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_p
     )
     assert verification_result.returncode == 0, verification_result.stderr
 
-    build_evidence.write_text(json.dumps({'profile': 'mock', 'target_results': {'spine_robot_core': 'ok'}, 'evidence_mode': 'syntax_only_fallback', 'claim_boundary': 'repository/sandbox only'}, indent=2), encoding='utf-8')
+    build_evidence.write_text(json.dumps({'profile': 'dev', 'build_profile': 'mock', 'target_results': {'spine_robot_core': 'ok'}, 'evidence_mode': 'syntax_only_fallback', 'claim_boundary': 'repository/sandbox only'}, indent=2), encoding='utf-8')
     acceptance_script = Path('scripts/write_acceptance_summary.py')
     acceptance_result = subprocess.run(
         [
@@ -401,8 +401,8 @@ def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_p
             '--verification-report', str(verification),
             '--readiness-manifest', str(readiness),
             '--build-evidence-report', str(build_evidence),
-            '--profile', 'mock',
-            '--installed-binary', str(tmp_path / 'mock/spine_robot_core'),
+            '--profile', 'dev',
+            '--installed-binary', str(tmp_path / 'dev/spine_robot_core'),
         ],
         check=False,
         capture_output=True,
@@ -416,9 +416,9 @@ def test_verification_and_acceptance_summary_chain_can_materialize_reports(tmp_p
     assert payload['build_evidence_report'] == 'build_evidence_report.json'
     assert payload['verification_snapshot']['verification_boundary'] == 'environment_blocked'
     assert payload['verification_snapshot']['build_evidence_mode'] == 'syntax_only_fallback'
-    assert payload['profiles'] == ['mock']
-    assert payload['requested_profiles'] == ['mock']
-    assert payload['acceptance_scope']['validated_profiles'] == ['mock']
+    assert payload['profiles'] == ['dev']
+    assert payload['requested_profiles'] == ['dev']
+    assert payload['acceptance_scope']['validated_profiles'] == ['dev']
 
 
 
@@ -448,7 +448,7 @@ def test_write_acceptance_summary_uses_portable_relative_paths(tmp_path: Path) -
     verification = tmp_path / 'proof' / 'verification_execution_report.json'
     readiness = tmp_path / 'proof' / 'runtime_readiness_manifest.json'
     evidence = tmp_path / 'proof' / 'build_evidence_report.json'
-    installed = build_dir / 'mock' / 'spine_robot_core'
+    installed = build_dir / 'dev' / 'spine_robot_core'
     verification.parent.mkdir(parents=True, exist_ok=True)
     verification.write_text(json.dumps({'proof_scope': {'repository_proof': True, 'profile_gate_proof': False}, 'executed_phases': ['python']}), encoding='utf-8')
     readiness.write_text(json.dumps({'summary_state': 'degraded', 'verification': {'verification_boundary': ''}}), encoding='utf-8')
@@ -464,7 +464,7 @@ def test_write_acceptance_summary_uses_portable_relative_paths(tmp_path: Path) -
             '--readiness-manifest', str(readiness),
             '--build-evidence-report', str(evidence),
             '--installed-binary', str(installed),
-            '--profile', 'mock',
+            '--profile', 'dev',
         ],
         check=False,
         capture_output=True,
@@ -479,10 +479,10 @@ def test_write_acceptance_summary_uses_portable_relative_paths(tmp_path: Path) -
     assert payload['build_evidence_report'] == 'build_evidence_report.json'
     assert payload['verification_snapshot']['verification_boundary'] == ''
     assert payload['verification_snapshot']['build_evidence_mode'] == ''
-    assert payload['installed_binaries'] == ['../build/mock/spine_robot_core']
+    assert payload['installed_binaries'] == ['../build/dev/spine_robot_core']
     assert payload['verification_snapshot']['verification_boundary'] == ''
     assert payload['profiles'] == []
-    assert payload['requested_profiles'] == ['mock']
+    assert payload['requested_profiles'] == ['dev']
 
 
 def test_write_verification_report_uses_portable_relative_manifest_path(tmp_path: Path) -> None:
@@ -519,8 +519,8 @@ def test_acceptance_summary_falls_back_to_verification_report_when_local_readine
     verification = tmp_path / 'verification_execution_report.json'
     build_evidence = tmp_path / 'build_evidence_report.json'
     verification.write_text(json.dumps({
-        'proof_scope': {'repository_proof': True, 'profile_gate_proof': True, 'profile_phases': ['mock']},
-        'executed_phases': ['python', 'mock'],
+        'proof_scope': {'repository_proof': True, 'profile_gate_proof': True, 'profile_phases': ['dev']},
+        'executed_phases': ['python', 'dev'],
         'reported_tiers': {'python': 'repository'},
         'runtime_readiness': {
             'source': 'embedded_live_bundle',
@@ -542,7 +542,7 @@ def test_acceptance_summary_falls_back_to_verification_report_when_local_readine
             '--build-dir', str(tmp_path / 'build'),
             '--verification-report', str(verification),
             '--build-evidence-report', str(build_evidence),
-            '--profile', 'mock',
+            '--profile', 'dev',
         ],
         check=False,
         capture_output=True,
@@ -599,7 +599,7 @@ def test_verification_execution_report_uses_embedded_bundle_readiness_snapshot(t
         zf.writestr('runtime_readiness_manifest.json', json.dumps(readiness_manifest))
 
     report = VerificationExecutionReportService(Path.cwd()).build(
-        executed_phases=['python', 'mock'],
+        executed_phases=['python', 'dev'],
         sdk_binding_requested=True,
         model_binding_requested=True,
         readiness_manifest_path='should_not_be_used.json',

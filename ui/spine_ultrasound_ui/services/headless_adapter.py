@@ -9,10 +9,10 @@ from spine_ultrasound_ui.services.deployment_profile_service import DeploymentPr
 from spine_ultrasound_ui.services.headless_adapter_components import HeadlessAdapterSettings, build_host_services, build_runtime_transport
 from spine_ultrasound_ui.services.headless_adapter_products_surface import HeadlessAdapterProductsSurface
 from spine_ultrasound_ui.services.headless_adapter_surface import HeadlessAdapterSurface
+from spine_ultrasound_ui.services.headless_authority_query_service import HeadlessAuthorityQueryService
 from spine_ultrasound_ui.services.headless_command_service import HeadlessCommandService
 from spine_ultrasound_ui.services.headless_loop_driver import HeadlessLoopDriver
-from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope
-from spine_ultrasound_ui.services.scan_plan_contract import runtime_scan_plan_payload
+from spine_ultrasound_ui.services.ipc_protocol import ReplyEnvelope, is_write_command
 
 
 class HeadlessAdapter(HeadlessAdapterProductsSurface):
@@ -55,6 +55,11 @@ class HeadlessAdapter(HeadlessAdapterProductsSurface):
             deployment_profile_snapshot=lambda: self.deployment_profile_service.build_snapshot(RuntimeConfig.from_dict(self.runtime_config_snapshot_data or {})),
             control_plane_snapshot=lambda: dict(self.control_plane_status().get("control_plane_snapshot", {})),
         )
+        self.authority_query_service = HeadlessAuthorityQueryService(
+            dispatch_command=lambda command, payload: self.command_service._dispatch.dispatch(command, payload),
+            authoritative_contract_service=self.control_plane_aggregator.authoritative_contract_service,
+            runtime_config_provider=lambda: dict(self.runtime_config_snapshot_data),
+        )
         self.surface = HeadlessAdapterSurface(self)
 
     @property
@@ -88,68 +93,45 @@ class HeadlessAdapter(HeadlessAdapterProductsSurface):
         return self.runtime_introspection.control_authority_status()
     def resolve_authoritative_runtime_envelope(self) -> dict[str, Any]:
         """Return the canonical runtime-owned authoritative envelope or an explicit unavailable payload."""
-        desired_config = RuntimeConfig.from_dict(self.runtime_config_snapshot_data or {})
-        try:
-            reply = self.command_service._dispatch.dispatch('get_authoritative_runtime_envelope', {'reason': 'authoritative_query'})
-        except (RuntimeError, ValueError, TypeError):
-            reply = ReplyEnvelope(ok=False, message='authoritative query failed', data={})
-        if not bool(getattr(reply, 'ok', False)):
-            return self.control_plane_aggregator.authoritative_contract_service.build_unavailable_authoritative_runtime_envelope(
-                authority_source='headless_adapter',
-                detail=str(getattr(reply, 'message', '') or 'authoritative query failed'),
-                desired_runtime_config=desired_config,
-                envelope_origin='headless_dispatch_failed',
-            )
-        envelope_payload = dict(getattr(reply, 'data', {}) or {})
-        envelope = self.control_plane_aggregator.authoritative_contract_service.normalize_authoritative_runtime_envelope(
-            envelope_payload,
-            authority_source='headless_adapter',
-            desired_runtime_config=desired_config,
-            allow_direct_payload=True,
-        )
-        if envelope:
-            return envelope
-        return self.control_plane_aggregator.authoritative_contract_service.build_unavailable_authoritative_runtime_envelope(
-            authority_source='headless_adapter',
-            detail='runtime did not publish an authoritative runtime envelope',
-            desired_runtime_config=desired_config,
-            envelope_origin='headless_dispatch_missing_envelope',
-        )
+        return self.authority_query_service.resolve_authoritative_runtime_envelope()
     def resolve_control_authority(self) -> dict[str, Any]:
         """Return the canonical control-authority snapshot for read consumers."""
-        envelope = self.resolve_authoritative_runtime_envelope()
-        return dict(envelope.get('control_authority', {}))
+        return self.authority_query_service.resolve_control_authority()
     def resolve_final_verdict(self, plan=None, config: RuntimeConfig | None = None, *, read_only: bool) -> dict[str, Any]:
         """Resolve the canonical runtime-owned final verdict surface."""
-        if read_only:
-            command = 'query_final_verdict'
-            payload: dict[str, Any] = {}
-        else:
-            command = 'validate_scan_plan'
-            active_config = config if config is not None else RuntimeConfig.from_dict(self.runtime_config_snapshot_data or {})
-            payload = {
-                'scan_plan': runtime_scan_plan_payload(plan),
-                'config_snapshot': active_config.to_dict(),
-            }
-        try:
-            reply = self.command_service._dispatch.dispatch(command, payload)
-        except (RuntimeError, ValueError, TypeError):
-            return {}
-        if not bool(getattr(reply, 'ok', False)):
-            return {}
-        verdict = self.control_plane_aggregator.authoritative_contract_service.extract_final_verdict(dict(getattr(reply, 'data', {}) or {}))
-        if verdict:
-            return verdict
-        if read_only:
-            authoritative_envelope = self.resolve_authoritative_runtime_envelope()
-            return self.control_plane_aggregator.authoritative_contract_service.extract_final_verdict(authoritative_envelope)
-        return self.resolve_final_verdict(read_only=True)
+        return self.authority_query_service.resolve_final_verdict(plan=plan, config=config, read_only=read_only)
     def query_final_verdict_snapshot(self) -> dict[str, Any]:
         """Compatibility wrapper for the read-only final-verdict API."""
-        return self.resolve_final_verdict(read_only=True)
+        return self.authority_query_service.query_final_verdict_snapshot()
     def recent_commands(self) -> dict[str, Any]:
         return self.command_service.recent_commands()
+
+    def _readonly_rejection(self, operation: str) -> dict[str, Any]:
+        """Return a stable failure envelope for headless write attempts.
+
+        Args:
+            operation: Command or façade method name that attempted to mutate
+                runtime/control state.
+
+        Returns:
+            Serialized reply envelope shape used by the rest of the adapter.
+
+        Boundary behavior:
+            Headless is a permanent read-only evidence and review surface. It may
+            query runtime authority/verdict/session products, but it must not
+            initiate robot writes, lease mutations, or runtime-config writes.
+        """
+        return {
+            "ok": False,
+            "message": "headless adapter is a read-only evidence surface; use the desktop operator console for write-control transitions",
+            "request_id": "",
+            "protocol_version": 1,
+            "data": {"operation": operation, "read_only_surface": "headless_adapter"},
+        }
+
     def command(self, name: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        if is_write_command(name):
+            return self._readonly_rejection(name)
         return self.command_service.command(name, payload)
     def snapshot(self, topics: set[str] | None = None) -> list[dict[str, Any]]:
         return self.surface.snapshot(topics)
@@ -196,41 +178,20 @@ class HeadlessAdapter(HeadlessAdapterProductsSurface):
     def ultrasound_frame(self) -> str:
         return self.surface.ultrasound_frame()
     def acquire_control_lease(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        data = dict(payload or {})
-        profile = self.deployment_profile_service.build_snapshot(RuntimeConfig.from_dict(self.runtime_config_snapshot_data or {})).get('name', 'dev')
-        return self.control_authority.acquire(
-            actor_id=str(data.get('actor_id', '')),
-            role=str(data.get('role', 'operator')),
-            workspace=str(data.get('workspace', 'desktop')),
-            session_id=str(data.get('session_id', self._current_session_id)),
-            intent_reason=str(data.get('intent_reason', '')),
-            deployment_profile=str(data.get('profile', profile)),
-            ttl_s=int(data.get('ttl_s', self.control_authority.lease_ttl_s) or self.control_authority.lease_ttl_s),
-            source=str(data.get('source', 'api')),
-            preempt=bool(data.get('preempt', False)),
-            preempt_reason=str(data.get('preempt_reason', '')),
-            requested_claims=data.get('requested_claims') or data.get('claims'),
-        )
+        del payload
+        return self._readonly_rejection("acquire_control_lease")
+
     def renew_control_lease(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        data = dict(payload or {})
-        return self.control_authority.renew(
-            lease_id=str(data.get('lease_id', '')),
-            actor_id=str(data.get('actor_id', '')) or None,
-            ttl_s=int(data.get('ttl_s', self.control_authority.lease_ttl_s) or self.control_authority.lease_ttl_s),
-        )
+        del payload
+        return self._readonly_rejection("renew_control_lease")
+
     def release_control_lease(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        data = dict(payload or {})
-        return self.control_authority.release(
-            lease_id=str(data.get('lease_id', '')) or None,
-            actor_id=str(data.get('actor_id', '')) or None,
-            reason=str(data.get('reason', '')),
-        )
+        del payload
+        return self._readonly_rejection("release_control_lease")
+
     def set_runtime_config(self, config_payload: dict[str, Any]) -> dict[str, Any]:
-        self.runtime_config_snapshot_data = dict(config_payload or {})
-        if self.runtime is not None:
-            self.runtime.update_runtime_config(RuntimeConfig.from_dict(self.runtime_config_snapshot_data))
-            self._store_messages(self.runtime.telemetry_snapshot())
-        return {'runtime_config': dict(self.runtime_config_snapshot_data), 'backend_mode': self.mode}
+        del config_payload
+        return self._readonly_rejection("set_runtime_config")
     def runtime_config(self) -> dict[str, Any]:
         return {'runtime_config': dict(self.runtime_config_snapshot_data), 'backend_mode': self.mode}
     def _remember_recent_command_hook(self, command: str, payload: dict[str, Any], reply: ReplyEnvelope) -> None:

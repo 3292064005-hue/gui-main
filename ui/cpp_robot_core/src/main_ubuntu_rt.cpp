@@ -1,40 +1,12 @@
-#include <cerrno>
 #include <csignal>
-#include <cstring>
 #include <iostream>
-#include <pthread.h>
-#include <sched.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 #include "robot_core/command_server.h"
+#include "robot_core/rt_host_bootstrap.h"
 
 namespace {
 
 robot_core::CommandServer* g_server = nullptr;
-
-void pinThreadToIsolatedCores() {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(0, &cpuset);
-  CPU_SET(1, &cpuset);
-
-  const pthread_t current_thread = pthread_self();
-  if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) != 0) {
-    std::cerr << "[Warning] Failed to set CPU affinity to isolated cores. Are you root?" << std::endl;
-  } else {
-    std::cout << "[RT-Core] System isolated to CPU 0,1 successfully." << std::endl;
-  }
-}
-
-void lockMemoryForRt() {
-  if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
-    std::cerr << "[Warning] mlockall failed: " << std::strerror(errno)
-              << " - Check LimitMEMLOCK in systemd!" << std::endl;
-  } else {
-    std::cout << "[RT-Core] Memory globally locked successfully. OS page faults eliminated." << std::endl;
-  }
-}
 
 void handleSignal(int) {
   if (g_server != nullptr) {
@@ -48,8 +20,21 @@ void handleSignal(int) {
 int main() {
   std::cout << "Starting spine_robot_core..." << std::endl;
 
-  lockMemoryForRt();
-  pinThreadToIsolatedCores();
+  const auto rt_host_config = robot_core::loadRtHostBootstrapConfigFromEnv();
+  const auto rt_host_report = robot_core::applyRtHostBootstrap(rt_host_config);
+  std::cout << "[RT-Core] contract_version=" << rt_host_report.contract_version
+            << " contract_label=" << rt_host_report.contract_label
+            << " expected_host_id=" << rt_host_report.expected_host_id
+            << " actual_host_id=" << rt_host_report.actual_host_id
+            << " policy=" << rt_host_report.scheduler_policy
+            << " priority=" << rt_host_report.scheduler_priority
+            << " cpus=" << robot_core::formatCpuAffinity(rt_host_report.cpu_affinity)
+            << " preempt_rt=" << (rt_host_report.preempt_rt_ready ? "yes" : "no") << std::endl;
+  if (!rt_host_report.ok) {
+    std::cerr << "[RT-Core] bootstrap failed: " << rt_host_report.failure_reason << std::endl;
+    return 2;
+  }
+  std::cout << "[RT-Core] explicit scheduler/affinity/mlock/PREEMPT_RT bootstrap complete" << std::endl;
 
   robot_core::CommandServer server;
   g_server = &server;

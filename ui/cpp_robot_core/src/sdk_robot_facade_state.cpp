@@ -3,7 +3,7 @@
 namespace robot_core {
 
 bool SdkRobotFacade::connected() const { return connected_; }
-bool SdkRobotFacade::powered() const { return powered_; }
+bool SdkRobotFacade::powered() const { return state_store_.powered; }
 bool SdkRobotFacade::automaticMode() const { return auto_mode_; }
 bool SdkRobotFacade::rtMainlineConfigured() const { return rt_mainline_configured_; }
 bool SdkRobotFacade::motionChannelReady() const { return motion_channel_ready_; }
@@ -19,7 +19,7 @@ bool SdkRobotFacade::liveBindingEstablished() const { return live_binding_establ
 RtPhaseTelemetry SdkRobotFacade::phaseTelemetry() const { return last_phase_telemetry_; }
 
 bool SdkRobotFacade::liveTakeoverReady() const {
-  return vendored_sdk_detected_ && live_binding_established_ && control_source_exclusive_ && connected_ && powered_ && auto_mode_ && rt_mainline_configured_;
+  return vendored_sdk_detected_ && live_binding_established_ && control_source_exclusive_ && connected_ && state_store_.powered && auto_mode_ && rt_mainline_configured_;
 }
 
 std::string SdkRobotFacade::sdkBindingMode() const {
@@ -32,7 +32,7 @@ std::string SdkRobotFacade::sdkBindingMode() const {
 std::string SdkRobotFacade::hardwareLifecycleState() const {
   if (!connected_) return "disconnected";
   if (!network_healthy_) return "network_degraded";
-  if (!powered_) return "connected";
+  if (!state_store_.powered) return "connected";
   if (!auto_mode_) return "powered";
   if (!rt_mainline_configured_) return "auto_ready";
   if (active_rt_phase_ != "idle") return live_binding_established_ ? "rt_active" : "rt_contract_active";
@@ -107,7 +107,7 @@ void SdkRobotFacade::setControlSourceExclusive(bool exclusive) {
 
 void SdkRobotFacade::setNetworkHealthy(bool healthy) {
   network_healthy_ = healthy;
-  motion_channel_ready_ = connected_ && powered_ && healthy;
+  motion_channel_ready_ = connected_ && state_store_.powered && healthy;
   state_channel_ready_ = connected_ && healthy;
   refreshBindingTruth();
   appendLog(std::string("network_health=") + (healthy ? "healthy" : "degraded"));

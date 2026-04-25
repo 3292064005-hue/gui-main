@@ -7,6 +7,7 @@ from typing import Any
 from spine_ultrasound_ui.models import RuntimeConfig
 
 _PROFILE_ORDER = ("dev", "lab", "research", "clinical", "review")
+_PROFILE_ALIASES = {"mock": "dev", "hil": "research", "prod": "clinical"}
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,6 @@ class DeploymentProfile:
     research_sandbox_enabled: bool = False
     allowed_guidance_source_tiers: tuple[str, ...] = ("live", "replay", "simulated")
     allowed_force_source_tiers: tuple[str, ...] = ("live", "replay", "simulated")
-    allow_contract_shell_writes: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -49,7 +49,6 @@ class DeploymentProfile:
             "research_sandbox_enabled": self.research_sandbox_enabled,
             "allowed_guidance_source_tiers": list(self.allowed_guidance_source_tiers),
             "allowed_force_source_tiers": list(self.allowed_force_source_tiers),
-            "allow_contract_shell_writes": self.allow_contract_shell_writes,
         }
 
 
@@ -57,8 +56,31 @@ class DeploymentProfileService:
     def __init__(self, env: dict[str, str] | None = None) -> None:
         self._env = env if env is not None else dict(os.environ)
 
+    @staticmethod
+    def normalize_profile_name(name: str) -> str:
+        """Normalize profile names to the canonical deployment matrix.
+
+        Args:
+            name: Raw profile token from environment variables, scripts, or
+                acceptance artifacts.
+
+        Returns:
+            Canonical profile name when the token is recognized. Legacy aliases
+            are mapped as follows: ``mock -> dev``, ``hil -> research``, and
+            ``prod -> clinical``. Unknown values are returned as lowercase text
+            so callers can decide whether to reject or ignore them.
+
+        Raises:
+            No exceptions are raised.
+
+        Boundary behaviour:
+            Empty input returns an empty string.
+        """
+        token = str(name or "").strip().lower()
+        return _PROFILE_ALIASES.get(token, token)
+
     def resolve(self, config: RuntimeConfig | None = None) -> DeploymentProfile:
-        requested = str(self._env.get("SPINE_DEPLOYMENT_PROFILE") or self._env.get("SPINE_PROFILE") or "").strip().lower()
+        requested = self.normalize_profile_name(self._env.get("SPINE_DEPLOYMENT_PROFILE") or self._env.get("SPINE_PROFILE") or "")
         if requested not in _PROFILE_ORDER:
             requested = self._infer_profile(config)
         if requested == "clinical":
@@ -80,7 +102,6 @@ class DeploymentProfileService:
                 research_sandbox_enabled=False,
                 allowed_guidance_source_tiers=("live",),
                 allowed_force_source_tiers=("live",),
-                allow_contract_shell_writes=False,
             )
         if requested == "research":
             return DeploymentProfile(
@@ -101,7 +122,6 @@ class DeploymentProfileService:
                 research_sandbox_enabled=True,
                 allowed_guidance_source_tiers=("live",),
                 allowed_force_source_tiers=("live",),
-                allow_contract_shell_writes=False,
             )
         if requested == "lab":
             return DeploymentProfile(
@@ -122,7 +142,6 @@ class DeploymentProfileService:
                 research_sandbox_enabled=True,
                 allowed_guidance_source_tiers=("live", "replay"),
                 allowed_force_source_tiers=("live", "replay", "simulated"),
-                allow_contract_shell_writes=True,
             )
         if requested == "review":
             return DeploymentProfile(
@@ -143,7 +162,6 @@ class DeploymentProfileService:
                 research_sandbox_enabled=False,
                 allowed_guidance_source_tiers=("live", "replay", "simulated"),
                 allowed_force_source_tiers=("live", "replay", "simulated"),
-                allow_contract_shell_writes=False,
             )
         return DeploymentProfile(
             "dev",
@@ -163,7 +181,6 @@ class DeploymentProfileService:
             research_sandbox_enabled=True,
             allowed_guidance_source_tiers=("live", "replay", "simulated"),
             allowed_force_source_tiers=("live", "replay", "simulated"),
-            allow_contract_shell_writes=True,
         )
 
     def build_snapshot(self, config: RuntimeConfig | None = None) -> dict[str, Any]:

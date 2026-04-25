@@ -12,6 +12,12 @@ def test_deployment_profile_defaults_to_dev_without_explicit_runtime_intent() ->
     assert profile.name == 'dev'
 
 
+def test_deployment_profile_service_normalizes_legacy_profile_aliases() -> None:
+    assert DeploymentProfileService(env={'SPINE_DEPLOYMENT_PROFILE': 'mock'}).resolve(RuntimeConfig()).name == 'dev'
+    assert DeploymentProfileService(env={'SPINE_DEPLOYMENT_PROFILE': 'hil'}).resolve(RuntimeConfig()).name == 'research'
+    assert DeploymentProfileService(env={'SPINE_DEPLOYMENT_PROFILE': 'prod'}).resolve(RuntimeConfig()).name == 'clinical'
+
+
 def test_runtime_mode_policy_defaults_dev_desktop_to_mock() -> None:
     decision = resolve_runtime_mode(explicit_mode=None, surface='desktop', env={})
     assert decision.profile_name == 'dev'
@@ -24,6 +30,15 @@ def test_runtime_mode_policy_blocks_mock_in_research_headless() -> None:
         resolve_runtime_mode(
             explicit_mode='mock',
             surface='headless',
+            env={'SPINE_DEPLOYMENT_PROFILE': 'research'},
+        )
+
+
+def test_runtime_mode_policy_blocks_api_desktop_for_live_profiles() -> None:
+    with pytest.raises(ValueError, match='only allows backend modes: core'):
+        resolve_runtime_mode(
+            explicit_mode='api',
+            surface='desktop',
             env={'SPINE_DEPLOYMENT_PROFILE': 'research'},
         )
 
@@ -45,4 +60,15 @@ def test_headless_runtime_mode_does_not_fallback_to_ui_backend_env() -> None:
         env={'SPINE_DEPLOYMENT_PROFILE': 'dev', 'SPINE_UI_BACKEND': 'api'},
     )
     assert decision.mode == 'mock'
+    assert decision.resolution_source == 'profile_default'
+
+
+def test_runtime_mode_policy_can_ignore_surface_backend_env_for_unified_launcher() -> None:
+    decision = resolve_runtime_mode(
+        explicit_mode=None,
+        surface='desktop',
+        env={'SPINE_DEPLOYMENT_PROFILE': 'research', 'SPINE_UI_BACKEND': 'api'},
+        allow_environment_override=False,
+    )
+    assert decision.mode == 'core'
     assert decision.resolution_source == 'profile_default'

@@ -59,7 +59,7 @@ class MonitorPresenter:
         if identity_contract:
             asset_lines.extend(["", f"身份合同：{identity_contract.get('robot_model', '-')} / {identity_contract.get('sdk_robot_class', '-')} / {identity_contract.get('axis_count', '-')}", f"支持 RT：{', '.join(identity_contract.get('supported_rt_modes', [])) or '-'}", f"主线模式：{identity_contract.get('clinical_mainline_mode', '-')} / link={identity_contract.get('preferred_link', '-')}" ])
         if clinical_mainline_contract:
-            asset_lines.extend(["", f"临床主线合同：loop={clinical_mainline_contract.get('rt_loop_hz', '-')} Hz / single_control_source={clinical_mainline_contract.get('single_control_source_required', '-')}", f"主线序列：{' -> '.join(clinical_mainline_contract.get('required_sequence', [])) or '-'}" ])
+            asset_lines.extend(["", f"临床主线合同：loop={clinical_mainline_contract.get('rt_loop_hz', '-')} Hz / single_control_source={clinical_mainline_contract.get('single_control_source_required', '-')}", f"主线序列：{' -> '.join(clinical_mainline_contract.get('required_sequence', [])) or '-'}", f"runtime 内部 phase：{' -> '.join(clinical_mainline_contract.get('runtime_owned_phase_sequence', [])) or '-'}" ])
         if capability_contract:
             asset_lines.extend(["", f"能力合同：rt={capability_contract.get('scan_rt_mode', '-')} / source={capability_contract.get('runtime_source', '-')}"])
             modules = capability_contract.get('modules', [])

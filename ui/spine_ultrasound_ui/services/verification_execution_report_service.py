@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
 from spine_ultrasound_ui.services.live_evidence_bundle_service import LiveEvidenceBundleService
 
 
@@ -35,7 +36,7 @@ class VerificationExecutionReportService:
         phases = self._normalize_phases(executed_phases)
         binding_mode = "live_candidate" if sdk_binding_requested and model_binding_requested else "contract_shell"
         repository_proof = "python" in phases
-        profile_phases = [phase for phase in phases if phase in {"mock", "hil", "prod"}]
+        profile_phases = [phase for phase in phases if phase in {"dev", "research", "clinical"}]
         readiness_snapshot = dict(readiness_manifest or {})
         inspection = LiveEvidenceBundleService(self.root_dir).inspect(
             str(live_evidence_bundle or ""),
@@ -119,13 +120,38 @@ class VerificationExecutionReportService:
         }
 
     def _normalize_phases(self, executed_phases: Iterable[str]) -> list[str]:
+        """Normalize verification phases to canonical deployment-profile tokens.
+
+        Accepted external phase tokens are:
+        - python
+        - dev / mock
+        - research / hil
+        - clinical / prod
+
+        Legacy aliases remain accepted so old scripts and archived reports do not
+        break, but emitted reports always use canonical deployment profile names.
+        """
         normalized: list[str] = []
+        phase_aliases = {
+            'python': 'python',
+            'mock': 'dev',
+            'dev': 'dev',
+            'hil': 'research',
+            'research': 'research',
+            'prod': 'clinical',
+            'clinical': 'clinical',
+        }
         for raw in executed_phases:
-            phase = str(raw).strip()
-            if not phase:
+            token = str(raw).strip().lower()
+            if not token:
                 continue
-            if phase not in normalized:
-                normalized.append(phase)
+            canonical = phase_aliases.get(token)
+            if canonical is None:
+                canonical = DeploymentProfileService.normalize_profile_name(token)
+            if not canonical:
+                continue
+            if canonical not in normalized:
+                normalized.append(canonical)
         return normalized
 
     def _build_safe_summary(

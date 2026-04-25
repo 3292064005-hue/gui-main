@@ -80,7 +80,7 @@ def test_sdk_robot_facade_exposes_controlled_ports_and_call_sites_use_them() -> 
 
     assert 'nrtExecutionPort().' in Path('cpp_robot_core/src/nrt_motion_service.cpp').read_text(encoding='utf-8')
     assert 'rtControlPort().' in Path('cpp_robot_core/src/rt_motion_service.cpp').read_text(encoding='utf-8')
-    assert 'collaborationPort().' in Path('cpp_robot_core/src/core_runtime_session_execution.cpp').read_text(encoding='utf-8')
+    assert 'collaborationPort().' in Path('cpp_robot_core/src/core_runtime_execution_commands.cpp').read_text(encoding='utf-8')
     assert 'queryPort().' in Path('cpp_robot_core/src/core_runtime.cpp').read_text(encoding='utf-8')
     assert 'lifecyclePort().' in Path('cpp_robot_core/src/core_runtime.cpp').read_text(encoding='utf-8')
 
@@ -91,7 +91,7 @@ def test_runtime_lane_routes_rt_commands_to_rt_control_mutex() -> None:
         'runtimeLaneForCommand',
         'findRuntimeCommandGuardContract',
         'if (lane == CoreRuntime::RuntimeLane::RtControl)',
-        'return dispatch_with_contract(owner_.rt_lane_mutex_)',
+        'return dispatch_with_contract(owner_.lanes_.rt)',
     ):
         assert required in source
 
@@ -212,10 +212,14 @@ def test_api_bridge_backend_uses_split_lease_and_verdict_services() -> None:
     source = Path('spine_ultrasound_ui/services/api_bridge_backend.py').read_text(encoding='utf-8')
     assert 'ApiBridgeLeaseService' in source
     assert 'ApiBridgeVerdictService' in source
+    assert 'ApiBridgeTransportClient' in source
+    assert 'ApiAuthorityProjectionReader' in source
+    assert 'ApiTelemetryClient' in source
+    assert 'ApiMediaClient' in source
     assert 'def _lease_allowed(self) -> bool:' in source
-    assert 'if self._lease_allowed():' in source
-    assert 'effective_include_lease = include_lease and self._lease_allowed()' in source
-    assert 'self._lease_service.ensure_control_lease(' in source
+    assert 'effective_include_lease = False' in source
+    assert 'startup skips all lease mutation paths' in source
+    assert 'headless HTTP API is read-only; lease headers suppressed' in source
     assert 'self._verdict_service.resolve_final_verdict(' in source
 
     verdict_source = Path('spine_ultrasound_ui/services/api_bridge_verdict_service.py').read_text(encoding='utf-8')

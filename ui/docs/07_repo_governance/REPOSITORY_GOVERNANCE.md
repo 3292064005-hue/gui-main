@@ -32,12 +32,12 @@ The following job names are the canonical required checks for protected-branch c
 `scripts/verify_mainline.sh` is the local/CI-aligned mainline gate and supports:
 
 - `VERIFY_PHASE=python`
-- `VERIFY_PHASE=mock`
-- `VERIFY_PHASE=hil`
-- `VERIFY_PHASE=prod`
+- `VERIFY_PHASE=dev`
+- `VERIFY_PHASE=research`
+- `VERIFY_PHASE=clinical`
 - `VERIFY_PHASE=all`
 
-Build directories for `mock`, `hil`, and `prod` must remain isolated. Evidence-scope wording must follow [`../05_verification/VERIFICATION_POLICY.md`](../05_verification/VERIFICATION_POLICY.md).
+Build directories for `dev`, `research`, and `clinical` verification phases must remain isolated (each phase maps internally to its own C++ build profile). Evidence-scope wording must follow [`../05_verification/VERIFICATION_POLICY.md`](../05_verification/VERIFICATION_POLICY.md).
 
 ## Required repository-level gate family
 At minimum, repository/profile gate execution must include:

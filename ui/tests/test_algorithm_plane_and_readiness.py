@@ -28,7 +28,7 @@ def test_device_readiness_contract(tmp_path: Path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     session_dir = controller.session_service.current_session_dir
     assert session_dir is not None
     readiness = json.loads((session_dir / 'meta' / 'device_readiness.json').read_text(encoding='utf-8'))

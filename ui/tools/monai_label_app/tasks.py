@@ -116,11 +116,13 @@ class LaminaCenterTask(_BaseOfflineTask):
             "lamina_centers": dict(payload.get("lamina_centers", {})),
         }
         self._write_json(annotation_path, persisted)
-        return TaskResult({
-            "saved": True,
-            "lamina_centers_path": str(annotation_path),
-            "case_id": case_id,
-        })
+        return TaskResult(
+            {
+                "saved": True,
+                "lamina_centers_path": str(annotation_path),
+                "case_id": case_id,
+            }
+        )
 
 
 class UcaAuxiliaryTask(_BaseOfflineTask):
@@ -168,11 +170,13 @@ class UcaAuxiliaryTask(_BaseOfflineTask):
             "uca_labels": dict(payload.get("uca_labels", {})),
         }
         self._write_json(annotation_path, persisted)
-        return TaskResult({
-            "saved": True,
-            "uca_label_path": str(annotation_path),
-            "case_id": case_id,
-        })
+        return TaskResult(
+            {
+                "saved": True,
+                "uca_label_path": str(annotation_path),
+                "case_id": case_id,
+            }
+        )
 
 
 class OfflineTaskRegistry:

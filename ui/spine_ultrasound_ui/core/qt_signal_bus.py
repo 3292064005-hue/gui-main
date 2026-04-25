@@ -13,7 +13,7 @@ class QtSignalBus(QObject):
     sig_force_warning = Signal(float)
     sig_new_us_frame = Signal(np.ndarray)
     sig_new_pose = Signal(np.ndarray, np.ndarray)
-    sig_cmd_start_scan = Signal()
+    sig_cmd_start_procedure = Signal()
     sig_cmd_emergency_stop = Signal()
     sig_config_updated = Signal(str, object)
     sig_process_health_changed = Signal(str, bool)

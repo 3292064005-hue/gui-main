@@ -1,4 +1,5 @@
 #include "robot_core/core_runtime.h"
+#include "robot_core/deployment_policy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -29,16 +30,6 @@ std::vector<double> array16ToVector(const std::array<double, 16>& values) { retu
 std::vector<double> array3ToVector(const std::array<double, 3>& values) { return std::vector<double>(values.begin(), values.end()); }
 
 
-bool strictDeploymentShellWritesForbidden() {
-  const char* profile = std::getenv("SPINE_DEPLOYMENT_PROFILE");
-  const std::string profile_name = profile != nullptr ? std::string(profile) : std::string();
-  if (profile_name == "research" || profile_name == "clinical") return true;
-  const char* strict = std::getenv("SPINE_STRICT_CONTROL_AUTHORITY");
-  if (strict == nullptr) return false;
-  const std::string value(strict);
-  return value == "1" || value == "true" || value == "TRUE" || value == "on" || value == "ON";
-}
-
 }  // namespace
 
 std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
@@ -46,24 +37,24 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
   std::vector<std::string> blockers;
   std::vector<std::string> warnings;
   appendMainlineContractIssuesLocked(&blockers, &warnings);
-  const auto runtime_cfg = sdk_robot_.runtimeConfig();
-  const std::string authority_state = controller_online_ ? (blockers.empty() ? std::string("ready") : std::string("blocked")) : std::string("degraded");
+  const auto runtime_cfg = procedure_executor_.sdk_robot.runtimeConfig();
+  const std::string authority_state = state_store_.controller_online ? (blockers.empty() ? std::string("ready") : std::string("blocked")) : std::string("degraded");
   const auto session_freeze = object({
-      field("session_locked", boolLiteral(!session_id_.empty())),
-      field("session_id", quote(session_id_)),
-      field("session_dir", quote(session_dir_)),
-      field("locked_at_ns", std::to_string(session_locked_ts_ns_)),
-      field("plan_hash", quote(plan_hash_)),
-      field("active_segment", std::to_string(active_segment_)),
-      field("tool_name", quote(config_.tool_name)),
-      field("tcp_name", quote(config_.tcp_name)),
-      field("load_kg", formatDouble(config_.load_kg)),
-      field("rt_mode", quote(config_.rt_mode)),
-      field("cartesian_impedance", vectorJson(config_.cartesian_impedance)),
-      field("desired_wrench_n", vectorJson(config_.desired_wrench_n)),
-      field("contact_force_target_n", formatDouble(config_.contact_force_target_n)),
-      field("scan_force_target_n", formatDouble(config_.scan_force_target_n)),
-      field("retract_timeout_ms", formatDouble(config_.retract_timeout_ms)),
+      field("session_locked", boolLiteral(!state_store_.session_id.empty())),
+      field("session_id", quote(state_store_.session_id)),
+      field("session_dir", quote(state_store_.session_dir)),
+      field("locked_at_ns", std::to_string(state_store_.session_locked_ts_ns)),
+      field("plan_hash", quote(state_store_.plan_hash)),
+      field("active_segment", std::to_string(state_store_.active_segment)),
+      field("tool_name", quote(state_store_.config.tool_name)),
+      field("tcp_name", quote(state_store_.config.tcp_name)),
+      field("load_kg", formatDouble(state_store_.config.load_kg)),
+      field("rt_mode", quote(state_store_.config.rt_mode)),
+      field("cartesian_impedance", vectorJson(state_store_.config.cartesian_impedance)),
+      field("desired_wrench_n", vectorJson(state_store_.config.desired_wrench_n)),
+      field("contact_force_target_n", formatDouble(state_store_.config.contact_force_target_n)),
+      field("scan_force_target_n", formatDouble(state_store_.config.scan_force_target_n)),
+      field("retract_timeout_ms", formatDouble(state_store_.config.retract_timeout_ms)),
       field("freeze_version", quote("hard_freeze_v2"))
   });
   const auto applied_runtime_config = object({
@@ -76,16 +67,15 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
       field("joint_filter_hz", formatDouble(runtime_cfg.joint_filter_hz)),
       field("cart_filter_hz", formatDouble(runtime_cfg.cart_filter_hz)),
       field("torque_filter_hz", formatDouble(runtime_cfg.torque_filter_hz)),
-      field("fc_frame_type", quote(config_.fc_frame_type)),
-      field("preferred_link", quote(config_.preferred_link)),
-      field("requires_single_control_source", boolLiteral(config_.requires_single_control_source)),
-      field("allow_contract_shell_writes", boolLiteral(config_.allow_contract_shell_writes)),
-      field("rt_mode", quote(config_.rt_mode)),
-      field("runtime_config_contract_digest", quote(config_.runtime_config_contract_digest)),
-      field("runtime_config_schema_version", quote(config_.runtime_config_schema_version)),
-      field("tool_name", quote(config_.tool_name)),
-      field("tcp_name", quote(config_.tcp_name)),
-      field("load_kg", formatDouble(config_.load_kg)),
+      field("fc_frame_type", quote(state_store_.config.fc_frame_type)),
+      field("preferred_link", quote(state_store_.config.preferred_link)),
+      field("requires_single_control_source", boolLiteral(state_store_.config.requires_single_control_source)),
+      field("rt_mode", quote(state_store_.config.rt_mode)),
+      field("runtime_config_contract_digest", quote(state_store_.config.runtime_config_contract_digest)),
+      field("runtime_config_schema_version", quote(state_store_.config.runtime_config_schema_version)),
+      field("tool_name", quote(state_store_.config.tool_name)),
+      field("tcp_name", quote(state_store_.config.tcp_name)),
+      field("load_kg", formatDouble(state_store_.config.load_kg)),
       field("cartesian_impedance", vectorJson(array6ToVector(runtime_cfg.cartesian_impedance))),
       field("desired_wrench_n", vectorJson(array6ToVector(runtime_cfg.desired_wrench_n))),
       field("fc_frame_matrix", vectorJson(array16ToVector(runtime_cfg.fc_frame_matrix))),
@@ -105,57 +95,56 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
       field("scan_force_target_n", formatDouble(runtime_cfg.scan_force_target_n)),
       field("retract_timeout_ms", formatDouble(runtime_cfg.retract_timeout_ms))
   });
-  const bool shell_write_allowed = config_.allow_contract_shell_writes && !strictDeploymentShellWritesForbidden();
   const auto write_capabilities = object({
       field("hardware_lifecycle_write", object({
-          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || shell_write_allowed)),
-          field("reason", quote((sdk_robot_.liveBindingEstablished() || shell_write_allowed) ? std::string("") : (strictDeploymentShellWritesForbidden() ? std::string("deployment_profile_forbids_contract_shell_write") : std::string("live_binding_required")))),
+          field("allowed", boolLiteral(procedure_executor_.sdk_robot.liveBindingEstablished())),
+          field("reason", quote(procedure_executor_.sdk_robot.liveBindingEstablished() ? std::string("") : std::string("live_binding_required"))),
           field("source_of_truth", quote("cpp_robot_core"))
       })),
       field("nrt_motion_write", object({
-          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || shell_write_allowed)),
-          field("reason", quote((sdk_robot_.liveBindingEstablished() || shell_write_allowed) ? std::string("") : (strictDeploymentShellWritesForbidden() ? std::string("deployment_profile_forbids_contract_shell_write") : std::string("live_binding_required")))),
+          field("allowed", boolLiteral(procedure_executor_.sdk_robot.liveBindingEstablished())),
+          field("reason", quote(procedure_executor_.sdk_robot.liveBindingEstablished() ? std::string("") : std::string("live_binding_required"))),
           field("source_of_truth", quote("cpp_robot_core"))
       })),
       field("rt_motion_write", object({
-          field("allowed", boolLiteral(sdk_robot_.liveTakeoverReady() || shell_write_allowed)),
-          field("reason", quote((sdk_robot_.liveTakeoverReady() || shell_write_allowed) ? std::string("") : (strictDeploymentShellWritesForbidden() ? std::string("deployment_profile_forbids_contract_shell_write") : std::string("live_takeover_ready_required")))),
+          field("allowed", boolLiteral(procedure_executor_.sdk_robot.liveTakeoverReady())),
+          field("reason", quote(procedure_executor_.sdk_robot.liveTakeoverReady() ? std::string("") : std::string("live_takeover_ready_required"))),
           field("source_of_truth", quote("cpp_robot_core"))
       })),
       field("recovery_write", object({
-          field("allowed", boolLiteral(sdk_robot_.liveBindingEstablished() || shell_write_allowed)),
-          field("reason", quote((sdk_robot_.liveBindingEstablished() || shell_write_allowed) ? std::string("") : (strictDeploymentShellWritesForbidden() ? std::string("deployment_profile_forbids_contract_shell_write") : std::string("live_binding_required")))),
+          field("allowed", boolLiteral(procedure_executor_.sdk_robot.liveBindingEstablished())),
+          field("reason", quote(procedure_executor_.sdk_robot.liveBindingEstablished() ? std::string("") : std::string("live_binding_required"))),
           field("source_of_truth", quote("cpp_robot_core"))
       })),
       field("session_freeze_write", object({
-          field("allowed", boolLiteral(controller_online_)),
-          field("reason", quote(controller_online_ ? std::string("") : std::string("controller_not_connected"))),
+          field("allowed", boolLiteral(state_store_.controller_online)),
+          field("reason", quote(state_store_.controller_online ? std::string("") : std::string("controller_not_connected"))),
           field("source_of_truth", quote("cpp_robot_core"))
       }))
   });
 
   const auto control_authority = controlAuthorityJsonLocked();
   const auto telemetry_authority = object({
-      field("runtime_source", quote(sdk_robot_.queryPort().runtimeSource())),
+      field("runtime_source", quote(procedure_executor_.sdk_robot.queryPort().runtimeSource())),
       field("fact_policy", quote(simulatedTelemetryAllowedLocked() ? std::string("mock_profile_simulated_facts") : std::string("measured_only_or_unavailable"))),
       field("quality", object({
-          field("source", quote(quality_source_)),
-          field("available", boolLiteral(quality_available_)),
-          field("authoritative", boolLiteral(quality_authoritative_))
+          field("source", quote(state_store_.quality_source)),
+          field("available", boolLiteral(state_store_.quality_available)),
+          field("authoritative", boolLiteral(state_store_.quality_authoritative))
       })),
       field("contact", object({
-          field("pressure_source", quote(contact_state_.pressure_source)),
-          field("quality_source", quote(contact_state_.quality_source)),
-          field("pressure_available", boolLiteral(contact_state_.pressure_available)),
-          field("quality_available", boolLiteral(contact_state_.quality_available)),
-          field("authoritative", boolLiteral(contact_state_.authoritative))
+          field("pressure_source", quote(state_store_.contact_state.pressure_source)),
+          field("quality_source", quote(state_store_.contact_state.quality_source)),
+          field("pressure_available", boolLiteral(state_store_.contact_state.pressure_available)),
+          field("quality_available", boolLiteral(state_store_.contact_state.quality_available)),
+          field("authoritative", boolLiteral(state_store_.contact_state.authoritative))
       }))
   });
   const auto plan_digest = object({
-      field("plan_id", quote(plan_id_)),
-      field("plan_hash", quote(plan_hash_)),
-      field("active_segment", std::to_string(active_segment_)),
-      field("session_id", quote(session_id_))
+      field("plan_id", quote(state_store_.plan_id)),
+      field("plan_hash", quote(state_store_.plan_hash)),
+      field("active_segment", std::to_string(state_store_.active_segment)),
+      field("session_id", quote(state_store_.session_id))
   });
   return object({
       field("summary_state", quote(authority_state)),
@@ -169,7 +158,7 @@ std::string CoreRuntime::authoritativeRuntimeEnvelopeJsonInternal() const {
       field("telemetry_authority", telemetry_authority),
       field("session_freeze", session_freeze),
       field("plan_digest", plan_digest),
-      field("final_verdict", finalVerdictJson(last_final_verdict_))
+      field("final_verdict", finalVerdictJson(evidence_projector_.last_final_verdict))
   });
 }
 

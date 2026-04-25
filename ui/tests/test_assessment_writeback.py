@@ -26,7 +26,7 @@ def test_assessment_writeback_updates_runtime_and_experiment(tmp_path: Path) -> 
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.safe_retreat()
     controller.save_results()
     controller.export_summary()

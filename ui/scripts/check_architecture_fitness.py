@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,7 +13,9 @@ CORE_RUNTIME_DISPATCHER_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime
 SDK_FACADE_HEADER = ROOT / 'cpp_robot_core' / 'include' / 'robot_core' / 'sdk_robot_facade.h'
 NRT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'nrt_motion_service.cpp'
 RT_MOTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'rt_motion_service.cpp'
-SESSION_EXECUTION_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_session_execution.cpp'
+SESSION_FAULT_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_session_execution.cpp'
+SESSION_COMMAND_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_session_commands.cpp'
+EXECUTION_COMMAND_SOURCE = ROOT / 'cpp_robot_core' / 'src' / 'core_runtime_execution_commands.cpp'
 APP_CONTROLLER_RUNTIME_MIXIN = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_controller_runtime_mixin.py'
 APP_RUNTIME_BRIDGE = ROOT / 'spine_ultrasound_ui' / 'core' / 'app_runtime_bridge.py'
 CONFIG_MANAGER = ROOT / 'spine_ultrasound_ui' / 'services' / 'config_manager.py'
@@ -41,13 +44,28 @@ LEGACY_ARCHIVE_WRAPPER_BASENAMES = (
     'test_spawned_core_integration.py',
 )
 IGNORED_TOP_LEVEL_DIRS = frozenset({'.git', '.pytest_cache', 'archive', 'repo'})
+FORBIDDEN_LEGACY_RUNTIME_KEYS = (
+    'fallback_home_joint_rad',
+    'fallback_approach_pose_xyzabc',
+    'fallback_entry_pose_xyzabc',
+    'fallback_retreat_pose_xyzabc',
+    'emergency_home_joint_rad',
+    'emergency_approach_pose_xyzabc',
+    'emergency_entry_pose_xyzabc',
+    'emergency_retreat_pose_xyzabc',
+    'allow_contract_shell_writes',
+)
 _MAX_MAINLINE_FILE_LINES = {
     'spine_ultrasound_ui/services/api_bridge_lease_service.py': 220,
     'spine_ultrasound_ui/services/api_bridge_verdict_service.py': 220,
     'cpp_robot_core/src/sdk_robot_facade.cpp': 300,
     'cpp_robot_core/src/sdk_robot_facade_lifecycle.cpp': 420,
     'cpp_robot_core/src/sdk_robot_facade_nrt.cpp': 420,
-    'cpp_robot_core/src/sdk_robot_facade_rt.cpp': 760,
+    'cpp_robot_core/src/sdk_robot_facade_rt.cpp': 420,
+    'cpp_robot_core/src/sdk_robot_facade_rt_phase.cpp': 500,
+    'cpp_robot_core/src/core_runtime_session_commands.cpp': 430,
+    'cpp_robot_core/src/core_runtime_execution_commands.cpp': 460,
+    'cpp_robot_core/src/core_runtime_authority.cpp': 180,
     'cpp_robot_core/src/sdk_robot_facade_cache.cpp': 220,
     'cpp_robot_core/src/core_runtime.cpp': 820,
     'cpp_robot_core/src/core_runtime_contracts.cpp': 880,
@@ -128,15 +146,34 @@ def _iter_scannable_python_sources(*, root: Path, self_path: Path, config_manage
     Yields:
         Repository Python files that remain in-scope for mainline scanning.
     """
-    for path in root.rglob('*.py'):
-        if _should_skip_python_file(path, root=root, self_path=self_path, config_manager=config_manager):
-            continue
-        yield path
+    pruned_dirs = {".git", ".pytest_cache", "__pycache__", "tests", "third_party", "archive", "repo"}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in pruned_dirs]
+        for filename in filenames:
+            if filename.endswith(".py"):
+                path = Path(dirpath) / filename
+                if not _should_skip_python_file(path, root=root, self_path=self_path, config_manager=config_manager):
+                    yield path
 
 
 
 def main() -> int:
     failures: list[str] = []
+
+    pruned_dirs = {'archive', '.git', '.pytest_cache', '__pycache__', 'tests', 'third_party'}
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [name for name in dirnames if name not in pruned_dirs]
+        for filename in filenames:
+            path = Path(dirpath) / filename
+            if path.suffix.lower() not in {'.json', '.yaml', '.yml', '.md'}:
+                continue
+            try:
+                content = path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                continue
+            for legacy_key in FORBIDDEN_LEGACY_RUNTIME_KEYS:
+                if legacy_key in content:
+                    failures.append(f'Forbidden legacy runtime key remains referenced in configuration/documentation file: {path.relative_to(ROOT)} :: {legacy_key}')
 
     headless_text = HEADLESS_ADAPTER.read_text(encoding='utf-8')
     if '_bind_session_product_method' in headless_text or 'setattr(HeadlessAdapter' in headless_text:
@@ -145,10 +182,11 @@ def main() -> int:
     runtime_text = CORE_RUNTIME_HEADER.read_text(encoding='utf-8')
     for required in (
         'enum class RuntimeLane',
-        'command_lane_mutex_',
-        'query_lane_mutex_',
-        'rt_lane_mutex_',
-        'state_mutex_',
+        'RuntimeLaneScheduler lanes_',
+        'RuntimeStateStore state_store_',
+        'RuntimeAuthorityKernel authority_kernel_',
+        'RuntimeEvidenceProjector evidence_projector_',
+        'RuntimeProcedureExecutor procedure_executor_',
     ):
         if required not in runtime_text:
             failures.append(f'CoreRuntime lane contract missing: {required}')
@@ -179,7 +217,11 @@ def main() -> int:
         'cpp_robot_core/src/sdk_robot_facade_lifecycle.cpp',
         'cpp_robot_core/src/sdk_robot_facade_nrt.cpp',
         'cpp_robot_core/src/sdk_robot_facade_rt.cpp',
+        'cpp_robot_core/src/sdk_robot_facade_rt_phase.cpp',
         'cpp_robot_core/src/sdk_robot_facade_cache.cpp',
+        'cpp_robot_core/src/core_runtime_authority.cpp',
+        'cpp_robot_core/src/core_runtime_session_commands.cpp',
+        'cpp_robot_core/src/core_runtime_execution_commands.cpp',
     ):
         if not (ROOT / required).exists():
             failures.append(f'SdkRobotFacade split-unit missing: {required}')
@@ -197,7 +239,7 @@ def main() -> int:
         'findRuntimeCommandGuardContract',
         'validateRuntimeCommandGuard',
         'validateRuntimeCommandReplyEnvelope',
-        'return dispatch_with_contract(owner_.rt_lane_mutex_)',
+        'return dispatch_with_contract(owner_.lanes_.rt)',
     ):
         if required not in dispatcher_source:
             failures.append(f'CoreRuntime controlled-lane/port usage missing: {required}')
@@ -210,9 +252,9 @@ def main() -> int:
     if 'rtControlPort().' not in rt_source:
         failures.append('RtMotionService must consume the restricted RtControlPort surface')
 
-    session_source = SESSION_EXECUTION_SOURCE.read_text(encoding='utf-8')
-    if 'collaborationPort().' not in session_source:
-        failures.append('Session execution must consume the restricted CollaborationPort surface')
+    execution_source = EXECUTION_COMMAND_SOURCE.read_text(encoding='utf-8')
+    if 'collaborationPort().' not in execution_source:
+        failures.append('Execution command handling must consume the restricted CollaborationPort surface')
 
     controller_runtime_text = APP_CONTROLLER_RUNTIME_MIXIN.read_text(encoding='utf-8')
     for required in (
@@ -245,10 +287,14 @@ def main() -> int:
     for required in (
         'ApiBridgeLeaseService',
         'ApiBridgeVerdictService',
+        'ApiBridgeTransportClient',
+        'ApiAuthorityProjectionReader',
+        'ApiTelemetryClient',
+        'ApiMediaClient',
         'def _lease_allowed(self) -> bool:',
-        'if self._lease_allowed():',
-        'effective_include_lease = include_lease and self._lease_allowed()',
-        'self._lease_service.ensure_control_lease(',
+        'effective_include_lease = False',
+        'startup skips all lease mutation paths',
+        'headless HTTP API is read-only; lease headers suppressed',
         'self._verdict_service.resolve_final_verdict(',
     ):
         if required not in api_bridge_backend_text:
@@ -346,7 +392,7 @@ def main() -> int:
     if 'tests.archive' in RUNTIME_VERDICT_TEST.read_text(encoding='utf-8'):
         failures.append('Stable runtime verdict surface must not import archived compatibility tests')
     verify_mainline_text = (ROOT / 'scripts' / 'verify_mainline.sh').read_text(encoding='utf-8')
-    rt_quality_observed_fixture = ROOT / 'artifacts' / 'verification' / 'current_delivery_fix' / 'rt_quality_observed.json'
+    rt_quality_observed_fixture = ROOT / 'artifacts' / 'verification' / 'current_mainline_full_closure' / 'rt_quality_observed.json'
     if not rt_quality_observed_fixture.exists():
         failures.append('RT quality observed fixture must exist for mainline evidence gating')
     acceptance_text = (ROOT / 'scripts' / 'final_acceptance_audit.sh').read_text(encoding='utf-8')
@@ -397,7 +443,7 @@ def main() -> int:
     ):
         if required not in recording_source_text and required not in recording_header_text:
             failures.append(f'RecordingService async alarm persistence contract missing: {required}')
-    if 'recording_service_.recordAlarm(alarm);' not in runtime_state_store_text:
+    if 'evidence_projector_.recording_service.recordAlarm(alarm);' not in runtime_state_store_text:
         failures.append('CoreRuntime must enqueue alarms through RecordingService')
 
     for required in (

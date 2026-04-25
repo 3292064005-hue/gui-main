@@ -8,6 +8,7 @@ from spine_ultrasound_ui.core.app_controller import AppController
 from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.mainline_runtime_doctor_service import MainlineRuntimeDoctorService
 from spine_ultrasound_ui.services.mock_backend import MockBackend
+from spine_ultrasound_ui.services.sdk_environment_doctor_service import SdkEnvironmentDoctorService
 from spine_ultrasound_ui.services.sdk_runtime_asset_service import SdkRuntimeAssetService
 
 
@@ -144,3 +145,11 @@ def test_mainline_runtime_doctor_blocks_rt_quality_budget_violations() -> None:
     )
     names = {item["name"] for item in result["blockers"]}
     assert {"rt_cycle_overrun_detected", "rt_wake_jitter_budget_exceeded", "rt_cycle_budget_exceeded", "rt_quality_gate_failed"} <= names
+
+
+
+def test_environment_doctor_requires_rt_host_contract_env_alignment() -> None:
+    snapshot = SdkEnvironmentDoctorService().inspect(RuntimeConfig())
+    names = {item['name'] for item in snapshot['checks']}
+    assert 'RT host systemd env contract' in names
+    assert 'RT host CPU affinity contract' in names

@@ -132,8 +132,11 @@ private:
   int64_t sampleSourceTimestampNs(const QueuedSample& sample) const;
   std::filesystem::path samplePath(const QueuedSample& sample) const;
 
-  std::filesystem::path session_dir_;
-  std::string session_id_;
+  struct LocalStateStore {
+    std::filesystem::path session_dir;
+    std::string session_id;
+  };
+  LocalStateStore state_store_{};
   int64_t seq_{0};
   std::atomic<bool> active_{false};
   RecorderStatus recorder_status_{};

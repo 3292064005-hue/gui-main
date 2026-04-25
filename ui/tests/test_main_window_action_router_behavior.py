@@ -26,8 +26,8 @@ class _WindowHarness:
         self.called: list[str] = []
         self.unsupported: list[str] = []
 
-    def _action_start_scan(self) -> None:
-        self.called.append('start_scan')
+    def _action_start_procedure(self) -> None:
+        self.called.append('start_procedure')
 
     def _report_unsupported_window_action(self, action_name: str) -> None:
         self.unsupported.append(action_name)
@@ -39,7 +39,7 @@ class _BackendHarness:
         self._status_bar = _FakeStatusBar()
         self.backend = SimpleNamespace()
         if callback is not None:
-            setattr(self.backend, 'start_scan', callback)
+            setattr(self.backend, 'start_procedure', callback)
 
     def statusBar(self) -> _FakeStatusBar:
         return self._status_bar
@@ -48,8 +48,8 @@ class _BackendHarness:
 def test_action_router_dispatches_semantic_window_action() -> None:
     window = _WindowHarness()
     router = MainWindowActionRouter(window)
-    router.dispatch('start_scan')()
-    assert window.called == ['start_scan']
+    router.dispatch('start_procedure')()
+    assert window.called == ['start_procedure']
 
 
 def test_action_router_reports_unsupported_action_without_crashing() -> None:
@@ -61,23 +61,23 @@ def test_action_router_reports_unsupported_action_without_crashing() -> None:
 
 def test_invoke_backend_action_reports_missing_backend_action() -> None:
     window = _BackendHarness()
-    result = invoke_backend_action(window, 'start_scan')
+    result = invoke_backend_action(window, 'start_procedure')
     assert result is False
     assert window.runtime_bridge.logs and window.runtime_bridge.logs[-1][0] == 'ERROR'
     assert 'backend action not available' in window.runtime_bridge.logs[-1][1]
-    assert window.statusBar().messages and '动作 start_scan 失败' in window.statusBar().messages[-1][0]
+    assert window.statusBar().messages and '动作 start_procedure 失败' in window.statusBar().messages[-1][0]
 
 
 def test_invoke_backend_action_reports_runtime_failure_without_raising() -> None:
     def _boom() -> None:
-        raise RuntimeError('transport timeout during start_scan')
+        raise RuntimeError('transport timeout during start_procedure')
 
     window = _BackendHarness(callback=_boom)
-    result = invoke_backend_action(window, 'start_scan')
+    result = invoke_backend_action(window, 'start_procedure')
     assert result is False
     level, message = window.runtime_bridge.logs[-1]
     assert level == 'ERROR'
-    assert 'transport timeout during start_scan' in message
+    assert 'transport timeout during start_procedure' in message
 
 
 def test_report_action_failure_emits_log_and_status() -> None:

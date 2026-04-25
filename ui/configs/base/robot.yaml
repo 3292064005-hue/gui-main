@@ -7,7 +7,6 @@ remote_ip: 192.168.0.160
 local_ip: 192.168.0.100
 preferred_link: wired_direct
 requires_single_control_source: true
-allow_contract_shell_writes: false
 realtime_client_language: C++
 rt_loop_hz: 1000
 rt_mode: cartesianImpedance

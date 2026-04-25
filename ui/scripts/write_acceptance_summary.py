@@ -12,6 +12,13 @@ import argparse
 import json
 import os
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
 
 
 class EvidenceLoadError(RuntimeError):
@@ -50,9 +57,9 @@ def _portable_path(raw: str, *, base_dir: Path) -> str:
     original = Path(raw)
     candidate = original if original.is_absolute() else (Path.cwd() / original)
     try:
-        return os.path.relpath(candidate.resolve(strict=False), base_dir.resolve(strict=False))
+        return os.path.relpath(candidate.resolve(strict=False), base_dir.resolve(strict=False)).replace("\\", "/")
     except ValueError:
-        return str(original)
+        return str(original).replace("\\", "/")
 
 
 
@@ -84,13 +91,31 @@ def _load_json_dict(raw: str, *, label: str, required: bool) -> dict:
 
 
 
+def _normalize_profiles(items: list[str]) -> list[str]:
+    """Return canonical profile names while preserving first-seen order.
+
+    Args:
+        items: Raw profile tokens from scripts or upstream reports.
+
+    Returns:
+        Canonical profile names compatible with the deployment matrix.
+    """
+    normalized: list[str] = []
+    for raw in items:
+        token = DeploymentProfileService.normalize_profile_name(raw)
+        if not token or token in normalized:
+            continue
+        normalized.append(token)
+    return normalized
+
+
 def _validated_profiles(*, verification_report: dict, requested_profiles: list[str]) -> list[str]:
-    """Return only profiles that are actually closed by verification evidence."""
+    """Return only canonical profiles that are actually closed by verification evidence."""
     proof_scope = dict(verification_report.get('proof_scope') or {})
     if not bool(proof_scope.get('profile_gate_proof', False)):
         return []
-    proven = [str(item).strip() for item in proof_scope.get('profile_phases', []) if str(item).strip()]
-    requested = [str(item).strip() for item in requested_profiles if str(item).strip()]
+    proven = _normalize_profiles([str(item).strip() for item in proof_scope.get('profile_phases', []) if str(item).strip()])
+    requested = _normalize_profiles([str(item).strip() for item in requested_profiles if str(item).strip()])
     if not requested:
         return proven
     return [item for item in requested if item in proven]
@@ -101,9 +126,18 @@ def _verification_snapshot(*, verification_report: dict, readiness_manifest: dic
     readiness_verification = dict(readiness_manifest.get('verification') or {})
     verification_runtime = dict(verification_report.get('runtime_readiness') or {})
     reported_tiers = dict(verification_report.get('reported_tiers') or {})
+    proof_scope = dict(verification_report.get('proof_scope') or {})
+    real_environment = dict(verification_report.get('real_environment') or {})
     summary_state = str(readiness_manifest.get('summary_state', '') or verification_runtime.get('summary_state', ''))
     verification_boundary = str(readiness_verification.get('verification_boundary', '') or verification_runtime.get('verification_boundary', ''))
     evidence_tier = str(readiness_verification.get('evidence_tier', '') or verification_runtime.get('evidence_tier', ''))
+    build_evidence_mode = str(build_evidence_report.get('evidence_mode', ''))
+    evidence_components = {
+        'repo_proof': bool(proof_scope.get('repository_proof', False)),
+        'sandbox_proof': bool(proof_scope.get('profile_gate_proof', False)),
+        'build_proof': bool(build_evidence_mode),
+        'live_hil_proof': bool(real_environment.get('validated', False)),
+    }
     return {
         'summary_state': summary_state,
         'verification_boundary': verification_boundary,
@@ -113,7 +147,13 @@ def _verification_snapshot(*, verification_report: dict, readiness_manifest: dic
         'runtime_readiness_source': 'linked_manifest' if readiness_manifest else 'verification_report',
         'reported_tiers': reported_tiers,
         'claim_boundary': str(build_evidence_report.get('claim_boundary') or verification_report.get('claim_guardrails', {}).get('safe_summary', '')),
-        'build_evidence_mode': str(build_evidence_report.get('evidence_mode', '')),
+        'build_evidence_mode': build_evidence_mode,
+        'evidence_components': evidence_components,
+        'claim_evaluator': {
+            'claim_closed': bool(evidence_components['repo_proof'] and evidence_components['build_proof']),
+            'requires_live_hil_for_profiles': [str(item) for item in proof_scope.get('profile_phases', []) if str(item) in {'research', 'clinical'}],
+            'live_hil_closed': bool(evidence_components['live_hil_proof']),
+        },
     }
 
 
@@ -129,9 +169,10 @@ def main() -> int:
     except EvidenceLoadError as exc:
         print(f'[FAIL] {exc}', file=os.sys.stderr)
         return 2
+    requested_profiles = _normalize_profiles(list(args.profiles))
     validated_profiles = _validated_profiles(
         verification_report=verification_report_payload,
-        requested_profiles=list(args.profiles),
+        requested_profiles=requested_profiles,
     )
     payload = {
         'schema_version': 'acceptance.summary.v2',
@@ -141,7 +182,7 @@ def main() -> int:
         'readiness_manifest': _portable_path(args.readiness_manifest, base_dir=base_dir),
         'build_evidence_report': _portable_path(args.build_evidence_report, base_dir=base_dir),
         'profiles': validated_profiles,
-        'requested_profiles': list(args.profiles),
+        'requested_profiles': requested_profiles,
         'installed_binaries': [_portable_path(item, base_dir=base_dir) for item in args.installed_binaries],
         'requested_bindings': {
             'with_sdk': bool(args.with_sdk),
@@ -152,7 +193,7 @@ def main() -> int:
             'repository_proof': bool((verification_report_payload.get('proof_scope') or {}).get('repository_proof', False)),
             'profile_gate_proof': bool((verification_report_payload.get('proof_scope') or {}).get('profile_gate_proof', False)),
             'validated_profiles': validated_profiles,
-            'unvalidated_requested_profiles': [item for item in args.profiles if item not in validated_profiles],
+            'unvalidated_requested_profiles': [item for item in requested_profiles if item not in validated_profiles],
             'claim_boundary': 'profiles only close when verification_report.proof_scope.profile_gate_proof is true',
         },
         'verification_snapshot': _verification_snapshot(

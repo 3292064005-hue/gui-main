@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from spine_ultrasound_ui.services.runtime_command_catalog import COMMANDS
+from spine_ultrasound_ui.services.runtime_command_catalog import COMMANDS, retired_alias_rejection
 from spine_ultrasound_ui.services.runtime_command_contracts import contract_for
 
 
@@ -24,7 +24,7 @@ def _matches_expected_type(value: Any, expected_type: str) -> bool:
 
 def validate_command_payload(command: str, payload: dict[str, Any] | None = None) -> None:
     if command not in COMMANDS:
-        raise ValueError(f"unsupported command: {command}")
+        raise ValueError(retired_alias_rejection(command))
     payload = payload or {}
     if not isinstance(payload, dict):
         raise ValueError("payload must be a JSON object")

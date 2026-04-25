@@ -8,7 +8,7 @@
 namespace robot_core {
 
 std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& invocation) {
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
   const auto& command = invocation.command;
   using PowerHandler = std::function<std::string(CoreRuntime*, const RuntimeCommandInvocation&)>;
   static const std::unordered_map<std::string, PowerHandler> handlers = {
@@ -18,14 +18,14 @@ std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& 
            return self->replyJson(inv.request_id, false, "typed request mismatch: power_on");
          }
          (void)request;
-         if (!self->controller_online_) {
+         if (!self->state_store_.controller_online) {
            return self->replyJson(inv.request_id, false, "robot not connected");
          }
-         if (!self->sdk_robot_.lifecyclePort().setPower(true)) {
+         if (!self->procedure_executor_.sdk_robot.lifecyclePort().setPower(true)) {
            return self->replyJson(inv.request_id, false, "power_on failed");
          }
-         self->powered_ = true;
-         self->execution_state_ = RobotCoreState::Powered;
+         self->state_store_.powered = true;
+         self->state_store_.execution_state = RobotCoreState::Powered;
          return self->replyJson(inv.request_id, true, "power_on accepted");
        }},
       {"power_off", [](CoreRuntime* self, const RuntimeCommandInvocation& inv) {
@@ -34,12 +34,12 @@ std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& 
            return self->replyJson(inv.request_id, false, "typed request mismatch: power_off");
          }
          (void)request;
-         if (self->controller_online_ && !self->sdk_robot_.lifecyclePort().setPower(false)) {
+         if (self->state_store_.controller_online && !self->procedure_executor_.sdk_robot.lifecyclePort().setPower(false)) {
            return self->replyJson(inv.request_id, false, "power_off failed");
          }
-         self->powered_ = false;
-         self->automatic_mode_ = false;
-         self->execution_state_ = self->controller_online_ ? RobotCoreState::Connected : RobotCoreState::Disconnected;
+         self->state_store_.powered = false;
+         self->state_store_.automatic_mode = false;
+         self->state_store_.execution_state = self->state_store_.controller_online ? RobotCoreState::Connected : RobotCoreState::Disconnected;
          return self->replyJson(inv.request_id, true, "power_off accepted");
        }},
       {"set_auto_mode", [](CoreRuntime* self, const RuntimeCommandInvocation& inv) {
@@ -48,14 +48,14 @@ std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& 
            return self->replyJson(inv.request_id, false, "typed request mismatch: set_auto_mode");
          }
          (void)request;
-         if (!self->powered_) {
+         if (!self->state_store_.powered) {
            return self->replyJson(inv.request_id, false, "robot not powered");
          }
-         if (!self->sdk_robot_.lifecyclePort().setAutoMode()) {
+         if (!self->procedure_executor_.sdk_robot.lifecyclePort().setAutoMode()) {
            return self->replyJson(inv.request_id, false, "set_auto_mode failed");
          }
-         self->automatic_mode_ = true;
-         self->execution_state_ = RobotCoreState::AutoReady;
+         self->state_store_.automatic_mode = true;
+         self->state_store_.execution_state = RobotCoreState::AutoReady;
          return self->replyJson(inv.request_id, true, "set_auto_mode accepted");
        }},
       {"set_manual_mode", [](CoreRuntime* self, const RuntimeCommandInvocation& inv) {
@@ -64,11 +64,11 @@ std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& 
            return self->replyJson(inv.request_id, false, "typed request mismatch: set_manual_mode");
          }
          (void)request;
-         if (self->controller_online_) {
-           self->sdk_robot_.lifecyclePort().setManualMode();
+         if (self->state_store_.controller_online) {
+           self->procedure_executor_.sdk_robot.lifecyclePort().setManualMode();
          }
-         self->automatic_mode_ = false;
-         self->execution_state_ = self->powered_ ? RobotCoreState::Powered : RobotCoreState::Connected;
+         self->state_store_.automatic_mode = false;
+         self->state_store_.execution_state = self->state_store_.powered ? RobotCoreState::Powered : RobotCoreState::Connected;
          return self->replyJson(inv.request_id, true, "set_manual_mode accepted");
        }},
   };
@@ -80,7 +80,7 @@ std::string CoreRuntime::handlePowerModeCommand(const RuntimeCommandInvocation& 
 }
 
 std::string CoreRuntime::handleValidationCommand(const RuntimeCommandInvocation& invocation) {
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
   const auto& command = invocation.command;
   using ValidationHandler = std::function<std::string(CoreRuntime*, const RuntimeCommandInvocation&)>;
   static const std::unordered_map<std::string, ValidationHandler> handlers = {
@@ -107,22 +107,9 @@ std::string CoreRuntime::handleValidationCommand(const RuntimeCommandInvocation&
              request->config_snapshot.value_or("{}"),
              request->scan_plan,
              request->scan_plan_hash.value_or(""));
-         self->last_final_verdict_ = verdict;
+         self->evidence_projector_.last_final_verdict = verdict;
          const auto verdict_json = self->finalVerdictJson(verdict);
          return self->replyJson(inv.request_id, verdict.accepted, verdict.accepted ? "validate_scan_plan accepted" : "validate_scan_plan rejected", json::object({json::field("final_verdict", verdict_json), json::field("canonical_command", json::quote("validate_scan_plan"))}));
-       }},
-      {"compile_scan_plan", [](CoreRuntime* self, const RuntimeCommandInvocation& inv) {
-         const auto* request = inv.requestAs<CompileScanPlanRequest>();
-         if (request == nullptr) {
-           return self->replyJson(inv.request_id, false, "typed request mismatch: compile_scan_plan");
-         }
-         const auto verdict = self->compileScanPlanVerdictLocked(
-             request->config_snapshot.value_or("{}"),
-             request->scan_plan,
-             request->scan_plan_hash.value_or(""));
-         self->last_final_verdict_ = verdict;
-         const auto verdict_json = self->finalVerdictJson(verdict);
-         return self->replyJson(inv.request_id, verdict.accepted, verdict.accepted ? "compile_scan_plan accepted" : "compile_scan_plan rejected", json::object({json::field("final_verdict", verdict_json), json::field("canonical_command", json::quote("validate_scan_plan")), json::field("deprecated_alias", json::boolLiteral(true))}));
        }},
       {"query_final_verdict", [](CoreRuntime* self, const RuntimeCommandInvocation& inv) {
          const auto* request = inv.requestAs<QueryFinalVerdictRequest>();
@@ -130,7 +117,7 @@ std::string CoreRuntime::handleValidationCommand(const RuntimeCommandInvocation&
            return self->replyJson(inv.request_id, false, "typed request mismatch: query_final_verdict");
          }
          (void)request;
-         const auto verdict_json = self->finalVerdictJson(self->last_final_verdict_);
+         const auto verdict_json = self->finalVerdictJson(self->evidence_projector_.last_final_verdict);
          return self->replyJson(inv.request_id, true, "final verdict snapshot", json::object({json::field("final_verdict", verdict_json)}));
        }},
   };

@@ -79,6 +79,12 @@ ARTIFACT_SCHEMA_HINTS: Final[dict[str, str]] = {
     "command_policy_snapshot": "session/command_policy_snapshot_v1.schema.json",
     "contract_kernel_diff": "session/contract_kernel_diff_v1.schema.json",
     "session_evidence_seal": "session/session_evidence_seal_v1.schema.json",
+    "dataset_export_manifest": "manifest.schema.json",
+    "lamina_center_dataset_case": "datasets/lamina_center_annotation.schema.json",
+    "uca_dataset_case": "datasets/uca_label.schema.json",
+    "nnunet_conversion_manifest": "manifest.schema.json",
+    "training_backend_request": "training/backend_training_request.schema.json",
+    "training_model_package": "training/model_package.schema.json",
     "postprocess_stage_manifest": "session/postprocess_stage_manifest_v1.schema.json",
     "session_intelligence_manifest": "session/session_intelligence_manifest_v1.schema.json",
 }

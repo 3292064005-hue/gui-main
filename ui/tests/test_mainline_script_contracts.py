@@ -22,7 +22,7 @@ def test_verify_mainline_uses_ephemeral_build_dir_and_phase_dispatch() -> None:
     assert 'rm -rf "${BUILD_DIR}"' in script
     assert 'VERIFY_PHASE="${VERIFY_PHASE:-all}"' in script
     assert 'case "${VERIFY_PHASE}" in' in script
-    assert 'run_cpp_profile_gate mock' in script or 'run_cpp_profile_gate "mock"' in script
+    assert 'run_cpp_phase_gate dev' in script or 'run_cpp_phase_gate "dev"' in script
     assert 'scripts/build_cpp_targets.py' in script
     assert '--jobs "${CMAKE_BUILD_PARALLEL_LEVEL}"' in script
     assert 'ctest --test-dir' in script
@@ -31,9 +31,9 @@ def test_verify_mainline_uses_ephemeral_build_dir_and_phase_dispatch() -> None:
 def test_start_real_and_demo_do_not_dirty_repo_build_tree() -> None:
     start_real = _read('scripts/start_real.sh')
     start_demo = _read('scripts/start_demo.sh')
-    assert 'start_hil.sh' in start_real and 'start_prod.sh' in start_real
-    assert 'trap ' in start_demo
-    assert 'cd "$ROOT_DIR"' in start_demo
+    assert 'scripts/start_hil.sh' in start_real and 'scripts/start_prod.sh' in start_real
+    assert 'scripts/mock_robot_core_server.py' not in start_demo
+    assert 'scripts/start_mainline.py' in start_demo
 
 
 def test_cpp_profile_flags_are_build_type_aware() -> None:
@@ -67,7 +67,7 @@ def test_mainline_cpp_gates_default_to_mock_without_sdk() -> None:
     acceptance_script = _read('scripts/final_acceptance_audit.sh')
     assert 'ROBOT_CORE_WITH_XCORE_SDK="${ROBOT_CORE_WITH_XCORE_SDK:-OFF}"' in verify_script
     assert 'ROBOT_CORE_WITH_XMATE_MODEL="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"' in verify_script
-    assert 'run_cpp_profile_gate' in verify_script
+    assert 'run_cpp_phase_gate' in verify_script
     assert 'ROBOT_CORE_WITH_XCORE_SDK="${ROBOT_CORE_WITH_XCORE_SDK:-OFF}"' in acceptance_script
     assert 'ROBOT_CORE_WITH_XMATE_MODEL="${ROBOT_CORE_WITH_XMATE_MODEL:-OFF}"' in acceptance_script
 
@@ -128,7 +128,7 @@ def test_cpp_examples_are_not_built_by_default_in_mainline() -> None:
 
 def test_mainline_cpp_gate_uses_phase_isolated_build_directories() -> None:
     verify_script = _read('scripts/verify_mainline.sh')
-    assert 'profile_build_dir()' in verify_script
+    assert 'phase_build_dir()' in verify_script
     assert "${BUILD_DIR}" in verify_script
     assert 'assert_registered_cpp_tests' in verify_script
     assert 'EXPECTED_CPP_TEST_COUNT' in verify_script
@@ -178,6 +178,16 @@ def test_systemd_cpp_service_points_to_installed_binary_not_build_tree() -> None
     service = _read('configs/systemd/spine-cpp-core.service')
     assert '/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core' in service
     assert '/opt/spine_ultrasound/cpp_robot_core/build/spine_robot_core' not in service
+
+
+def test_rt_setup_script_preserves_existing_installed_env_and_renders_scheduler_from_contract() -> None:
+    script = _read('scripts/setup_ubuntu_rt.sh')
+    assert 'if [ ! -f "$ENV_TARGET" ]; then' in script
+    assert 'Reusing existing RT host contract from $ENV_TARGET' in script
+    assert 'SPINE_RT_SCHED_POLICY' in script
+    assert 'SPINE_RT_SCHED_PRIORITY' in script
+    assert "elif line.startswith('CPUSchedulingPolicy='):" in script
+    assert "elif line.startswith('CPUSchedulingPriority='):" in script
 
 
 def test_cpp_prereq_script_uses_same_mock_mainline_defaults() -> None:
@@ -238,6 +248,15 @@ def test_readme_and_deployment_document_tls_bootstrap_before_doctor() -> None:
     assert './scripts/generate_dev_tls_cert.sh' in deployment
 
 
+def test_backend_authority_docs_and_rt_host_delivery_docs_match_read_only_api_and_rt_contract_rendering() -> None:
+    authority_doc = _read('docs/02_governance/BACKEND_AUTHORITY_SURFACE.md')
+    rt_host_doc = _read('docs/04_profiles_and_release/RT_HOST_DELIVERY.md')
+    assert 'must not forward `acquire_control_lease` / `renew_control_lease` / `release_control_lease`' in authority_doc
+    assert 'only the desktop operator console may initiate those transitions' in authority_doc
+    assert '`CPUSchedulingPolicy` and `CPUSchedulingPriority` in the installed systemd unit must match `SPINE_RT_SCHED_POLICY` and `SPINE_RT_SCHED_PRIORITY`' in rt_host_doc
+    assert 'installs the sample contract only when `/etc/default/spine-cpp-core` does not already exist' in rt_host_doc
+
+
 def test_cpp_prereq_script_enforces_cmake_minimum_version() -> None:
     script = _read('scripts/check_cpp_prereqs.sh')
     assert "cmake>=3.24" in script
@@ -260,7 +279,7 @@ def test_verify_mainline_emits_phase_scoped_failure_context_and_rejects_unknown_
     verify_script = _read('scripts/verify_mainline.sh')
     assert '[FAIL] verify_mainline.sh phase=' in verify_script
     assert 'Unsupported VERIFY_PHASE=' in verify_script
-    assert 'Expected one of: python, mock, hil, prod, all' in verify_script
+    assert 'Expected one of: python, dev, research, clinical, all' in verify_script
 
 
 def test_verify_mainline_batches_default_python_gate_for_constrained_envs() -> None:
@@ -278,8 +297,8 @@ def test_verify_mainline_keeps_archive_compat_out_of_default_python_gate() -> No
 
 def test_verify_mainline_prod_phase_builds_tests_and_installs() -> None:
     verify_script = _read('scripts/verify_mainline.sh')
-    assert 'run_cpp_profile_install_check' in verify_script
-    assert 'run_prod_profile_release_smoke' in verify_script
+    assert 'run_cpp_phase_install_check' in verify_script
+    assert 'run_clinical_release_smoke' in verify_script
     assert 'scripts/deployment_smoke_test.py' in verify_script
     assert 'EXPECTED_CPP_TEST_COUNT="${EXPECTED_CPP_TEST_COUNT:-${#CPP_TEST_TARGETS[@]}}"' in verify_script
 
@@ -319,7 +338,7 @@ def test_acceptance_audit_emits_claim_safe_verification_report_and_does_not_over
 
 def test_acceptance_audit_forces_mock_profile_bindings_off_even_when_live_flags_are_enabled() -> None:
     script = _read('scripts/final_acceptance_audit.sh')
-    assert 'if [[ "$PROFILE" == "mock" ]]; then' in script
+    assert 'if [[ "$BUILD_PROFILE" == "mock" ]]; then' in script
     assert 'PROFILE_WITH_SDK=OFF' in script
     assert 'PROFILE_WITH_MODEL=OFF' in script
 
@@ -402,7 +421,7 @@ def test_robot_identity_service_uses_structured_default_model_contract() -> None
 def test_start_headless_script_delegates_default_backend_resolution_to_runtime_policy() -> None:
     script = _read('scripts/start_headless.sh')
     assert 'scripts/resolve_headless_backend.py' in script
-    assert 'SPINE_HEADLESS_BACKEND' in script
+    assert 'SPINE_HEADLESS_BACKEND' not in script
 
 
 
@@ -411,9 +430,11 @@ def test_readme_and_profile_matrix_align_review_headless_policy() -> None:
     readme = _read('README.md')
     profile_matrix = _read('docs/04_profiles_and_release/PROFILE_MATRIX.md')
     runtime_policy = _read('spine_ultrasound_ui/services/runtime_mode_policy.py')
-    assert 'headless 默认后端由 deployment profile 决定：`dev -> mock`，`review/lab/research/clinical -> core`；其中 `review` 仅允许在只读 evidence / replay / contract inspection 场景显式切到 `mock`。' in readme
+    assert 'headless 默认后端由 deployment profile 决定：`dev -> mock`，`lab/research/clinical/review -> core`；其中 `review` 仅允许在只读 evidence / replay / contract inspection 场景显式切到 `mock`。' in readme
     assert 'headless review may use `mock` **only** for read-only evidence / replay / contract inspection flows' in profile_matrix
+    assert 'desktop is the real operator station: `api` is limited to explicit review/integration desktops and is forbidden for `lab/research/clinical` write control.' in profile_matrix
     assert '"review": frozenset({"mock", "core"})' in runtime_policy
+    assert '"research": frozenset({"core"})' in runtime_policy
     assert '"review": "core"' in runtime_policy
 def test_readme_documents_runtime_policy_backed_headless_resolution() -> None:
     readme = _read('README.md')

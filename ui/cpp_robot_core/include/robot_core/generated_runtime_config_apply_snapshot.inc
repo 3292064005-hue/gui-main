@@ -95,7 +95,6 @@
   CONFIG_EXPR.sdk_robot_class = json::extractString(SOURCE_EXPR, "sdk_robot_class", CONFIG_EXPR.sdk_robot_class); \
   CONFIG_EXPR.preferred_link = json::extractString(SOURCE_EXPR, "preferred_link", CONFIG_EXPR.preferred_link); \
   CONFIG_EXPR.requires_single_control_source = json::extractBool(SOURCE_EXPR, "requires_single_control_source", CONFIG_EXPR.requires_single_control_source); \
-  CONFIG_EXPR.allow_contract_shell_writes = json::extractBool(SOURCE_EXPR, "allow_contract_shell_writes", CONFIG_EXPR.allow_contract_shell_writes); \
   CONFIG_EXPR.build_id = json::extractString(SOURCE_EXPR, "build_id", CONFIG_EXPR.build_id); \
   CONFIG_EXPR.software_version = json::extractString(SOURCE_EXPR, "software_version", CONFIG_EXPR.software_version); \
   CONFIG_EXPR.runtime_config_contract_digest = json::extractString(SOURCE_EXPR, "runtime_config_contract_digest", CONFIG_EXPR.runtime_config_contract_digest); \
@@ -135,12 +134,4 @@
   const auto load_inertia__arr = json::extractDoubleArray(SOURCE_EXPR, "load_inertia", CONFIG_EXPR.load_inertia); \
   if (!load_inertia__arr.empty()) CONFIG_EXPR.load_inertia = load_inertia__arr; \
   const auto home_joint_rad__arr = json::extractDoubleArray(SOURCE_EXPR, "home_joint_rad", CONFIG_EXPR.home_joint_rad); \
-  if (!home_joint_rad__arr.empty()) CONFIG_EXPR.home_joint_rad = home_joint_rad__arr; \
-  const auto emergency_home_joint_rad__arr = json::extractDoubleArray(SOURCE_EXPR, "emergency_home_joint_rad", CONFIG_EXPR.emergency_home_joint_rad); \
-  if (!emergency_home_joint_rad__arr.empty()) CONFIG_EXPR.emergency_home_joint_rad = emergency_home_joint_rad__arr; \
-  const auto emergency_approach_pose_xyzabc__arr = json::extractDoubleArray(SOURCE_EXPR, "emergency_approach_pose_xyzabc", CONFIG_EXPR.emergency_approach_pose_xyzabc); \
-  if (!emergency_approach_pose_xyzabc__arr.empty()) CONFIG_EXPR.emergency_approach_pose_xyzabc = emergency_approach_pose_xyzabc__arr; \
-  const auto emergency_entry_pose_xyzabc__arr = json::extractDoubleArray(SOURCE_EXPR, "emergency_entry_pose_xyzabc", CONFIG_EXPR.emergency_entry_pose_xyzabc); \
-  if (!emergency_entry_pose_xyzabc__arr.empty()) CONFIG_EXPR.emergency_entry_pose_xyzabc = emergency_entry_pose_xyzabc__arr; \
-  const auto emergency_retreat_pose_xyzabc__arr = json::extractDoubleArray(SOURCE_EXPR, "emergency_retreat_pose_xyzabc", CONFIG_EXPR.emergency_retreat_pose_xyzabc); \
-  if (!emergency_retreat_pose_xyzabc__arr.empty()) CONFIG_EXPR.emergency_retreat_pose_xyzabc = emergency_retreat_pose_xyzabc__arr;
+  if (!home_joint_rad__arr.empty()) CONFIG_EXPR.home_joint_rad = home_joint_rad__arr;

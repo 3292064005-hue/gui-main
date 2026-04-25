@@ -12,6 +12,25 @@ from pathlib import Path
 from typing import Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
+from spine_ultrasound_ui.services.runtime_mode_policy import resolve_runtime_mode
+
+_CANONICAL_DEPLOYMENT_PROFILES = ("dev", "lab", "research", "clinical", "review")
+_LEGACY_PROFILE_ALIASES = {
+    "mock": "dev",
+    "hil": "research",
+    "prod": "clinical",
+}
+_BUILD_PROFILE_BY_DEPLOYMENT = {
+    "dev": "mock",
+    "lab": "hil",
+    "research": "hil",
+    "clinical": "prod",
+    "review": "mock",
+}
 
 
 def _bool_env(name: str, default: bool) -> bool:
@@ -21,10 +40,36 @@ def _bool_env(name: str, default: bool) -> bool:
     return str(value).strip().lower() not in {"0", "false", "off", "no", ""}
 
 
+def _env_str(*names: str, default: str) -> str:
+    for name in names:
+        raw = os.getenv(name)
+        if raw is not None and str(raw).strip():
+            return str(raw).strip()
+    return default
+
+
+def _normalize_deployment_profile(raw: str | None) -> str:
+    normalized = str(raw or "").strip().lower()
+    if not normalized:
+        return "dev"
+    return _LEGACY_PROFILE_ALIASES.get(normalized, normalized)
+
+
+def _validate_deployment_profile(profile: str) -> str:
+    if profile not in _CANONICAL_DEPLOYMENT_PROFILES:
+        valid = ", ".join(_CANONICAL_DEPLOYMENT_PROFILES + tuple(_LEGACY_PROFILE_ALIASES))
+        raise SystemExit(f"Unsupported --profile={profile!r}. Expected one of: {valid}")
+    return profile
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Unified operator-facing launcher for Spine mainline surfaces")
     parser.add_argument("--surface", choices=("desktop", "headless"), default=os.getenv("SPINE_MAINLINE_SURFACE", "desktop"))
-    parser.add_argument("--profile", choices=("mock", "hil", "prod"), default=os.getenv("ROBOT_CORE_PROFILE", "mock"))
+    parser.add_argument(
+        "--profile",
+        default=_env_str("SPINE_DEPLOYMENT_PROFILE", "SPINE_PROFILE", default="dev"),
+        help="deployment profile (dev/lab/research/clinical/review); legacy aliases mock/hil/prod are still accepted",
+    )
     parser.add_argument("--backend", choices=("mock", "core", "api", "auto"), default=os.getenv("SPINE_MAINLINE_BACKEND", "auto"))
     parser.add_argument("--build-dir", default=os.getenv("SPINE_CORE_BUILD_DIR", "/tmp/spine_core_build_runtime"))
     parser.add_argument("--cmake-build-type", default=os.getenv("CMAKE_BUILD_TYPE", "Release"))
@@ -39,31 +84,70 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--core-telemetry-port", type=int, default=int(os.getenv("SPINE_CORE_TELEMETRY_PORT", "5657")))
     parser.add_argument("--core-ready-timeout-sec", type=float, default=float(os.getenv("SPINE_CORE_READY_TIMEOUT_SEC", "8.0")))
     parser.add_argument("--core-ready-poll-sec", type=float, default=float(os.getenv("SPINE_CORE_READY_POLL_SEC", "0.1")))
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.profile = _validate_deployment_profile(_normalize_deployment_profile(args.profile))
+    return args
+
+
+def _resolve_backend(*, profile_name: str, surface: str, backend: str, env: Mapping[str, str]) -> str:
+    explicit_backend = None if backend == "auto" else backend
+    decision = resolve_runtime_mode(
+        explicit_mode=explicit_backend,
+        surface=surface,
+        env=env,
+        allow_environment_override=False,
+    )
+    if decision.profile_name != profile_name:
+        raise RuntimeError(
+            f"launcher profile drift: expected deployment profile '{profile_name}', runtime policy resolved '{decision.profile_name}'"
+        )
+    return decision.mode
+
+
+def _resolve_core_build_flags(*, deployment_profile: str, backend: str) -> tuple[str, str, str]:
+    build_profile = _BUILD_PROFILE_BY_DEPLOYMENT[deployment_profile]
+    requires_live_sdk = deployment_profile in {"research", "clinical"}
+    wants_contract_transport = backend == "core"
+    sdk_default = requires_live_sdk or deployment_profile == "lab" or wants_contract_transport
+    model_default = requires_live_sdk
+    with_sdk = "ON" if _bool_env("ROBOT_CORE_WITH_XCORE_SDK", sdk_default) else "OFF"
+    with_model = "ON" if _bool_env("ROBOT_CORE_WITH_XMATE_MODEL", model_default) else "OFF"
+    if with_sdk == "OFF":
+        with_model = "OFF"
+    return build_profile, with_sdk, with_model
 
 
 def build_env(args: argparse.Namespace) -> dict[str, str]:
     env = dict(os.environ)
-    profile_to_deployment = {
-        "mock": "dev",
-        "hil": "lab",
-        "prod": "clinical",
-    }
-    env.setdefault("SPINE_DEPLOYMENT_PROFILE", profile_to_deployment.get(args.profile, "dev"))
-    backend = args.backend
-    if backend == "auto":
-        backend = "core" if args.profile in {"hil", "prod"} else "mock"
-    env["SPINE_MAINLINE_BACKEND"] = backend
+    env["SPINE_DEPLOYMENT_PROFILE"] = args.profile
+    env["SPINE_PROFILE"] = args.profile
+    env.pop("SPINE_LAB_MODE", None)
+    env.pop("SPINE_RESEARCH_MODE", None)
+    env.pop("SPINE_READ_ONLY_MODE", None)
+    env.pop("SPINE_UI_BACKEND", None)
+    env.pop("SPINE_HEADLESS_BACKEND", None)
+
+    profile = DeploymentProfileService({"SPINE_DEPLOYMENT_PROFILE": args.profile}).resolve(None)
+    if args.profile == "lab":
+        env["SPINE_LAB_MODE"] = "1"
+    elif args.profile == "research":
+        env["SPINE_RESEARCH_MODE"] = "1"
+    elif args.profile == "review":
+        env["SPINE_READ_ONLY_MODE"] = "1"
+
+    resolved_backend = _resolve_backend(profile_name=args.profile, surface=args.surface, backend=args.backend, env=env)
+    env["SPINE_MAINLINE_BACKEND"] = resolved_backend
     if args.surface == "desktop":
-        env["SPINE_UI_BACKEND"] = backend
+        env["SPINE_UI_BACKEND"] = resolved_backend
     else:
-        env["SPINE_HEADLESS_BACKEND"] = backend
-    if args.profile == "hil":
-        env.setdefault("SPINE_LAB_MODE", "1")
-    if args.profile == "prod":
-        env.setdefault("SPINE_STRICT_CONTROL_AUTHORITY", "1")
-    if backend == "core" and args.profile in {"hil", "prod"}:
-        env.setdefault("SPINE_STRICT_CONTROL_AUTHORITY", "1")
+        env["SPINE_HEADLESS_BACKEND"] = resolved_backend
+
+    env["SPINE_STRICT_CONTROL_AUTHORITY"] = "1" if profile.requires_strict_control_authority else "0"
+    build_profile, with_sdk, with_model = _resolve_core_build_flags(deployment_profile=args.profile, backend=resolved_backend)
+    env["ROBOT_CORE_PROFILE"] = build_profile
+    env.setdefault("SPINE_RUNTIME_BUILD_PROFILE", build_profile)
+    env["ROBOT_CORE_WITH_XCORE_SDK"] = with_sdk
+    env["ROBOT_CORE_WITH_XMATE_MODEL"] = with_model
     return env
 
 
@@ -75,7 +159,7 @@ def maybe_run_doctor(args: argparse.Namespace, env: Mapping[str, str]) -> None:
     if args.skip_doctor:
         return
     cmd = [sys.executable, str(ROOT / "scripts" / "doctor_runtime.py"), "--surface", args.surface]
-    if args.doctor_strict or args.profile == "prod":
+    if args.doctor_strict or args.profile in {"research", "clinical"}:
         cmd.append("--strict")
     run_checked(cmd, env=env)
 
@@ -89,9 +173,9 @@ def maybe_build_core(args: argparse.Namespace, env: Mapping[str, str]) -> Path:
     cmake_args = [
         "cmake", "-S", str(ROOT / "cpp_robot_core"), "-B", str(build_dir),
         f"-DCMAKE_BUILD_TYPE={args.cmake_build_type}",
-        f"-DROBOT_CORE_PROFILE={args.profile}",
-        "-DROBOT_CORE_WITH_XCORE_SDK=ON",
-        f"-DROBOT_CORE_WITH_XMATE_MODEL={'ON' if _bool_env('ROBOT_CORE_WITH_XMATE_MODEL', True) else 'OFF'}",
+        f"-DROBOT_CORE_PROFILE={env.get('ROBOT_CORE_PROFILE', 'mock')}",
+        f"-DROBOT_CORE_WITH_XCORE_SDK={env.get('ROBOT_CORE_WITH_XCORE_SDK', 'OFF')}",
+        f"-DROBOT_CORE_WITH_XMATE_MODEL={env.get('ROBOT_CORE_WITH_XMATE_MODEL', 'OFF')}",
     ]
     sdk_root = os.getenv("XCORE_SDK_ROOT") or os.getenv("ROKAE_SDK_ROOT")
     if sdk_root:

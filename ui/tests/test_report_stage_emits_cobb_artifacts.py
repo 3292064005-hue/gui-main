@@ -27,7 +27,7 @@ def _build_assessed_session(tmp_path: Path) -> Path:
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.safe_retreat()
     controller.save_results()
     controller.export_summary()

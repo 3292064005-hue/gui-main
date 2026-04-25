@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -8,7 +9,7 @@ from importlib import metadata
 from dataclasses import dataclass, field
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.runtime_version_policy import (
@@ -119,6 +120,7 @@ class SdkEnvironmentDoctorService:
         checks.extend(self._sdk_mount_checks())
         checks.extend(self._tls_checks())
         checks.extend(self._network_checks(config))
+        checks.extend(self._rt_host_checks())
         checks.extend(self._source_policy_checks(config))
 
         blockers = [item.to_dict() for item in checks if item.severity == "blocker" and not item.ok]
@@ -267,6 +269,210 @@ class SdkEnvironmentDoctorService:
                 detail if policy.execution_write_ready else detail + " / execution_write blocked",
             ),
         ]
+
+
+    def _rt_host_checks(self) -> list[DoctorCheck]:
+        repo_service_file = self.root_dir / "configs" / "systemd" / "spine-cpp-core.service"
+        repo_env_file = self.root_dir / "configs" / "systemd" / "spine-cpp-core.env"
+        deployed_service_file = Path("/etc/systemd/system/spine-cpp-core.service")
+        deployed_env_file = Path("/etc/default/spine-cpp-core")
+        service_file = deployed_service_file if deployed_service_file.exists() else repo_service_file
+        env_file = deployed_env_file if deployed_env_file.exists() else repo_env_file
+        bootstrap_header = self.root_dir / "cpp_robot_core" / "include" / "robot_core" / "rt_host_bootstrap.h"
+        bootstrap_source = self.root_dir / "cpp_robot_core" / "src" / "rt_host_bootstrap.cpp"
+        main_source = self.root_dir / "cpp_robot_core" / "src" / "main_ubuntu_rt.cpp"
+        service_text = service_file.read_text(encoding="utf-8") if service_file.exists() else ""
+        env_text = env_file.read_text(encoding="utf-8") if env_file.exists() else ""
+        main_text = main_source.read_text(encoding="utf-8") if main_source.exists() else ""
+        env_map = self._parse_env_contract_text(env_text)
+        contract_matrix = self._load_rt_host_contract_matrix()
+        contract_matrix_path = self.root_dir / "configs" / "runtime" / "rt_host_profiles.json"
+        selected_label, selected_profile = self._select_rt_host_contract_profile(env_map, contract_matrix)
+        service_has_memlock = "LimitMEMLOCK=infinity" in service_text and "LimitRTPRIO=99" in service_text
+        service_has_env = "EnvironmentFile=-/etc/default/spine-cpp-core" in service_text
+        service_scheduler_policy = self._parse_systemd_scalar(service_text, "CPUSchedulingPolicy")
+        service_scheduler_priority = self._parse_systemd_int(service_text, "CPUSchedulingPriority")
+        env_scheduler_policy = str(env_map.get("SPINE_RT_SCHED_POLICY", "")).strip().lower()
+        env_scheduler_priority = self._parse_optional_int(env_map.get("SPINE_RT_SCHED_PRIORITY", ""))
+        service_has_scheduler = bool(
+            service_scheduler_policy
+            and env_scheduler_policy
+            and service_scheduler_priority is not None
+            and env_scheduler_priority is not None
+            and service_scheduler_policy == env_scheduler_policy
+            and service_scheduler_priority == env_scheduler_priority
+        )
+        service_cpu_affinity = self._parse_systemd_cpu_affinity(service_text)
+        env_cpu_affinity = self._parse_cpu_affinity_csv(env_map.get("SPINE_RT_CPU_SET", ""))
+        cpu_contract_aligned = bool(service_cpu_affinity and env_cpu_affinity and service_cpu_affinity == env_cpu_affinity)
+        bootstrap_has_explicit_sched = "applyRtHostBootstrap" in main_text and "loadRtHostBootstrapConfigFromEnv" in main_text and "SPINE_RT_HOST_CONTRACT_VERSION" in bootstrap_source.read_text(encoding="utf-8") if bootstrap_source.exists() else False
+        required_env_keys = {
+            "SPINE_RT_HOST_CONTRACT_VERSION",
+            "SPINE_RT_HOST_CONTRACT_LABEL",
+            "SPINE_RT_SCHED_POLICY",
+            "SPINE_RT_SCHED_PRIORITY",
+            "SPINE_RT_CPU_SET",
+            "SPINE_RT_FIXED_HOST_ID",
+            "SPINE_RT_REQUIRE_SCHEDULER",
+            "SPINE_RT_REQUIRE_AFFINITY",
+            "SPINE_RT_REQUIRE_MEMORY_LOCK",
+            "SPINE_RT_REQUIRE_PREEMPT_RT",
+            "SPINE_RT_REQUIRE_FIXED_HOST_ID",
+        }
+        env_complete = required_env_keys.issubset(set(env_map))
+        profile_selected = bool(selected_label and selected_profile)
+        env_label_matches = bool(selected_label and str(env_map.get("SPINE_RT_HOST_CONTRACT_LABEL", "")).strip() == selected_label)
+        env_fixed_host_matches = bool(
+            not bool(selected_profile.get("require_fixed_host_id", False))
+            or (
+                bool(str(env_map.get("SPINE_RT_FIXED_HOST_ID", "")).strip())
+                and str(env_map.get("SPINE_RT_FIXED_HOST_ID", "")).strip() == str(selected_profile.get("fixed_host_id", "")).strip()
+            )
+        )
+        fixed_host_topology_selected = bool(
+            profile_selected
+            and str(selected_profile.get("deployment_topology", "")).strip() == "single_fixed_workstation"
+            and bool(selected_profile.get("require_fixed_host_id", False))
+        )
+        scheduler_matches_profile = bool(
+            profile_selected
+            and env_fixed_host_matches
+            and service_scheduler_policy == str(selected_profile.get("scheduler_policy", ""))
+            and env_scheduler_policy == str(selected_profile.get("scheduler_policy", ""))
+            and service_scheduler_priority == selected_profile.get("scheduler_priority")
+            and env_scheduler_priority == selected_profile.get("scheduler_priority")
+        )
+        cpu_matches_profile = bool(profile_selected and service_cpu_affinity == list(selected_profile.get("cpu_set", [])) and env_cpu_affinity == list(selected_profile.get("cpu_set", [])))
+        env_requirements_match_profile = bool(
+            profile_selected
+            and bool(int(str(env_map.get("SPINE_RT_REQUIRE_SCHEDULER", "0") or "0"))) == bool(selected_profile.get("require_scheduler", False))
+            and bool(int(str(env_map.get("SPINE_RT_REQUIRE_AFFINITY", "0") or "0"))) == bool(selected_profile.get("require_affinity", False))
+            and bool(int(str(env_map.get("SPINE_RT_REQUIRE_MEMORY_LOCK", "0") or "0"))) == bool(selected_profile.get("require_memory_lock", False))
+            and bool(int(str(env_map.get("SPINE_RT_REQUIRE_PREEMPT_RT", "0") or "0"))) == bool(selected_profile.get("require_preempt_rt", False))
+            and bool(int(str(env_map.get("SPINE_RT_REQUIRE_FIXED_HOST_ID", "0") or "0"))) == bool(selected_profile.get("require_fixed_host_id", False))
+        )
+        realtime_flag = Path("/sys/kernel/realtime")
+        realtime_ready = realtime_flag.exists() and realtime_flag.read_text(encoding="utf-8", errors="ignore").strip() == "1"
+        grub_file = Path("/etc/default/grub")
+        grub_text = grub_file.read_text(encoding="utf-8", errors="ignore") if grub_file.exists() else ""
+        cpu_tokens = []
+        if env_cpu_affinity:
+            cpu_csv = ','.join(str(item) for item in env_cpu_affinity)
+            cpu_tokens = [f"isolcpus={cpu_csv}", f"rcu_nocbs={cpu_csv}", f"nohz_full={cpu_csv}"]
+        grub_cpu_isolation_required = bool(selected_profile.get("grub_cpu_isolation_required", bool(cpu_tokens))) if profile_selected else bool(cpu_tokens)
+        grub_cpu_isolation_aligned = (not grub_cpu_isolation_required) or (bool(cpu_tokens) and all(token in grub_text for token in cpu_tokens))
+        path_detail = f"service={self._display_path(service_file)} env={self._display_path(env_file)} profile={selected_label or '-'}"
+        return [
+            self._check("RT host contract matrix", bool(contract_matrix) and contract_matrix_path.exists(), "blocker", self._display_path(contract_matrix_path)),
+            self._check("RT host contract profile", profile_selected and env_label_matches, "blocker", path_detail + (" / contract profile selected" if profile_selected and env_label_matches else " / env label missing or profile not found")),
+            self._check("RT host bootstrap source", bootstrap_header.exists() and bootstrap_source.exists(), "blocker", f"{self._display_path(bootstrap_header)} / {self._display_path(bootstrap_source)}"),
+            self._check("RT host explicit scheduler bootstrap", bootstrap_has_explicit_sched, "blocker", self._display_path(main_source)),
+            self._check("RT host systemd env contract", service_has_env and env_file.exists() and env_complete, "blocker", path_detail + (" / contract keys present" if service_has_env and env_file.exists() and env_complete else " / missing EnvironmentFile or contract keys")),
+            self._check("RT host systemd scheduler policy", service_has_scheduler, "blocker", self._display_path(service_file) + (f" / policy={service_scheduler_policy} priority={service_scheduler_priority}" if service_has_scheduler else f" / service policy={service_scheduler_policy or '-'} priority={service_scheduler_priority if service_scheduler_priority is not None else '-'} env policy={env_scheduler_policy or '-'} priority={env_scheduler_priority if env_scheduler_priority is not None else '-'}")),
+            self._check("RT host fixed workstation identity", fixed_host_topology_selected and env_fixed_host_matches, "blocker", f"profile={selected_label or '-'} expected_host={selected_profile.get('fixed_host_id', '-') if selected_profile else '-'} env_host={env_map.get('SPINE_RT_FIXED_HOST_ID', '-') or '-'} topology={selected_profile.get('deployment_topology', '-') if selected_profile else '-'}"),
+            self._check("RT host profile scheduler alignment", scheduler_matches_profile, "blocker", f"profile={selected_label or '-'} expected_policy={selected_profile.get('scheduler_policy', '-') if selected_profile else '-'} expected_priority={selected_profile.get('scheduler_priority', '-') if selected_profile else '-'}"),
+            self._check("RT host systemd memlock/rtprio", service_has_memlock, "blocker", self._display_path(service_file) + (" / memlock+rtprio configured" if service_has_memlock else " / missing LimitMEMLOCK or LimitRTPRIO")),
+            self._check("RT host CPU affinity contract", cpu_contract_aligned, "blocker", f"service={','.join(str(item) for item in service_cpu_affinity) or '-'} env={','.join(str(item) for item in env_cpu_affinity) or '-'}"),
+            self._check("RT host profile CPU alignment", cpu_matches_profile, "blocker", f"profile={selected_label or '-'} expected={','.join(str(item) for item in selected_profile.get('cpu_set', [])) or '-'} service={','.join(str(item) for item in service_cpu_affinity) or '-'} env={','.join(str(item) for item in env_cpu_affinity) or '-'}"),
+            self._check("RT host profile requirement flags", env_requirements_match_profile, "blocker", f"profile={selected_label or '-'} require_scheduler={selected_profile.get('require_scheduler', '-') if selected_profile else '-'} require_affinity={selected_profile.get('require_affinity', '-') if selected_profile else '-'} require_memory_lock={selected_profile.get('require_memory_lock', '-') if selected_profile else '-'} require_preempt_rt={selected_profile.get('require_preempt_rt', '-') if selected_profile else '-'} require_fixed_host_id={selected_profile.get('require_fixed_host_id', '-') if selected_profile else '-'}"),
+            self._check("RT host GRUB CPU isolation", grub_cpu_isolation_aligned, "warning", self._display_path(grub_file) + (f" / {' '.join(cpu_tokens)}" if grub_cpu_isolation_aligned else " / CPU isolation tokens missing or not aligned with SPINE_RT_CPU_SET")),
+            self._check("RT kernel flag", realtime_ready, "warning", str(realtime_flag) if realtime_flag.exists() else "host missing /sys/kernel/realtime; PREEMPT_RT must be verified on target machine"),
+        ]
+
+
+    def _load_rt_host_contract_matrix(self) -> dict[str, Any]:
+        matrix_path = self.root_dir / "configs" / "runtime" / "rt_host_profiles.json"
+        if not matrix_path.exists():
+            return {}
+        try:
+            payload = json.loads(matrix_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(payload, dict):
+            return {}
+        return payload
+
+    @staticmethod
+    def _normalize_rt_host_profile(profile: Mapping[str, Any] | None) -> dict[str, Any]:
+        payload = dict(profile or {})
+        cpu_set = payload.get("cpu_set", [])
+        normalized_cpu: list[int] = []
+        if isinstance(cpu_set, (list, tuple)):
+            for item in cpu_set:
+                try:
+                    normalized_cpu.append(int(item))
+                except (TypeError, ValueError):
+                    return {}
+        payload["cpu_set"] = normalized_cpu
+        payload["scheduler_policy"] = str(payload.get("scheduler_policy", "")).strip().lower()
+        payload["scheduler_priority"] = SdkEnvironmentDoctorService._parse_optional_int(payload.get("scheduler_priority"))
+        payload["fixed_host_id"] = str(payload.get("fixed_host_id", "") or "").strip()
+        payload["deployment_topology"] = str(payload.get("deployment_topology", "") or "").strip()
+        for key in ("require_scheduler", "require_affinity", "require_memory_lock", "require_preempt_rt", "require_fixed_host_id", "grub_cpu_isolation_required"):
+            payload[key] = bool(payload.get(key, False))
+        return payload
+
+    def _select_rt_host_contract_profile(self, env_map: Mapping[str, str], matrix: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+        profiles = dict(matrix.get("profiles") or {})
+        requested_label = str(env_map.get("SPINE_RT_HOST_CONTRACT_LABEL", "")).strip()
+        if requested_label and requested_label in profiles:
+            return requested_label, self._normalize_rt_host_profile(profiles.get(requested_label))
+        if profiles:
+            label = next(iter(profiles))
+            return label, self._normalize_rt_host_profile(profiles.get(label))
+        return requested_label, {}
+
+    @staticmethod
+    def _parse_env_contract_text(text: str) -> dict[str, str]:
+        payload: dict[str, str] = {}
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            payload[key.strip()] = value.strip()
+        return payload
+
+    @staticmethod
+    def _parse_cpu_affinity_csv(value: str) -> list[int]:
+        items: list[int] = []
+        for token in (part.strip() for part in str(value or '').split(',')):
+            if not token:
+                continue
+            try:
+                items.append(int(token))
+            except ValueError:
+                return []
+        return items
+
+    @staticmethod
+    def _parse_optional_int(value: object) -> int | None:
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_systemd_scalar(service_text: str, key: str) -> str:
+        prefix = f"{key}="
+        for raw_line in service_text.splitlines():
+            line = raw_line.strip()
+            if line.startswith(prefix):
+                return line.split('=', 1)[1].strip().lower()
+        return ""
+
+    @staticmethod
+    def _parse_systemd_int(service_text: str, key: str) -> int | None:
+        return SdkEnvironmentDoctorService._parse_optional_int(SdkEnvironmentDoctorService._parse_systemd_scalar(service_text, key))
+
+    @staticmethod
+    def _parse_systemd_cpu_affinity(service_text: str) -> list[int]:
+        for raw_line in service_text.splitlines():
+            line = raw_line.strip()
+            if not line.startswith('CPUAffinity='):
+                continue
+            return [int(token) for token in line.split('=', 1)[1].split() if token.strip().isdigit()]
+        return []
 
     def _network_checks(self, config: RuntimeConfig) -> list[DoctorCheck]:
         same_subnet = self._same_subnet(config.remote_ip, config.local_ip)

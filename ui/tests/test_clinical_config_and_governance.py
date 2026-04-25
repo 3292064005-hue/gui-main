@@ -52,7 +52,7 @@ def test_app_controller_blocks_scan_when_config_baseline_invalid(tmp_path: Path)
     controller.run_localization()
     controller.generate_path()
     controller.update_config(RuntimeConfig(pressure_lower=9.0, pressure_target=8.0, pressure_upper=7.0))
-    controller.start_scan()
+    controller.start_procedure()
     assert controller.workflow_artifacts.session_locked is False
     assert controller.config_report["summary_state"] == "blocked"
     names = {item["name"] for item in controller.config_report["blockers"]}
@@ -69,7 +69,7 @@ def test_export_governance_snapshot_contains_config_and_session_governance(tmp_p
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.run_preprocess()
     controller.run_reconstruction()
     controller.run_assessment()
@@ -91,7 +91,7 @@ def test_session_governance_service_summarizes_active_session(tmp_path: Path) ->
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.run_preprocess()
     controller.run_reconstruction()
     controller.run_assessment()

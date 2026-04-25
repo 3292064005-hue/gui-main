@@ -286,10 +286,6 @@
       "type": "boolean",
       "default": true
     },
-    "allow_contract_shell_writes": {
-      "type": "boolean",
-      "default": false
-    },
     "build_id": {
       "type": "string",
       "default": "dev"
@@ -509,63 +505,6 @@
         0.0,
         0.0
       ]
-    },
-    "emergency_home_joint_rad": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      },
-      "default": [
-        0.0,
-        0.3,
-        0.6,
-        0.0,
-        1.2,
-        0.0,
-        0.0
-      ]
-    },
-    "emergency_approach_pose_xyzabc": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      },
-      "default": [
-        0.118,
-        0.015,
-        0.205,
-        3.1415926535,
-        0.0,
-        1.5707963267
-      ]
-    },
-    "emergency_entry_pose_xyzabc": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      },
-      "default": [
-        0.118,
-        0.015,
-        0.19,
-        3.1415926535,
-        0.0,
-        1.5707963267
-      ]
-    },
-    "emergency_retreat_pose_xyzabc": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      },
-      "default": [
-        0.118,
-        0.015,
-        0.23,
-        3.1415926535,
-        0.0,
-        1.5707963267
-      ]
     }
   },
   "required": [
@@ -641,7 +580,6 @@
     "sdk_robot_class",
     "preferred_link",
     "requires_single_control_source",
-    "allow_contract_shell_writes",
     "build_id",
     "software_version",
     "runtime_config_contract_digest",
@@ -674,11 +612,7 @@
     "tcp_frame_matrix",
     "load_com_mm",
     "load_inertia",
-    "home_joint_rad",
-    "emergency_home_joint_rad",
-    "emergency_approach_pose_xyzabc",
-    "emergency_entry_pose_xyzabc",
-    "emergency_retreat_pose_xyzabc"
+    "home_joint_rad"
   ],
   "additionalProperties": false,
   "$schema": "http://json-schema.org/draft-07/schema#",

@@ -51,7 +51,7 @@ def test_headless_assessment_reads_authoritative_artifacts(tmp_path: Path) -> No
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.safe_retreat()
     controller.save_results()
     controller.export_summary()

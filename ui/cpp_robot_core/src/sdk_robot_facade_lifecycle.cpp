@@ -23,7 +23,7 @@ public:
         std::error_code ec;
         owner_.robot_->setPowerState(on, ec);
         if (!owner_.applyErrorCode("setPowerState", ec, nullptr)) {
-          owner_.powered_ = false;
+          owner_.state_store_.powered = false;
           owner_.motion_channel_ready_ = false;
           owner_.refreshBindingTruth();
           return false;
@@ -34,8 +34,8 @@ public:
       }
     }
 #endif
-    owner_.powered_ = on;
-    owner_.motion_channel_ready_ = owner_.connected_ && owner_.powered_ && owner_.network_healthy_;
+    owner_.state_store_.powered = on;
+    owner_.motion_channel_ready_ = owner_.connected_ && owner_.state_store_.powered && owner_.network_healthy_;
     owner_.binding_detail_ = on ? "powered" : "unpowered";
     owner_.refreshRuntimeCaches();
     owner_.refreshBindingTruth();
@@ -116,7 +116,7 @@ public:
                               owner_.rt_config_.sdk_robot_class == ROBOT_CORE_DEFAULT_SDK_CLASS &&
                               owner_.rt_config_.axis_count == ROBOT_CORE_DEFAULT_AXIS_COUNT;
     owner_.configureContactControllersFromRuntimeConfig();
-    owner_.rt_mainline_configured_ = owner_.connected_ && owner_.powered_ && owner_.auto_mode_ && config_valid && owner_.control_source_exclusive_;
+    owner_.rt_mainline_configured_ = owner_.connected_ && owner_.state_store_.powered && owner_.auto_mode_ && config_valid && owner_.control_source_exclusive_;
     owner_.binding_detail_ = owner_.rt_mainline_configured_ ? "rt_configured" : "rt_configuration_blocked";
     owner_.appendLog("configureRtMainline(robot=" + owner_.rt_config_.robot_model + ",class=" + owner_.rt_config_.sdk_robot_class + ",axis_count=" + std::to_string(owner_.rt_config_.axis_count) + ",rt_network_tolerance=" + std::to_string(owner_.rt_config_.rt_network_tolerance_percent) + ")");
     owner_.refreshBindingTruth();
@@ -133,7 +133,7 @@ public:
 
   bool ensurePoweredAuto(std::string* reason) {
     if (!ensureConnected(reason)) return false;
-    if (!owner_.powered_) {
+    if (!owner_.state_store_.powered) {
       owner_.captureFailure("ensurePoweredAuto", "controller_not_powered", reason);
       return false;
     }

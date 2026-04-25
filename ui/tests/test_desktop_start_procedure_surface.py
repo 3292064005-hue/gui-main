@@ -10,7 +10,8 @@ def test_app_controller_exposes_canonical_start_procedure_entry() -> None:
     source = (ROOT / 'spine_ultrasound_ui' / 'core' / 'app_controller_runtime_mixin.py').read_text(encoding='utf-8')
     assert 'def start_procedure(self, procedure: str = "scan") -> None:' in source
     assert 'if normalized_procedure != "scan":' in source
-    assert 'self.start_procedure("scan")' in source
+    assert 'def start_scan(self)' not in source
+    assert 'retired command alias: start_scan; use start_procedure(scan)' in source
 
 
 def test_main_window_routes_scan_button_permissions_and_actions_to_start_procedure() -> None:
@@ -27,7 +28,7 @@ def test_permission_and_recommendation_surfaces_include_canonical_start_procedur
     view_state = (ROOT / 'spine_ultrasound_ui' / 'core' / 'view_state_factory.py').read_text(encoding='utf-8')
     assert '"start_procedure": self._rule(' in workflow
     assert '"start_procedure": "开始扫查"' in workflow
-    assert '"refresh_sdk_assets", "start_procedure", "start_scan"' in view_state
+    assert '"refresh_sdk_assets", "start_procedure", "run_preprocess"' in view_state
     assert '"start_procedure": "自动扫查"' in view_state
 
 

@@ -249,7 +249,7 @@ class BridgeObservabilityService:
                 return execution_state in {"APPROACHING", "CONTACT_SEEKING", "CONTACT_STABLE", "SCANNING", "PAUSED_HOLD", "RETREATING", "RECOVERY_RETRACT", "SCAN_COMPLETE"}, "approach_prescan 后应观测到进入路径执行态。"
             if command == "seek_contact":
                 return execution_state in {"CONTACT_SEEKING", "CONTACT_STABLE", "SCANNING", "PAUSED_HOLD"}, "seek_contact 后应观测到接触相关执行态。"
-            if command in {"start_procedure", "start_scan"}:
+            if command == "start_procedure":
                 return execution_state in {"SCANNING", "PAUSED_HOLD", "SCAN_COMPLETE"}, "start_procedure(scan) 后应观测到进入 SCANNING/PAUSED_HOLD/SCAN_COMPLETE。"
             if command == "pause_scan":
                 return execution_state == "PAUSED_HOLD", "pause_scan 后应观测到 PAUSED_HOLD。"

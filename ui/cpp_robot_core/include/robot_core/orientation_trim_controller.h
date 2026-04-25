@@ -21,7 +21,10 @@ public:
   const OrientationTrimState& state() const { return state_; }
 
 private:
-  OrientationTrimConfig config_{};
+  struct LocalStateStore {
+    OrientationTrimConfig config{};
+  };
+  LocalStateStore state_store_{};
   OrientationTrimState state_{};
 };
 

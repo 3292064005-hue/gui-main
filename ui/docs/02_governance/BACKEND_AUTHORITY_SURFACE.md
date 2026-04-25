@@ -22,7 +22,7 @@ General ownership rules live in [`CONTROL_AUTHORITY_AND_BOUNDARIES.md`](./CONTRO
 - consume canonical backend methods first
 - treat nested control-plane payloads as compatibility-only
 - never synthesize a stronger runtime fact from degraded projections
-- on the core path, Python/headless layers may normalize `_command_context` and forward `acquire_control_lease` / `renew_control_lease` / `release_control_lease`, but they must not become the final lease owner or command arbiter
+- Python/headless layers may normalize `_command_context` for runtime-owned writes, but HTTP API/review surfaces must stay read-only and must not forward `acquire_control_lease` / `renew_control_lease` / `release_control_lease`; only the desktop operator console may initiate those transitions through the canonical runtime path.
 
 ## Verification entrypoints
 - `python scripts/check_backend_authority_parity.py`

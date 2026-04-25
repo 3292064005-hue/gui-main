@@ -28,4 +28,4 @@ status: active
 - Planning is advisory until session freeze.
 - After freeze, plan/runtime/session digest become immutable execution inputs.
 - Desktop/UI start-scan affordances now route through canonical `start_procedure(scan)` at the controller boundary.
-- `start_scan` is retained only as a compatibility alias for legacy callers and archived evidence surfaces.
+- `start_scan` is retired from the active runtime command surface; migration diagnostics live in `schemas/runtime_command_compat_manifest.json`.

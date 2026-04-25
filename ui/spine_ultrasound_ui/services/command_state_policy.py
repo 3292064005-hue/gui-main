@@ -51,8 +51,8 @@ class CommandStatePolicyService:
         'validate_setup': ('retry_validation', 'monitor'),
         'seek_contact': ('safe_retreat', 'reacquire_contact'),
         'start_procedure': ('seek_contact', 'resume_gate'),
-        'start_scan': ('seek_contact', 'resume_gate'),
         'resume_scan': ('seek_contact', 'resume_gate'),
+        'stop_scan': ('post_scan_home', 'scan_stop'),
         'safe_retreat': ('safe_retreat', 'recovery_retract'),
         'clear_fault': ('manual_review', 'fault_clearance'),
         'emergency_stop': ('estop_latched', 'estop'),
@@ -74,15 +74,13 @@ class CommandStatePolicyService:
             'write_command': True,
             'blocked_reason_code': 'start_procedure_blocked',
         },
-        'start_scan': {
-            'required_contact_state': ('CONTACT_STABLE',),
-            'required_plan_state': ('execution_plan_loaded',),
-            'required_resume_mode': ('initial_start', 'patch_before_resume'),
-        },
         'resume_scan': {
             'required_contact_state': ('CONTACT_STABLE',),
             'required_plan_state': ('execution_plan_loaded',),
             'required_resume_mode': ('exact_waypoint_resume', 'segment_restart', 'reacquire_contact_then_resume'),
+        },
+        'stop_scan': {
+            'required_plan_state': ('execution_plan_loaded', 'validated_plan'),
         },
         'safe_retreat': {'required_plan_state': ('execution_plan_loaded', 'validated_plan')},
     }
@@ -179,7 +177,7 @@ class CommandStatePolicyService:
             reject_reason_code=f'{command}_state_gate',
             fallback_action=fallback_action,
             recovery_escalation=recovery_escalation,
-            ui_visibility='write_control',
+            ui_visibility='shim_only' if str(spec.get('alias_kind', '')).strip() == 'shim_only' else 'write_control',
             role_write_gate=role_gate,
             required_contact_state=tuple(requirements.get('required_contact_state', ('*',))),
             required_plan_state=tuple(requirements.get('required_plan_state', ('*',))),

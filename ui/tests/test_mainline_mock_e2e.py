@@ -48,7 +48,7 @@ def test_mock_mainline_e2e_workflow(tmp_path):
         controller.create_experiment()
         controller.run_localization()
         controller.generate_path()
-        controller.start_scan()
+        controller.start_procedure()
         controller.pause_scan()
         controller.resume_scan()
         controller.safe_retreat()

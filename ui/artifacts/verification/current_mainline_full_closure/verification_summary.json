@@ -1,0 +1,40 @@
+{
+  "verification_scope": "mainline_full_closure_static_sandbox_after_audit_fix",
+  "implemented_items": [
+    "P0-3 runtime component boundary split",
+    "P1-1 API bridge collaborator split",
+    "P2-2 helper/boundary cleanup",
+    "retired alias diagnostic consistency",
+    "active test/gate assertions synchronized with runtime component split",
+    "historical verification report cleanup",
+    "A1 mainline claim-boundary gate wired into workflow/verify/final acceptance",
+    "A5 dataset/export/training formal evidence chain forbids placeholder lifecycle materialization",
+    "P2-2 helper cleanup fully gated by strict_convergence_audit",
+    "active Python source gate prunes archive and avoids bytecode/cache emission",
+    "active p0 runtime projection test synchronized with runtime component split"
+  ],
+  "passed_static_checks": [
+    "scripts/check_runtime_contract_parity.py",
+    "scripts/check_artifact_lifecycle_registry.py",
+    "scripts/strict_convergence_audit.py",
+    "scripts/check_repository_gates.py",
+    "scripts/check_python_compile.py",
+    "custom active-test stale-symbol residual assertion",
+    "custom alias retirement manifest assertion",
+    "scripts/check_mainline_claim_boundary.py",
+    "formal evidence-chain no-placeholder lifecycle policy",
+    "tests/test_artifact_lifecycle_formal_chain.py::custom invocation",
+    "scripts/check_python_compile.py active source gate",
+    "tests/test_runtime_helper_cleanup_contract.py::custom invocation",
+    "scripts/check_architecture_fitness.py",
+    "custom grep: no active tests expect bare sdk_robot_ runtime member"
+  ],
+  "not_executed": [
+    "real xCore controller connection",
+    "HIL/live scan",
+    "C++ full CMake build",
+    "full pytest",
+    "PySide6 UI runtime"
+  ],
+  "notes": "Static/sandbox evidence only. This report does not represent real-device, HIL, PREEMPT_RT, or live scan verification. Formal dataset/export/training lifecycle artifacts are release-required and cannot use placeholder materialization policies."
+}

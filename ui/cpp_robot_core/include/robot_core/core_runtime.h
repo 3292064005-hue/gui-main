@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "robot_core/core_runtime_kernel_components.h"
 #include "robot_core/contact_gate.h"
 #include "robot_core/contact_observer.h"
 #include "robot_core/force_control_config.h"
@@ -32,20 +33,7 @@ class CoreRuntime;
 class CoreRuntimeDispatcher;
 class CoreRuntimeContractPublisher;
 
-struct RuntimeAuthorityLease {
-  bool active{false};
-  std::string lease_id;
-  std::string actor_id;
-  std::string workspace;
-  std::string role;
-  std::string session_id;
-  std::string source;
-  std::string intent_reason;
-  std::string deployment_profile;
-  int64_t acquired_ts_ns{0};
-  int64_t refreshed_ts_ns{0};
-  std::set<std::string> granted_claims{};
-};
+
 
 class CoreRuntime {
 public:
@@ -125,6 +113,10 @@ private:
   std::string handlePowerModeCommand(const RuntimeCommandInvocation& invocation);
   std::string handleValidationCommand(const RuntimeCommandInvocation& invocation);
   std::string handleQueryCommand(const RuntimeCommandInvocation& invocation);
+  std::string handleOperationalQueryCommandLocked(const RuntimeCommandInvocation& invocation);
+  std::string handleMotionQueryCommandLocked(const RuntimeCommandInvocation& invocation);
+  std::string handleIdentityQueryCommandLocked(const RuntimeCommandInvocation& invocation);
+  std::string handleContractQueryCommandLocked(const RuntimeCommandInvocation& invocation);
   std::string handleFaultInjectionCommand(const RuntimeCommandInvocation& invocation);
   std::string handleSessionCommand(const RuntimeCommandInvocation& invocation);
   std::string handleExecutionCommand(const RuntimeCommandInvocation& invocation);
@@ -148,7 +140,7 @@ private:
    * @param auto_action Optional automatic recovery action taken by the runtime.
    * @return void
    * @throws No exceptions are thrown.
-   * @boundary Runs under ``state_mutex_`` and must only copy alarm payload into in-memory queues.
+   * @boundary Runs under ``state_store_.mutex`` and must only copy alarm payload into in-memory queues.
    *     JSON serialization and filesystem writes are delegated to ``RecordingService``'s worker thread.
    */
   void queueAlarmLocked(const std::string& severity, const std::string& source, const std::string& message, const std::string& workflow_step = "", const std::string& request_id = "", const std::string& auto_action = "");
@@ -216,7 +208,7 @@ private:
   void updatePlanProgressLocked(const RtObservedState& observed, const RtPhaseTelemetry& phase_telemetry);
   FinalVerdict compileScanPlanVerdictLocked(const std::string& config_snapshot_json, const std::string& scan_plan_json, const std::string& scan_plan_hash = "");
   // Runtime-owned authority helpers. These methods are the final write-command
-  // arbiter on the core path and must only be called with state_mutex_ held.
+  // arbiter on the core path and must only be called with state_store_.mutex held.
   bool authorizeInvocationLocked(const RuntimeCommandInvocation& invocation, std::string* error);
   bool roleCanClaimLocked(const std::string& role, const std::string& claim) const;
   std::vector<std::string> allowedClaimsForRoleLocked(const std::string& role) const;
@@ -258,80 +250,13 @@ private:
 
   RuntimeLane commandLaneFor(std::string_view command) const;
 
-  mutable std::mutex state_mutex_;
-  mutable std::mutex command_lane_mutex_;
-  mutable std::mutex query_lane_mutex_;
-  mutable std::mutex rt_lane_mutex_;
-  RuntimeConfig config_{};
-  RobotCoreState execution_state_{RobotCoreState::Disconnected};
-  bool controller_online_{false};
-  bool powered_{false};
-  bool automatic_mode_{false};
-  bool tool_ready_{false};
-  bool tcp_ready_{false};
-  bool load_ready_{false};
-  bool pressure_fresh_{false};
-  bool robot_state_fresh_{false};
-  bool rt_jitter_ok_{true};
-  std::string fault_code_;
-  std::string session_id_;
-  std::string session_dir_;
-  std::string plan_id_;
-  std::string plan_hash_;
-  std::string locked_scan_plan_hash_;
-  std::string strict_runtime_freeze_gate_{"enforce"};
-  std::string frozen_device_roster_json_;
-  std::string frozen_safety_thresholds_json_;
-  std::string frozen_device_health_snapshot_json_;
-  std::string frozen_session_freeze_policy_json_;
-  std::vector<std::string> frozen_execution_critical_fields_{};
-  std::vector<std::string> frozen_evidence_only_fields_{};
-  bool frozen_recheck_on_start_procedure_{true};
-  bool plan_loaded_{false};
-  int total_points_{0};
-  int total_segments_{0};
-  int path_index_{0};
-  int frame_id_{0};
-  int active_segment_{0};
-  int active_waypoint_index_{0};
-  int retreat_ticks_remaining_{0};
-  int64_t session_locked_ts_ns_{0};
-  double progress_pct_{0.0};
-  double phase_{0.0};
-  double pressure_current_{0.0};
-  int64_t contact_stable_since_ns_{0};
-  std::string last_transition_;
-  std::string state_reason_;
-  double image_quality_{0.0};
-  double feature_confidence_{0.0};
-  double quality_score_{0.0};
-  std::string quality_source_{"unavailable"};
-  bool quality_available_{false};
-  bool quality_authoritative_{false};
-  ContactTelemetry contact_state_{};
-  RuntimeAuthorityLease authority_lease_{};
-  FinalVerdict last_final_verdict_{};
-  std::vector<DeviceHealth> devices_{};
-  ExecutionPlanRuntime execution_plan_runtime_{};
-  bool scan_procedure_active_{false};
-  std::vector<AlarmEvent> pending_alarms_{};
-  RobotStateHub robot_state_hub_{};
-  RecordingService recording_service_{};
-  SafetyService safety_service_{};
-  ContactGate contact_gate_{};
-  ContactObserver contact_observer_{};
-  NrtMotionService nrt_motion_service_{};
-  RtMotionService rt_motion_service_{};
-  RecoveryManager recovery_manager_{};
-  RecoveryKernel recovery_kernel_{};
-  RecoveryPolicy recovery_policy_{};
-  ScanPlanParser scan_plan_parser_{};
-  ScanPlanValidator scan_plan_validator_{};
-  StateMachineGuard state_machine_guard_{};
-  SdkRobotFacade sdk_robot_{};
-  ModelAuthority model_authority_{};
-  ForceControlLimits force_limits_{loadForceControlLimits()};
-  std::set<std::string> injected_faults_{};
+  RuntimeLaneScheduler lanes_{};
+  RuntimeStateStore state_store_{};
+  RuntimeAuthorityKernel authority_kernel_{};
+  RuntimeQueryProjector query_projector_{};
+  RuntimeEvidenceProjector evidence_projector_{};
+  RuntimeProcedureExecutor procedure_executor_{};
+  RuntimeKernelServices services_{};
   std::unique_ptr<CoreRuntimeDispatcher> runtime_dispatcher_;
   std::unique_ptr<CoreRuntimeContractPublisher> runtime_contract_publisher_;
 };

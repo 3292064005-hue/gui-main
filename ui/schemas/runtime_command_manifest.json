@@ -162,9 +162,7 @@
       ],
       "write_command": false,
       "capability_claim": "plan_compile",
-      "legacy_aliases": [
-        "compile_scan_plan"
-      ],
+      "legacy_aliases": [],
       "canonical_command": "validate_scan_plan",
       "alias_kind": "canonical",
       "handler_group": "handleValidationCommand",
@@ -172,39 +170,6 @@
       "removal_target": "",
       "replacement_command": "",
       "compatibility_note": ""
-    },
-    {
-      "name": "compile_scan_plan",
-      "required_payload_fields": [
-        "scan_plan"
-      ],
-      "required_nested_fields": {
-        "scan_plan": [
-          "plan_id",
-          "segments",
-          "plan_hash"
-        ]
-      },
-      "field_types": {
-        "scan_plan": "object",
-        "config_snapshot": "object",
-        "scan_plan_hash": "string"
-      },
-      "state_preconditions": [
-        "AUTO_READY",
-        "SESSION_LOCKED",
-        "PATH_VALIDATED",
-        "SCAN_COMPLETE"
-      ],
-      "write_command": false,
-      "capability_claim": "plan_compile",
-      "canonical_command": "validate_scan_plan",
-      "alias_kind": "deprecated_alias",
-      "handler_group": "handleValidationCommand",
-      "deprecation_stage": "warn_only",
-      "removal_target": "2026-Q4",
-      "replacement_command": "validate_scan_plan",
-      "compatibility_note": "Deprecated alias retained for compatibility; new code must call validate_scan_plan."
     },
     {
       "name": "query_final_verdict",
@@ -936,25 +901,8 @@
       "deprecation_stage": "",
       "removal_target": "",
       "replacement_command": "",
-      "compatibility_note": ""
-    },
-    {
-      "name": "start_scan",
-      "required_payload_fields": [],
-      "state_preconditions": [
-        "PATH_VALIDATED",
-        "CONTACT_STABLE",
-        "PAUSED_HOLD"
-      ],
-      "capability_claim": "rt_motion_write",
-      "write_command": true,
-      "canonical_command": "start_procedure",
-      "alias_kind": "compatibility_alias",
-      "handler_group": "handleExecutionCommand",
-      "deprecation_stage": "deprecated",
-      "removal_target": "after start_procedure migration completes",
-      "replacement_command": "start_procedure",
-      "compatibility_note": "Compatibility alias for legacy scan start requests; use start_procedure with procedure=scan."
+      "compatibility_note": "",
+      "legacy_aliases": []
     },
     {
       "name": "pause_scan",
@@ -981,6 +929,27 @@
       "capability_claim": "rt_motion_write",
       "write_command": true,
       "canonical_command": "resume_scan",
+      "alias_kind": "canonical",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "",
+      "removal_target": "",
+      "replacement_command": "",
+      "compatibility_note": ""
+    },
+    {
+      "name": "stop_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "APPROACHING",
+        "CONTACT_SEEKING",
+        "CONTACT_STABLE",
+        "SCANNING",
+        "PAUSED_HOLD",
+        "RECOVERY_RETRACT"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "stop_scan",
       "alias_kind": "canonical",
       "handler_group": "handleExecutionCommand",
       "deprecation_stage": "",
@@ -1238,5 +1207,6 @@
       "replacement_command": "",
       "compatibility_note": ""
     }
-  ]
+  ],
+  "retired_alias_manifest": "schemas/runtime_command_compat_manifest.json"
 }

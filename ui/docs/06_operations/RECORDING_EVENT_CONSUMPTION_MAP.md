@@ -52,3 +52,15 @@ status: active
 - `derived/core/audit_timeline_index.json`
 
 这些文件不是说明性文档，而是消费者可直接读取的落地产物。
+
+
+## Dataset/export/training formal evidence chain
+
+The following artifact families are now release-relevant lifecycle entries, not optional side products:
+
+- `dataset_export_manifest` records each exported case and its claim boundary; placeholder files may be declared in export manifests but are not accepted as formal evidence-chain materialization.
+- `lamina_center_dataset_case` and `uca_dataset_case` are formal dataset artifacts consumed by training and annotation tooling.
+- `training_bridge_model_ready_input_index`, `nnunet_conversion_manifest`, `training_backend_request`, and `training_model_package` form the training evidence chain.
+- `session_report`, `qa_pack`, and `release_evidence_pack` remain export-side release evidence and are checked by `scripts/check_artifact_lifecycle_registry.py`.
+
+Any new dataset/export/training artifact must add producer symbols, consumer symbols, schema hints, retention tier, and evidence-chain scope before it can be accepted into mainline. Formal `dataset_export`, `training`, and `export` scopes are fail-closed by `scripts/check_artifact_lifecycle_registry.py`: they must be release-required and must not use placeholder materialization policies.

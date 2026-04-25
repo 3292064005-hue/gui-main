@@ -110,3 +110,36 @@ def test_rt_quality_gate_requires_runtime_doctor_budget_blockers() -> None:
         'rt_quality_gate_passed',
     ):
         assert token in source
+
+
+def test_main_ubuntu_rt_uses_explicit_rt_host_bootstrap() -> None:
+    main = _read('cpp_robot_core/src/main_ubuntu_rt.cpp')
+    bootstrap = _read('cpp_robot_core/src/rt_host_bootstrap.cpp')
+    header = _read('cpp_robot_core/include/robot_core/rt_host_bootstrap.h')
+    assert 'loadRtHostBootstrapConfigFromEnv' in main
+    assert 'applyRtHostBootstrap' in main
+    assert 'pthread_setschedparam' in bootstrap
+    assert 'pthread_setaffinity_np' in bootstrap
+    assert 'mlockall' in bootstrap
+    assert 'RtHostBootstrapConfig' in header
+
+
+def test_contract_shell_write_override_is_removed_from_runtime_paths() -> None:
+    helper = _read('cpp_robot_core/src/deployment_policy.cpp')
+    facade = _read('cpp_robot_core/src/sdk_robot_facade.cpp')
+    rt = _read('cpp_robot_core/src/sdk_robot_facade_rt.cpp')
+    projection = _read('cpp_robot_core/src/core_runtime_contract_projection.cpp')
+    config_model = _read('spine_ultrasound_ui/models/config_model.py')
+    assert 'deploymentProfileForbidsContractShellWrites' in helper
+    assert 'contract_shell_write_override' not in facade
+    assert 'mock_profile_contract_shell_write' not in facade
+    assert 'allow_contract_shell_writes: bool = False' not in config_model
+    assert 'allow_contract_shell_writes' not in projection
+    assert 'live_binding_required' in rt
+
+
+def test_runtime_contract_projection_has_valid_bool_literal_calls() -> None:
+    projection = _read('cpp_robot_core/src/core_runtime_contract_projection.cpp')
+    assert "boolLiteralsdk_robot_" not in projection
+    assert "boolLiteral(procedure_executor_.sdk_robot.liveBindingEstablished())" in projection
+    assert "boolLiteral(procedure_executor_.sdk_robot.liveTakeoverReady())" in projection

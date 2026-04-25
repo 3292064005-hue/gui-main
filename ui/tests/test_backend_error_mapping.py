@@ -54,11 +54,11 @@ class _TransportRaisingClient:
 
 
 def test_backend_error_mapper_exposes_typed_metadata() -> None:
-    reply = BackendErrorMapper.reply_from_exception(httpx.ReadTimeout("deadline exceeded"), command="start_scan", context="api-command")
+    reply = BackendErrorMapper.reply_from_exception(httpx.ReadTimeout("deadline exceeded"), command="start_procedure", context="api-command")
     assert reply.ok is False
     assert reply.data["error_type"] == "transport_timeout"
     assert reply.data["retryable"] is True
-    assert reply.data["command"] == "start_scan"
+    assert reply.data["command"] == "start_procedure"
 
 
 def test_normalize_backend_exception_maps_invalid_payload() -> None:
@@ -70,10 +70,10 @@ def test_normalize_backend_exception_maps_invalid_payload() -> None:
 def test_api_bridge_backend_returns_typed_transport_error(tmp_path: Path) -> None:
     backend = ApiBridgeBackend(tmp_path)
     backend._client = _TransportRaisingClient()  # type: ignore[assignment]
-    reply = backend.send_command("start_scan", {})
+    reply = backend.send_command("start_procedure", {})
     assert reply.ok is False
     assert reply.data["error_type"] == "transport_timeout"
-    assert reply.data["command"] == "start_scan"
+    assert reply.data["command"] == "start_procedure"
 
 
 def test_robot_core_client_returns_typed_transport_error(tmp_path: Path, monkeypatch) -> None:
@@ -82,10 +82,10 @@ def test_robot_core_client_returns_typed_transport_error(tmp_path: Path, monkeyp
     monkeypatch.setattr(module, "create_client_ssl_context", lambda cert_path=None: object())
     monkeypatch.setattr(module, "send_tls_command", lambda *args, **kwargs: (_ for _ in ()).throw(TimeoutError("tls timeout")))
     backend = RobotCoreClientBackend(tmp_path)
-    reply = backend.send_command("start_scan", {})
+    reply = backend.send_command("start_procedure", {})
     assert reply.ok is False
     assert reply.data["error_type"] == "transport_timeout"
-    assert reply.data["command"] == "start_scan"
+    assert reply.data["command"] == "start_procedure"
 
 
 def test_api_server_lifespan_attempts_close_after_stop_failure() -> None:

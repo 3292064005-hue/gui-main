@@ -26,7 +26,10 @@ public:
   const TangentialScanState& state() const { return state_; }
 
 private:
-  TangentialScanConfig config_{};
+  struct LocalStateStore {
+    TangentialScanConfig config{};
+  };
+  LocalStateStore state_store_{};
   TangentialScanState state_{};
 };
 

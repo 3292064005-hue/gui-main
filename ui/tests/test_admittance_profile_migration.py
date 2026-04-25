@@ -8,13 +8,9 @@ from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.xmate_profile import load_xmate_profile
 
 
-def test_runtime_config_to_dict_emits_legacy_projection_metadata():
-    cfg = RuntimeConfig()
-    payload = cfg.to_dict()
-    compat = payload["legacy_compatibility"]
-    assert "flat_field_projection" in compat
-    assert "warnings" in compat
-    assert compat["flat_field_projection"]["normal_admittance_gain"] == cfg.normal_admittance_gain
+def test_runtime_config_to_dict_omits_legacy_projection_metadata():
+    payload = RuntimeConfig().to_dict()
+    assert "legacy_compatibility" not in payload
 
 
 def test_xmate_profile_prefers_nested_contact_control_defaults():
@@ -25,7 +21,7 @@ def test_xmate_profile_prefers_nested_contact_control_defaults():
     assert contact_control["max_normal_travel_mm"] == profile.seek_contact_max_travel_mm
 
 
-def test_xmate_profile_reports_legacy_flat_field_projection_warning(tmp_path: Path):
+def test_xmate_profile_derives_nested_contact_control_from_flat_fields(tmp_path: Path):
     payload = {
         "robot_model": "xmate3",
         "sdk_robot_class": "xMateRobot",
@@ -40,8 +36,6 @@ def test_xmate_profile_reports_legacy_flat_field_projection_warning(tmp_path: Pa
     path = tmp_path / "robot.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     profile = load_xmate_profile(path)
-    assert profile.compatibility_warnings
-    assert any("legacy flat contact-control" in item for item in profile.compatibility_warnings)
     assert profile.build_contact_control_profile()["max_normal_step_mm"] == 0.1
     assert profile.build_orientation_trim_profile()["gain"] == 0.11
 
@@ -69,7 +63,7 @@ def test_runtime_config_from_legacy_flat_fields_synthesizes_nested_contracts():
     assert cfg.force_estimator.preferred_source == "wrench"
 
 
-def test_xmate_profile_legacy_force_estimator_flat_fields_synthesize_nested_profile(tmp_path: Path):
+def test_xmate_profile_derives_force_estimator_from_flat_fields(tmp_path: Path):
     payload = {
         "robot_model": "xmate3",
         "sdk_robot_class": "xMateRobot",
@@ -82,7 +76,6 @@ def test_xmate_profile_legacy_force_estimator_flat_fields_synthesize_nested_prof
     path = tmp_path / "robot.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     profile = load_xmate_profile(path)
-    assert any("legacy flat force-estimator" in item for item in profile.compatibility_warnings)
     force_estimator = profile.build_force_estimator_profile()
     assert force_estimator["preferred_source"] == "pressure"
     assert force_estimator["stale_timeout_ms"] == 135

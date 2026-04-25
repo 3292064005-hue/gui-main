@@ -101,7 +101,6 @@
   std::string sdk_robot_class{"xMateRobot"}; \
   std::string preferred_link{"wired_direct"}; \
   bool requires_single_control_source{true}; \
-  bool allow_contract_shell_writes{false}; \
   std::string build_id{"dev"}; \
   std::string software_version{"0.3.0"}; \
   std::string runtime_config_contract_digest{""}; \
@@ -134,8 +133,4 @@
   std::vector<double> tcp_frame_matrix{{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 62.0, 0.0, 0.0, 0.0, 1.0}}; \
   std::vector<double> load_com_mm{{0.0, 0.0, 62.0}}; \
   std::vector<double> load_inertia{{0.0012, 0.0012, 0.0008, 0.0, 0.0, 0.0}}; \
-  std::vector<double> home_joint_rad{{0.0, 0.3, 0.6, 0.0, 1.2, 0.0, 0.0}}; \
-  std::vector<double> emergency_home_joint_rad{{0.0, 0.3, 0.6, 0.0, 1.2, 0.0, 0.0}}; \
-  std::vector<double> emergency_approach_pose_xyzabc{{0.118, 0.015, 0.205, 3.1415926535, 0.0, 1.5707963267}}; \
-  std::vector<double> emergency_entry_pose_xyzabc{{0.118, 0.015, 0.19, 3.1415926535, 0.0, 1.5707963267}}; \
-  std::vector<double> emergency_retreat_pose_xyzabc{{0.118, 0.015, 0.23, 3.1415926535, 0.0, 1.5707963267}};
+  std::vector<double> home_joint_rad{{0.0, 0.3, 0.6, 0.0, 1.2, 0.0, 0.0}};

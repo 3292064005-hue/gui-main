@@ -14,11 +14,45 @@ import json
 from pathlib import Path
 from typing import Any
 
-_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "schemas" / "runtime_command_manifest.json"
+_SCHEMA_ROOT = Path(__file__).resolve().parents[2] / "schemas"
+_MANIFEST_PATH = _SCHEMA_ROOT / "runtime_command_manifest.json"
+_COMPAT_MANIFEST_PATH = _SCHEMA_ROOT / "runtime_command_compat_manifest.json"
 
 
 class RuntimeCommandCatalogError(RuntimeError):
     """Raised when the shared runtime command manifest is malformed."""
+
+
+def _load_compat_manifest() -> dict[str, dict[str, Any]]:
+    """Load retired alias metadata kept outside the active command surface.
+
+    Retired aliases are intentionally not merged into ``COMMAND_SPECS``. The
+    returned mapping exists only for migration diagnostics and explicit retired
+    command errors; it must not be used for dispatch, role policy, payload
+    validation, generated C++ contracts, or capability claims.
+    """
+    try:
+        payload = json.loads(_COMPAT_MANIFEST_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError as exc:  # pragma: no cover - configuration error
+        raise RuntimeCommandCatalogError(f"runtime command compat manifest is not valid JSON: {_COMPAT_MANIFEST_PATH}") from exc
+    aliases = payload.get("retired_aliases", [])
+    if not isinstance(aliases, list):  # pragma: no cover - configuration error
+        raise RuntimeCommandCatalogError("runtime command compat manifest must contain a retired_aliases list")
+    resolved: dict[str, dict[str, Any]] = {}
+    for item in aliases:
+        if not isinstance(item, dict):  # pragma: no cover - configuration error
+            raise RuntimeCommandCatalogError("each retired alias entry must be a JSON object")
+        name = str(item.get("name", "")).strip()
+        if not name:  # pragma: no cover - configuration error
+            raise RuntimeCommandCatalogError("retired alias entries require a non-empty name")
+        alias = {str(key): deepcopy(value) for key, value in item.items() if key != "name"}
+        alias.setdefault("deprecation_stage", "retired")
+        alias.setdefault("alias_kind", "retired")
+        alias.setdefault("retired_from_active_manifest", True)
+        resolved[name] = alias
+    return resolved
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -66,6 +100,8 @@ _MANIFEST = _load_manifest()
 SCHEMA_VERSION: int = int(_MANIFEST["schema_version"])
 COMMAND_SPECS: dict[str, dict[str, Any]] = _MANIFEST["commands"]
 COMMANDS: set[str] = set(COMMAND_SPECS)
+RETIRED_ALIAS_SPECS: dict[str, dict[str, Any]] = _load_compat_manifest()
+RETIRED_ALIASES: set[str] = set(RETIRED_ALIAS_SPECS)
 _CANONICAL_TO_ALIASES: dict[str, list[str]] = {}
 for _command_name, _command_spec in COMMAND_SPECS.items():
     canonical = str(_command_spec.get("canonical_command", _command_name)).strip() or _command_name
@@ -86,8 +122,47 @@ def catalog_copy() -> dict[str, dict[str, Any]]:
 
 
 def command_names() -> set[str]:
-    """Return the registered runtime command names."""
+    """Return the registered active runtime command names."""
     return set(COMMANDS)
+
+
+def retired_alias_names() -> set[str]:
+    """Return retired command aliases kept only for migration diagnostics."""
+    return set(RETIRED_ALIASES)
+
+
+def is_retired_command_alias(command: str) -> bool:
+    """Return whether ``command`` is a retired alias outside active dispatch."""
+    return command in RETIRED_ALIAS_SPECS
+
+
+def is_retired_alias(command: str) -> bool:
+    """Backward-compatible alias for retired command checks."""
+    return is_retired_command_alias(command)
+
+
+def retired_alias_spec(command: str) -> dict[str, Any]:
+    """Return retired alias metadata for migration and error reporting.
+
+    Raises:
+        KeyError: If ``command`` is not a retired alias.
+    """
+    return deepcopy(RETIRED_ALIAS_SPECS[command])
+
+
+def retired_alias_rejection(command: str) -> str:
+    """Build a deterministic rejection message for an active-surface alias.
+
+    The function does not translate or dispatch retired aliases. It only gives
+    callers a stable diagnostic that points to the canonical replacement.
+    """
+    spec = RETIRED_ALIAS_SPECS.get(command)
+    if spec is None:
+        return f"unsupported command: {command}"
+    replacement = str(spec.get("replacement_command") or spec.get("canonical_command") or "").strip()
+    if replacement:
+        return f"retired command alias: {command}; use {replacement}"
+    return f"retired command alias: {command}"
 
 
 def command_spec(command: str) -> dict[str, Any]:
@@ -118,17 +193,32 @@ def canonical_command_name(command: str) -> str:
 def command_alias_kind(command: str) -> str:
     """Return the alias classification for ``command``.
 
-    Returns one of ``canonical`` or ``deprecated_alias`` for known commands and
-    an empty string for unknown commands.
+    Returns one of ``canonical``, ``deprecated_alias``, or ``shim_only`` for
+    known commands and an empty string for unknown commands.
     """
     spec = COMMAND_SPECS.get(command, {})
     return str(spec.get("alias_kind", "")).strip()
 
 
 def canonical_aliases(command: str) -> tuple[str, ...]:
-    """Return compatibility aliases registered for a canonical command."""
+    """Return active compatibility aliases registered for a canonical command.
+
+    Retired aliases are excluded by design. Use ``retired_aliases_for`` when a
+    migration report needs to enumerate removed names.
+    """
     canonical = canonical_command_name(command)
     return tuple(_CANONICAL_TO_ALIASES.get(canonical, ()))
+
+
+def retired_aliases_for(command: str) -> tuple[str, ...]:
+    """Return retired aliases whose replacement resolves to ``command``."""
+    normalized = canonical_command_name(command)
+    matches = []
+    for alias, spec in RETIRED_ALIAS_SPECS.items():
+        replacement = str(spec.get("replacement_command") or spec.get("canonical_command") or "").strip()
+        if replacement == normalized:
+            matches.append(alias)
+    return tuple(sorted(matches))
 
 
 def command_handler_group(command: str) -> str:
@@ -156,9 +246,33 @@ def is_deprecated_alias(command: str) -> bool:
     return command_alias_kind(command) == "deprecated_alias"
 
 
+def is_shim_only_alias(command: str) -> bool:
+    """Return ``True`` when a command entry is retained only as a transport shim."""
+    return command_alias_kind(command) == "shim_only"
+
+
+def active_command_names() -> set[str]:
+    """Return the active dispatchable runtime command names.
+
+    The active manifest is already canonical-only for retired aliases, so this
+    helper is an explicit mirror of ``command_names`` rather than a filtered
+    compatibility view.
+    """
+    return set(COMMANDS)
+
+
 def is_write_command(command: str) -> bool:
-    """Return whether ``command`` mutates the runtime control plane."""
-    spec = COMMAND_SPECS.get(command, {})
+    """Return whether ``command`` mutates the runtime control plane.
+
+    Retired aliases keep the compatibility-manifest value so diagnostics can
+    distinguish read-only migration aliases from unknown fail-closed commands.
+    Unknown commands remain fail-closed as write-like commands.
+    """
+    if command in RETIRED_ALIAS_SPECS:
+        return bool(RETIRED_ALIAS_SPECS[command].get("write_command", False))
+    spec = COMMAND_SPECS.get(command)
+    if spec is None:
+        return True
     return bool(spec.get("write_command", True))
 
 
@@ -168,10 +282,20 @@ def command_capability_claim(command: str) -> str:
     return str(spec.get("capability_claim", "")).strip()
 
 
-def capability_claims() -> dict[str, list[str]]:
-    """Build a reverse index of capability claims to commands."""
+def capability_claims(*, include_shims: bool = False) -> dict[str, list[str]]:
+    """Build a reverse index of capability claims to active commands.
+
+    Args:
+        include_shims: Include transport-only compatibility aliases when true.
+
+    Returns:
+        Capability-claim mapping. By default, shim-only aliases are excluded so
+        active role, readiness, and UI surfaces do not re-promote retired names.
+    """
     mapping: dict[str, list[str]] = {}
     for command, spec in COMMAND_SPECS.items():
+        if not include_shims and str(spec.get("alias_kind", "canonical")).strip() == "shim_only":
+            continue
         claim = str(spec.get("capability_claim", "")).strip()
         if not claim:
             continue

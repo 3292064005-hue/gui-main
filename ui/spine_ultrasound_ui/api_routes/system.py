@@ -10,6 +10,10 @@ from spine_ultrasound_ui.contracts import schema_catalog
 def build_system_router(adapter_getter: Callable[[], Any], deployment_profile_getter: Callable[[], Any]) -> APIRouter:
     router = APIRouter()
 
+
+    def _raise_read_only_api(endpoint: str) -> None:
+        raise HTTPException(status_code=403, detail=f"HTTP API is read-only evidence surface; {endpoint} must be initiated from the desktop operator console")
+
     @router.get("/api/v1/status")
     async def get_system_status():
         return adapter_getter().status()
@@ -137,43 +141,19 @@ def build_system_router(adapter_getter: Callable[[], Any], deployment_profile_ge
     async def post_control_lease_acquire(payload: Any = Body(default=None)):
         if payload is not None and not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="payload must be a JSON object")
-        adapter = adapter_getter()
-        if hasattr(adapter, "acquire_control_lease"):
-            return adapter.acquire_control_lease(payload or {})
-        return {
-            "ok": False,
-            "summary_state": "blocked",
-            "summary_label": "control lease unsupported",
-            "detail": "adapter does not support control lease acquisition",
-        }
+        _raise_read_only_api("control-lease acquire")
 
     @router.post("/api/v1/control-lease/renew")
     async def post_control_lease_renew(payload: Any = Body(default=None)):
         if payload is not None and not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="payload must be a JSON object")
-        adapter = adapter_getter()
-        if hasattr(adapter, "renew_control_lease"):
-            return adapter.renew_control_lease(payload or {})
-        return {
-            "ok": False,
-            "summary_state": "blocked",
-            "summary_label": "control lease renew unsupported",
-            "detail": "adapter does not support control lease renew",
-        }
+        _raise_read_only_api("control-lease renew")
 
     @router.post("/api/v1/control-lease/release")
     async def post_control_lease_release(payload: Any = Body(default=None)):
         if payload is not None and not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="payload must be a JSON object")
-        adapter = adapter_getter()
-        if hasattr(adapter, "release_control_lease"):
-            return adapter.release_control_lease(payload or {})
-        return {
-            "ok": False,
-            "summary_state": "blocked",
-            "summary_label": "control lease unsupported",
-            "detail": "adapter does not support control lease release",
-        }
+        _raise_read_only_api("control-lease release")
 
     @router.get("/api/v1/commands/recent")
     async def get_recent_commands():
@@ -193,10 +173,7 @@ def build_system_router(adapter_getter: Callable[[], Any], deployment_profile_ge
     async def post_runtime_config(payload: Any = Body(default=None)):
         if payload is not None and not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="payload must be a JSON object")
-        adapter = adapter_getter()
-        if hasattr(adapter, "set_runtime_config"):
-            return adapter.set_runtime_config(payload or {})
-        return {"runtime_config": payload or {}}
+        _raise_read_only_api("runtime-config update")
 
     @router.get("/api/v1/topics")
     async def get_topic_catalog():

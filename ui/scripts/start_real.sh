@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "[deprecated] start_real.sh has been split. Use scripts/start_hil.sh or scripts/start_prod.sh." >&2
+echo "[deprecated] start_real.sh has been replaced by deployment-profile launchers. Use scripts/start_hil.sh (research) or scripts/start_prod.sh (clinical)." >&2
 exit 2

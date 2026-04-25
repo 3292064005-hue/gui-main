@@ -9,6 +9,30 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+PROFILE_ALIASES = {
+    'dev': 'dev',
+    'mock': 'dev',
+    'research': 'research',
+    'hil': 'research',
+    'clinical': 'clinical',
+    'prod': 'clinical',
+}
+
+BUILD_PROFILE_FOR_CANONICAL = {
+    'dev': 'mock',
+    'research': 'hil',
+    'clinical': 'prod',
+}
+
+
+def normalize_profile(raw: str) -> str:
+    token = str(raw).strip().lower()
+    return PROFILE_ALIASES.get(token, '')
+
+
+def build_profile_for(canonical_profile: str) -> str:
+    return BUILD_PROFILE_FOR_CANONICAL[canonical_profile]
+
 KEY_TARGETS = [
     'spine_robot_core_runtime',
     'spine_robot_core',
@@ -23,7 +47,9 @@ KEY_SOURCES = [
     'cpp_robot_core/src/runtime_state_store.cpp',
     'cpp_robot_core/src/sdk_robot_facade.cpp',
     'cpp_robot_core/src/rt_motion_service.cpp',
-    'cpp_robot_core/src/core_runtime_session_execution.cpp',
+    'cpp_robot_core/src/core_runtime_authority.cpp',
+    'cpp_robot_core/src/core_runtime_session_commands.cpp',
+    'cpp_robot_core/src/core_runtime_execution_commands.cpp',
     'cpp_robot_core/src/model_authority.cpp',
 ]
 
@@ -38,16 +64,20 @@ def choose_generator() -> list[str]:
     return []
 
 
-def configure(repo_root: Path, build_dir: Path, profile: str, with_sdk: bool, with_model: bool) -> subprocess.CompletedProcess[str]:
+def configure(repo_root: Path, build_dir: Path, build_profile: str, with_sdk: bool, with_model: bool) -> subprocess.CompletedProcess[str]:
     cmd = [
         'cmake',
         '-S', 'cpp_robot_core',
         '-B', str(build_dir),
         '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-        f"-DROBOT_CORE_PROFILE={profile}",
+        f"-DROBOT_CORE_PROFILE={build_profile}",
         f"-DROBOT_CORE_WITH_XCORE_SDK={'ON' if with_sdk else 'OFF'}",
         f"-DROBOT_CORE_WITH_XMATE_MODEL={'ON' if with_model else 'OFF'}",
     ]
+    conda_prefix = os.environ.get('CONDA_PREFIX') or str(Path(os.environ.get('CONDA_EXE', '')).parent.parent)
+    conda_openssl = Path(conda_prefix) / 'Library'
+    if conda_openssl.joinpath('include', 'openssl', 'ssl.h').exists() and conda_openssl.joinpath('lib').exists():
+        cmd.append(f'-DOPENSSL_ROOT_DIR={conda_openssl}')
     cmd.extend(choose_generator())
     return run(cmd, repo_root)
 
@@ -109,7 +139,7 @@ def _portable_path(raw: str, *, base_dir: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Produce reproducible C++ build evidence with build+syntax fallback.')
-    parser.add_argument('--profile', default='hil', choices=['hil', 'mock', 'prod'])
+    parser.add_argument('--profile', default='research', choices=['dev', 'mock', 'research', 'hil', 'clinical', 'prod'])
     parser.add_argument('--with-sdk', action='store_true')
     parser.add_argument('--with-model', action='store_true')
     parser.add_argument('--report', required=True)
@@ -117,13 +147,18 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
+    canonical_profile = normalize_profile(args.profile)
+    if not canonical_profile:
+        raise SystemExit(f'Unsupported profile: {args.profile}')
+    build_profile = build_profile_for(canonical_profile)
     report_path = Path(args.report)
     report_base_dir = report_path.parent
     build_dir = Path(tempfile.mkdtemp(prefix='cpp_build_evidence_', dir='/tmp'))
     report: dict[str, object] = {
         'schema_version': 'cpp.build_evidence.v2',
         'path_basis': 'relative_to_report_dir_or_symbolic',
-        'profile': args.profile,
+        'profile': canonical_profile,
+        'build_profile': build_profile,
         'with_sdk': args.with_sdk,
         'with_model': args.with_model,
         'build_dir': '<ephemeral_tmpdir_removed>',
@@ -134,7 +169,7 @@ def main() -> int:
         'target_timeout_sec': args.target_timeout_sec,
     }
     try:
-        configure_proc = configure(repo_root, build_dir, args.profile, args.with_sdk, args.with_model)
+        configure_proc = configure(repo_root, build_dir, build_profile, args.with_sdk, args.with_model)
         report['configure_returncode'] = configure_proc.returncode
         report['generator'] = 'Ninja' if shutil.which('ninja') else 'default'
         if configure_proc.returncode != 0:

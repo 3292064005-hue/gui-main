@@ -70,20 +70,6 @@ template <> inline std::string CoreRuntime::handleTypedCommand<ClearInjectedFaul
   return handleClearInjectedFaultsTyped(context, request);
 }
 
-inline std::string CoreRuntime::handleCompileScanPlanTyped(const RuntimeCommandContext& context, const CompileScanPlanRequest& request) {
-  RuntimeCommandInvocation invocation{};
-  invocation.request_id = context.request_id;
-  invocation.command = CompileScanPlanRequest::kCommand;
-  invocation.envelope_json = context.envelope_json;
-  invocation.typed_request = request;
-  invocation.typed_contract = findRuntimeCommandTypedContract(CompileScanPlanRequest::kCommand);
-  return handleValidationCommand(invocation);
-}
-
-template <> inline std::string CoreRuntime::handleTypedCommand<CompileScanPlanRequest>(const RuntimeCommandContext& context, const CompileScanPlanRequest& request) {
-  return handleCompileScanPlanTyped(context, request);
-}
-
 inline std::string CoreRuntime::handleConnectRobotTyped(const RuntimeCommandContext& context, const ConnectRobotRequest& request) {
   RuntimeCommandInvocation invocation{};
   invocation.request_id = context.request_id;
@@ -868,20 +854,6 @@ template <> inline std::string CoreRuntime::handleTypedCommand<StartRecordPathRe
   return handleStartRecordPathTyped(context, request);
 }
 
-inline std::string CoreRuntime::handleStartScanTyped(const RuntimeCommandContext& context, const StartScanRequest& request) {
-  RuntimeCommandInvocation invocation{};
-  invocation.request_id = context.request_id;
-  invocation.command = StartScanRequest::kCommand;
-  invocation.envelope_json = context.envelope_json;
-  invocation.typed_request = request;
-  invocation.typed_contract = findRuntimeCommandTypedContract(StartScanRequest::kCommand);
-  return handleExecutionCommand(invocation);
-}
-
-template <> inline std::string CoreRuntime::handleTypedCommand<StartScanRequest>(const RuntimeCommandContext& context, const StartScanRequest& request) {
-  return handleStartScanTyped(context, request);
-}
-
 inline std::string CoreRuntime::handleStopRecordPathTyped(const RuntimeCommandContext& context, const StopRecordPathRequest& request) {
   RuntimeCommandInvocation invocation{};
   invocation.request_id = context.request_id;
@@ -894,6 +866,20 @@ inline std::string CoreRuntime::handleStopRecordPathTyped(const RuntimeCommandCo
 
 template <> inline std::string CoreRuntime::handleTypedCommand<StopRecordPathRequest>(const RuntimeCommandContext& context, const StopRecordPathRequest& request) {
   return handleStopRecordPathTyped(context, request);
+}
+
+inline std::string CoreRuntime::handleStopScanTyped(const RuntimeCommandContext& context, const StopScanRequest& request) {
+  RuntimeCommandInvocation invocation{};
+  invocation.request_id = context.request_id;
+  invocation.command = StopScanRequest::kCommand;
+  invocation.envelope_json = context.envelope_json;
+  invocation.typed_request = request;
+  invocation.typed_contract = findRuntimeCommandTypedContract(StopScanRequest::kCommand);
+  return handleExecutionCommand(invocation);
+}
+
+template <> inline std::string CoreRuntime::handleTypedCommand<StopScanRequest>(const RuntimeCommandContext& context, const StopScanRequest& request) {
+  return handleStopScanTyped(context, request);
 }
 
 inline std::string CoreRuntime::handleValidateScanPlanTyped(const RuntimeCommandContext& context, const ValidateScanPlanRequest& request) {

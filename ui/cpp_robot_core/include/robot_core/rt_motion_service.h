@@ -78,10 +78,10 @@ struct RtLoopContractSnapshot {
   double jitter_budget_ms{0.2};
 };
 
-class AdaptiveTimer {
+class RtLoopTelemetryTracker {
 public:
-  AdaptiveTimer(double min_period_ms = 1.0, double max_period_ms = 1.0, double target_cpu = 70.0);
-  ~AdaptiveTimer() = default;
+  RtLoopTelemetryTracker(double fixed_period_ms = 1.0, double telemetry_budget_ms = 1.0, double target_cpu = 70.0);
+  ~RtLoopTelemetryTracker() = default;
 
   void start();
   void wait();
@@ -91,8 +91,8 @@ public:
   void adjustPeriod(double cpu_usage);
 
 private:
-  double min_period_ms_;
-  double max_period_ms_;
+  double fixed_period_ms_;
+  double telemetry_budget_ms_;
   double target_cpu_;
   double current_period_ms_;
   double max_observed_cycle_ms_{0.0};
@@ -155,7 +155,7 @@ private:
   std::unique_ptr<robot_core::ImpedanceControlManager> impedance_manager_;
   std::atomic<bool> is_running_{false};
   spine_core_pod::CommandPose current_target_{};
-  std::unique_ptr<AdaptiveTimer> adaptive_timer_;
+  std::unique_ptr<RtLoopTelemetryTracker> loop_telemetry_tracker_;
   RtLoopContractSnapshot snapshot_{};
 };
 

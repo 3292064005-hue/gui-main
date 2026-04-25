@@ -56,27 +56,27 @@ std::string pressureSourceName(const RtObservedState& observed) {
 
 bool CoreRuntime::simulatedTelemetryAllowedLocked() const {
 #if defined(ROBOT_CORE_PROFILE_mock)
-  return sdk_robot_.queryPort().runtimeSource() == "simulated_contract";
+  return procedure_executor_.sdk_robot.queryPort().runtimeSource() == "simulated_contract";
 #else
   return false;
 #endif
 }
 
 void CoreRuntime::setState(RobotCoreState state) {
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
-  if (execution_state_ != state) {
-    last_transition_ = stateName(state);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
+  if (state_store_.execution_state != state) {
+    state_store_.last_transition = stateName(state);
   }
-  execution_state_ = state;
+  state_store_.execution_state = state;
 }
 
 RobotCoreState CoreRuntime::state() const {
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
-  return execution_state_;
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
+  return state_store_.execution_state;
 }
 
 TelemetrySnapshot CoreRuntime::takeTelemetrySnapshot() {
-  std::lock_guard<std::mutex> lane_lock(query_lane_mutex_);
+  std::lock_guard<std::mutex> lane_lock(lanes_.query);
 
   CoreStateSnapshot core_state;
   ContactTelemetry contact_state;
@@ -91,33 +91,33 @@ TelemetrySnapshot CoreRuntime::takeTelemetrySnapshot() {
   bool quality_authoritative = false;
   double quality_threshold = 0.7;
   {
-    std::lock_guard<std::mutex> state_lock(state_mutex_);
+    std::lock_guard<std::mutex> state_lock(state_store_.mutex);
     core_state = buildCoreSnapshotLocked();
-    contact_state = contact_state_;
+    contact_state = state_store_.contact_state;
     scan_progress = buildScanProgressLocked();
-    devices = devices_;
-    alarms = pending_alarms_;
-    pending_alarms_.clear();
-    image_quality = image_quality_;
-    feature_confidence = feature_confidence_;
-    quality_score = quality_score_;
-    quality_source = quality_source_;
-    quality_available = quality_available_;
-    quality_authoritative = quality_authoritative_;
-    quality_threshold = config_.image_quality_threshold;
+    devices = evidence_projector_.devices;
+    alarms = evidence_projector_.pending_alarms;
+    evidence_projector_.pending_alarms.clear();
+    image_quality = state_store_.image_quality;
+    feature_confidence = state_store_.feature_confidence;
+    quality_score = state_store_.quality_score;
+    quality_source = state_store_.quality_source;
+    quality_available = state_store_.quality_available;
+    quality_authoritative = state_store_.quality_authoritative;
+    quality_threshold = state_store_.config.image_quality_threshold;
   }
 
   TelemetrySnapshot snapshot;
   snapshot.core_state = core_state;
-  snapshot.robot_state = robot_state_hub_.latest();
+  snapshot.robot_state = query_projector_.robot_state_hub.latest();
   snapshot.contact_state = contact_state;
   snapshot.scan_progress = scan_progress;
   snapshot.devices = devices;
   {
-    std::lock_guard<std::mutex> state_lock(state_mutex_);
+    std::lock_guard<std::mutex> state_lock(state_store_.mutex);
     snapshot.safety_status = evaluateSafetyLocked();
   }
-  snapshot.recorder_status = recording_service_.status();
+  snapshot.recorder_status = evidence_projector_.recording_service.status();
   snapshot.quality_feedback = QualityFeedback{
       image_quality,
       feature_confidence,
@@ -134,18 +134,18 @@ TelemetrySnapshot CoreRuntime::takeTelemetrySnapshot() {
 void CoreRuntime::rtStep() {
   PendingRecordBundle record_bundle{};
   {
-    std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-    std::lock_guard<std::mutex> state_lock(state_mutex_);
-    phase_ += 0.03;
-    ++frame_id_;
+    std::lock_guard<std::mutex> lane_lock(lanes_.rt);
+    std::lock_guard<std::mutex> state_lock(state_store_.mutex);
+    state_store_.phase += 0.03;
+    ++state_store_.frame_id;
     RtObservedState observed{};
     std::string observed_reason;
-    sdk_robot_.rtControlPort().populateObservedState(observed, &observed_reason);
-    const auto phase_telemetry = sdk_robot_.queryPort().phaseTelemetry();
+    procedure_executor_.sdk_robot.rtControlPort().populateObservedState(observed, &observed_reason);
+    const auto phase_telemetry = procedure_executor_.sdk_robot.queryPort().phaseTelemetry();
     updateQualityLocked(observed, phase_telemetry);
     updateKinematicsLocked();
     updateContactAndProgressLocked(observed);
-    if (scan_procedure_active_ && execution_state_ == RobotCoreState::Scanning && sdk_robot_.activeRtPhase() == "idle") {
+    if (procedure_executor_.scan_procedure_active && state_store_.execution_state == RobotCoreState::Scanning && procedure_executor_.sdk_robot.activeRtPhase() == "idle") {
       std::string transition_reason;
       advancePlanSegmentLocked(&transition_reason);
     }
@@ -156,32 +156,32 @@ void CoreRuntime::rtStep() {
 }
 
 void CoreRuntime::recordRtLoopSample(double scheduled_period_ms, double execution_ms, double wake_jitter_ms, bool overrun) {
-  std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
-  rt_motion_service_.recordLoopSample(scheduled_period_ms, execution_ms, wake_jitter_ms, overrun);
-  const auto rt_snapshot = rt_motion_service_.snapshot();
+  std::lock_guard<std::mutex> lane_lock(lanes_.rt);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
+  procedure_executor_.rt_motion_service.recordLoopSample(scheduled_period_ms, execution_ms, wake_jitter_ms, overrun);
+  const auto rt_snapshot = procedure_executor_.rt_motion_service.snapshot();
   const bool within_jitter_budget = std::abs(rt_snapshot.last_wake_jitter_ms) <= rt_snapshot.jitter_budget_ms;
   const bool within_cycle_budget = rt_snapshot.max_cycle_ms <= (rt_snapshot.current_period_ms + rt_snapshot.jitter_budget_ms);
-  rt_jitter_ok_ = !overrun && within_jitter_budget && within_cycle_budget;
+  state_store_.rt_jitter_ok = !overrun && within_jitter_budget && within_cycle_budget;
 }
 
 void CoreRuntime::statePollStep() {
-  std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  std::lock_guard<std::mutex> lane_lock(lanes_.rt);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
   RtObservedState observed{};
   std::string observed_reason;
-  const bool observed_ok = sdk_robot_.rtControlPort().populateObservedState(observed, &observed_reason);
+  const bool observed_ok = procedure_executor_.sdk_robot.rtControlPort().populateObservedState(observed, &observed_reason);
 
   RobotStateSnapshot snapshot;
   snapshot.timestamp_ns = json::nowNs();
-  snapshot.power_state = sdk_robot_.powered() ? "on" : "off";
-  snapshot.operate_mode = sdk_robot_.automaticMode() ? "automatic" : "manual";
-  snapshot.operation_state = stateName(execution_state_);
-  snapshot.joint_pos = sdk_robot_.jointPos();
-  snapshot.joint_vel = sdk_robot_.jointVel();
-  snapshot.joint_torque = sdk_robot_.jointTorque();
-  snapshot.tcp_pose = sdk_robot_.tcpPose();
-  snapshot.runtime_source = sdk_robot_.queryPort().runtimeSource();
+  snapshot.power_state = procedure_executor_.sdk_robot.powered() ? "on" : "off";
+  snapshot.operate_mode = procedure_executor_.sdk_robot.automaticMode() ? "automatic" : "manual";
+  snapshot.operation_state = stateName(state_store_.execution_state);
+  snapshot.joint_pos = procedure_executor_.sdk_robot.jointPos();
+  snapshot.joint_vel = procedure_executor_.sdk_robot.jointVel();
+  snapshot.joint_torque = procedure_executor_.sdk_robot.jointTorque();
+  snapshot.tcp_pose = procedure_executor_.sdk_robot.tcpPose();
+  snapshot.runtime_source = procedure_executor_.sdk_robot.queryPort().runtimeSource();
   snapshot.pose_available = !snapshot.tcp_pose.empty();
   snapshot.pose_source = snapshot.pose_available ? (observed_ok && observed.valid ? "sdk_query_cache" : "runtime_cache") : "unavailable";
   snapshot.pose_authoritative = snapshot.pose_available && snapshot.runtime_source != "simulated_contract";
@@ -195,83 +195,90 @@ void CoreRuntime::statePollStep() {
   snapshot.force_available = observed.pressure_valid || (observed.valid && hasNonZeroMagnitude(snapshot.cart_force));
   snapshot.force_source = observed.pressure_valid ? "pressure_sensor" : (snapshot.force_available ? "external_wrench" : "unavailable");
   snapshot.force_authoritative = snapshot.force_available && snapshot.runtime_source != "simulated_contract";
-  snapshot.last_event = stateName(execution_state_);
-  snapshot.last_controller_log = fault_code_.empty() ? "-" : fault_code_;
-  robot_state_hub_.update(snapshot);
+  snapshot.last_event = stateName(state_store_.execution_state);
+  snapshot.last_controller_log = state_store_.fault_code.empty() ? "-" : state_store_.fault_code;
+  query_projector_.robot_state_hub.update(snapshot);
 }
 
 void CoreRuntime::watchdogStep() {
-  std::lock_guard<std::mutex> lane_lock(rt_lane_mutex_);
-  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  std::lock_guard<std::mutex> lane_lock(lanes_.rt);
+  std::lock_guard<std::mutex> state_lock(state_store_.mutex);
   const auto safety = evaluateSafetyLocked();
   const auto now = json::nowNs();
   const auto force_state = makeForceStateSnapshot(
       now,
       0.0,
-      std::vector<double>{0.0, 0.0, pressure_current_, 0.0, 0.0, 0.0},
-      force_limits_,
-      config_.pressure_target);
+      std::vector<double>{0.0, 0.0, state_store_.pressure_current, 0.0, 0.0, 0.0},
+      procedure_executor_.force_limits,
+      state_store_.config.pressure_target);
   const auto decision = decideSafetyAction(force_state);
-  const auto recovery_decision = recovery_policy_.evaluate(pressure_current_, config_.pressure_target, config_.pressure_upper, pressure_fresh_ ? 0.0 : static_cast<double>(config_.pressure_stale_ms));
+  const auto recovery_decision = procedure_executor_.recovery_policy.evaluate(state_store_.pressure_current, state_store_.config.pressure_target, state_store_.config.pressure_upper, state_store_.pressure_fresh ? 0.0 : static_cast<double>(state_store_.config.pressure_stale_ms));
   (void)recovery_decision;
-  const auto rt_snapshot = rt_motion_service_.snapshot();
-  rt_jitter_ok_ = rt_snapshot.overrun_count == 0 && rt_snapshot.max_cycle_ms <= (rt_snapshot.current_period_ms + rt_snapshot.jitter_budget_ms) && std::abs(rt_snapshot.last_wake_jitter_ms) <= rt_snapshot.jitter_budget_ms;
-  if (injected_faults_.count("rt_jitter_high") > 0) {
-    rt_jitter_ok_ = false;
+  const auto rt_snapshot = procedure_executor_.rt_motion_service.snapshot();
+  state_store_.rt_jitter_ok = rt_snapshot.overrun_count == 0 && rt_snapshot.max_cycle_ms <= (rt_snapshot.current_period_ms + rt_snapshot.jitter_budget_ms) && std::abs(rt_snapshot.last_wake_jitter_ms) <= rt_snapshot.jitter_budget_ms;
+  if (authority_kernel_.injected_faults.count("rt_jitter_high") > 0) {
+    state_store_.rt_jitter_ok = false;
   }
-  if (injected_faults_.count("pressure_stale") > 0) {
-    pressure_fresh_ = false;
+  if (authority_kernel_.injected_faults.count("pressure_stale") > 0) {
+    state_store_.pressure_fresh = false;
   }
-  if (injected_faults_.count("overpressure") > 0 && execution_state_ == RobotCoreState::Scanning) {
-    pressure_current_ = std::max(config_.pressure_upper + 0.5, force_limits_.max_z_force_n + 0.5);
+  if (authority_kernel_.injected_faults.count("overpressure") > 0 && state_store_.execution_state == RobotCoreState::Scanning) {
+    state_store_.pressure_current = std::max(state_store_.config.pressure_upper + 0.5, procedure_executor_.force_limits.max_z_force_n + 0.5);
   }
-  if (decision == SafetyDecision::WarnOnly && execution_state_ == RobotCoreState::Scanning) {
+  if (decision == SafetyDecision::WarnOnly && state_store_.execution_state == RobotCoreState::Scanning) {
     queueAlarmLocked("WARN", "force_monitor", "力控接近告警阈值", "force_monitor", "", "warn_only");
   }
-  if (pressure_current_ > config_.pressure_upper && execution_state_ == RobotCoreState::Scanning) {
-    rt_motion_service_.pauseAndHold();
-    recovery_manager_.pauseAndHold();
-    sdk_robot_.setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
-    execution_state_ = RobotCoreState::PausedHold;
-    contact_state_.mode = "OVERPRESSURE";
-    contact_state_.recommended_action = "CONTROLLED_RETRACT";
+  if (state_store_.pressure_current > state_store_.config.pressure_upper && state_store_.execution_state == RobotCoreState::Scanning) {
+    procedure_executor_.rt_motion_service.pauseAndHold();
+    procedure_executor_.recovery_manager.pauseAndHold();
+    procedure_executor_.sdk_robot.setRlStatus(state_store_.config.rl_project_name, state_store_.config.rl_task_name, false);
+    state_store_.execution_state = RobotCoreState::PausedHold;
+    state_store_.contact_state.mode = "OVERPRESSURE";
+    state_store_.contact_state.recommended_action = "CONTROLLED_RETRACT";
     queueAlarmLocked("RECOVERABLE_FAULT", "contact", "压力超上限，已进入保持状态", "scan_monitor", "", "hold");
   }
-  if (decision == SafetyDecision::ControlledRetract && execution_state_ != RobotCoreState::Estop) {
-    const auto rt_retract = rt_motion_service_.controlledRetract();
-    sdk_robot_.setRlStatus(config_.rl_project_name, config_.rl_task_name, false);
+  if (decision == SafetyDecision::ControlledRetract && state_store_.execution_state != RobotCoreState::Estop) {
+    const auto rt_retract = procedure_executor_.rt_motion_service.controlledRetract();
+    procedure_executor_.sdk_robot.setRlStatus(state_store_.config.rl_project_name, state_store_.config.rl_task_name, false);
     if (rt_retract.canProceedToNrtRetreat()) {
-      recovery_manager_.controlledRetract();
-      execution_state_ = RobotCoreState::Retreating;
+      procedure_executor_.recovery_manager.controlledRetract();
+      state_store_.execution_state = RobotCoreState::Retreating;
       queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "力控进入受控退让", "force_monitor", rt_retract.reason, "controlled_retract");
     } else {
-      recovery_manager_.cancelRetry();
-      execution_state_ = RobotCoreState::Fault;
-      fault_code_ = "CONTROLLED_RETRACT_INCOMPLETE";
+      procedure_executor_.recovery_manager.cancelRetry();
+      state_store_.execution_state = RobotCoreState::Fault;
+      state_store_.fault_code = "CONTROLLED_RETRACT_INCOMPLETE";
       queueAlarmLocked("RECOVERABLE_FAULT", "force_monitor", "RT受控回撤未完成，已阻断后续恢复链", "force_monitor", rt_retract.reason, "controlled_retract_incomplete");
     }
   }
-  if (decision == SafetyDecision::EstopLatch && execution_state_ != RobotCoreState::Estop) {
-    recovery_manager_.latchEstop();
-    execution_state_ = RobotCoreState::Estop;
+  if (decision == SafetyDecision::EstopLatch && state_store_.execution_state != RobotCoreState::Estop) {
+    procedure_executor_.recovery_manager.latchEstop();
+    state_store_.execution_state = RobotCoreState::Estop;
     queueAlarmLocked("FATAL_FAULT", "force_monitor", "力传感器超时，进入急停锁存", "telemetry_watchdog", "", "estop");
   }
-  if (execution_state_ == RobotCoreState::PausedHold || execution_state_ == RobotCoreState::Retreating) {
-    const bool within_band = std::fabs(pressure_current_ - config_.pressure_target) <= force_limits_.resume_force_band_n;
-    recovery_manager_.updateStableCondition(within_band, now);
+  if (state_store_.execution_state == RobotCoreState::PausedHold || state_store_.execution_state == RobotCoreState::Retreating) {
+    const bool within_band = std::fabs(state_store_.pressure_current - state_store_.config.pressure_target) <= procedure_executor_.force_limits.resume_force_band_n;
+    procedure_executor_.recovery_manager.updateStableCondition(within_band, now);
   }
-  if (!safety.safe_to_arm && controller_online_ && powered_ && automatic_mode_ && execution_state_ != RobotCoreState::Fault &&
-      execution_state_ != RobotCoreState::Estop && !fault_code_.empty()) {
+  if (!safety.safe_to_arm && state_store_.controller_online && state_store_.powered && state_store_.automatic_mode && state_store_.execution_state != RobotCoreState::Fault &&
+      state_store_.execution_state != RobotCoreState::Estop && !state_store_.fault_code.empty()) {
     queueAlarmLocked("WARN", "safety", "存在联锁，safe_to_arm 退化", "validate_setup", "", "warn_only");
   }
 }
 
 void CoreRuntime::updateKinematicsLocked() {
-  if (execution_state_ == RobotCoreState::Retreating && retreat_ticks_remaining_ > 0) {
-    --retreat_ticks_remaining_;
-    if (retreat_ticks_remaining_ <= 0) {
-      execution_state_ = plan_loaded_ ? RobotCoreState::PathValidated : RobotCoreState::AutoReady;
-      contact_state_.recommended_action = "IDLE";
+  if (state_store_.execution_state == RobotCoreState::Retreating && state_store_.retreat_ticks_remaining > 0) {
+    --state_store_.retreat_ticks_remaining;
+    if (state_store_.retreat_ticks_remaining <= 0) {
+      state_store_.execution_state = state_store_.retreat_completion_state;
+      if (state_store_.execution_state == RobotCoreState::ScanComplete) {
+        state_store_.contact_state.recommended_action = "POSTPROCESS";
+        state_store_.state_reason = "scan_complete";
+        procedure_executor_.scan_procedure_active = false;
+      } else {
+        state_store_.contact_state.recommended_action = "IDLE";
+      }
+      state_store_.retreat_completion_state = state_store_.plan_loaded ? RobotCoreState::PathValidated : RobotCoreState::AutoReady;
     }
   }
 }
@@ -280,201 +287,201 @@ void CoreRuntime::updateQualityLocked(const RtObservedState& observed, const RtP
   (void)observed;
   (void)phase_telemetry;
   if (simulatedTelemetryAllowedLocked()) {
-    image_quality_ = 0.78 + 0.12 * std::sin(phase_ * 0.7);
-    feature_confidence_ = 0.74 + 0.10 * std::cos(phase_ * 0.45);
-    quality_score_ = (image_quality_ + feature_confidence_) / 2.0;
-    quality_source_ = "mock_profile_simulated";
-    quality_available_ = true;
-    quality_authoritative_ = false;
+    state_store_.image_quality = 0.78 + 0.12 * std::sin(state_store_.phase * 0.7);
+    state_store_.feature_confidence = 0.74 + 0.10 * std::cos(state_store_.phase * 0.45);
+    state_store_.quality_score = (state_store_.image_quality + state_store_.feature_confidence) / 2.0;
+    state_store_.quality_source = "mock_profile_simulated";
+    state_store_.quality_available = true;
+    state_store_.quality_authoritative = false;
     return;
   }
-  image_quality_ = 0.0;
-  feature_confidence_ = 0.0;
-  quality_score_ = 0.0;
-  quality_source_ = "unavailable";
-  quality_available_ = false;
-  quality_authoritative_ = false;
+  state_store_.image_quality = 0.0;
+  state_store_.feature_confidence = 0.0;
+  state_store_.quality_score = 0.0;
+  state_store_.quality_source = "unavailable";
+  state_store_.quality_available = false;
+  state_store_.quality_authoritative = false;
 }
 
 void CoreRuntime::updateContactAndProgressLocked(const RtObservedState& observed) {
   const bool allow_simulated_pressure = simulatedTelemetryAllowedLocked();
   const bool pressure_available = observed.pressure_valid;
-  const auto phase_telemetry = sdk_robot_.queryPort().phaseTelemetry();
+  const auto phase_telemetry = procedure_executor_.sdk_robot.queryPort().phaseTelemetry();
   const std::string pressure_source = allow_simulated_pressure && !pressure_available ? "mock_profile_simulated" : pressureSourceName(observed);
   const auto assign_contact_metadata = [&](bool authoritative) {
-    contact_state_.pressure_source = pressure_source;
-    contact_state_.quality_source = quality_source_;
-    contact_state_.pressure_available = allow_simulated_pressure || pressure_available;
-    contact_state_.quality_available = quality_available_;
-    contact_state_.authoritative = authoritative;
-    contact_state_.contact_stable = execution_state_ == RobotCoreState::ContactStable || execution_state_ == RobotCoreState::Scanning || execution_state_ == RobotCoreState::PausedHold;
+    state_store_.contact_state.pressure_source = pressure_source;
+    state_store_.contact_state.quality_source = state_store_.quality_source;
+    state_store_.contact_state.pressure_available = allow_simulated_pressure || pressure_available;
+    state_store_.contact_state.quality_available = state_store_.quality_available;
+    state_store_.contact_state.authoritative = authoritative;
+    state_store_.contact_state.contact_stable = state_store_.execution_state == RobotCoreState::ContactStable || state_store_.execution_state == RobotCoreState::Scanning || state_store_.execution_state == RobotCoreState::PausedHold;
   };
 
-  if (execution_state_ == RobotCoreState::ContactSeeking) {
+  if (state_store_.execution_state == RobotCoreState::ContactSeeking) {
     ContactObservationInput input;
     if (pressure_available) {
-      pressure_current_ = observed.pressure_force_n;
+      state_store_.pressure_current = observed.pressure_force_n;
     } else if (allow_simulated_pressure) {
-      pressure_current_ = std::max(config_.pressure_lower, config_.pressure_target - 0.1 + 0.04 * std::sin(phase_));
+      state_store_.pressure_current = std::max(state_store_.config.pressure_lower, state_store_.config.pressure_target - 0.1 + 0.04 * std::sin(state_store_.phase));
     } else {
-      pressure_current_ = 0.0;
-      contact_stable_since_ns_ = 0;
-      contact_state_.mode = "WAITING_FOR_PRESSURE_SOURCE";
-      contact_state_.confidence = 0.0;
-      contact_state_.pressure_current = 0.0;
-      contact_state_.recommended_action = "WAIT_PRESSURE_SOURCE";
+      state_store_.pressure_current = 0.0;
+      state_store_.contact_stable_since_ns = 0;
+      state_store_.contact_state.mode = "WAITING_FOR_PRESSURE_SOURCE";
+      state_store_.contact_state.confidence = 0.0;
+      state_store_.contact_state.pressure_current = 0.0;
+      state_store_.contact_state.recommended_action = "WAIT_PRESSURE_SOURCE";
       assign_contact_metadata(false);
       return;
     }
-    input.external_pressure = pressure_current_;
-    input.cart_force_z = pressure_current_;
-    input.quality_score = quality_available_ ? quality_score_ : config_.image_quality_threshold;
-    const auto observed_contact = contact_observer_.evaluate(input);
-    if (pressure_current_ >= config_.pressure_target - 0.05) {
-      if (contact_stable_since_ns_ <= 0) {
-        contact_stable_since_ns_ = json::nowNs();
+    input.external_pressure = state_store_.pressure_current;
+    input.cart_force_z = state_store_.pressure_current;
+    input.quality_score = state_store_.quality_available ? state_store_.quality_score : state_store_.config.image_quality_threshold;
+    const auto observed_contact = procedure_executor_.contact_observer.evaluate(input);
+    if (state_store_.pressure_current >= state_store_.config.pressure_target - 0.05) {
+      if (state_store_.contact_stable_since_ns <= 0) {
+        state_store_.contact_stable_since_ns = json::nowNs();
       }
-      const auto gate = contact_gate_.evaluate(pressure_current_, config_.pressure_target, contact_stable_since_ns_, json::nowNs());
-      contact_state_.mode = gate.mode;
+      const auto gate = procedure_executor_.contact_gate.evaluate(state_store_.pressure_current, state_store_.config.pressure_target, state_store_.contact_stable_since_ns, json::nowNs());
+      state_store_.contact_state.mode = gate.mode;
       if (gate.contact_stable) {
-        execution_state_ = RobotCoreState::ContactStable;
-        state_reason_ = "contact_stable";
+        state_store_.execution_state = RobotCoreState::ContactStable;
+        state_store_.state_reason = "contact_stable";
       }
     } else {
-      contact_stable_since_ns_ = 0;
-      contact_state_.mode = observed_contact.mode;
+      state_store_.contact_stable_since_ns = 0;
+      state_store_.contact_state.mode = observed_contact.mode;
     }
-    contact_state_.confidence = pressure_available ? 0.78 : 0.52;
-    contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = execution_state_ == RobotCoreState::ContactStable ? "START_SCAN" : "WAIT_CONTACT_STABLE";
-    active_segment_ = std::max(active_segment_, 1);
-    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
+    state_store_.contact_state.confidence = pressure_available ? 0.78 : 0.52;
+    state_store_.contact_state.pressure_current = state_store_.pressure_current;
+    state_store_.contact_state.recommended_action = state_store_.execution_state == RobotCoreState::ContactStable ? "START_SCAN" : "WAIT_CONTACT_STABLE";
+    state_store_.active_segment = std::max(state_store_.active_segment, 1);
+    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!state_store_.quality_available || state_store_.quality_authoritative));
     return;
   }
 
-  if (execution_state_ == RobotCoreState::ContactStable) {
+  if (state_store_.execution_state == RobotCoreState::ContactStable) {
     if (pressure_available) {
-      pressure_current_ = observed.pressure_force_n;
+      state_store_.pressure_current = observed.pressure_force_n;
     } else if (allow_simulated_pressure) {
-      pressure_current_ = config_.pressure_target;
+      state_store_.pressure_current = state_store_.config.pressure_target;
     } else {
-      pressure_current_ = 0.0;
-      contact_state_.mode = "WAITING_FOR_PRESSURE_SOURCE";
-      contact_state_.confidence = 0.0;
-      contact_state_.pressure_current = 0.0;
-      contact_state_.recommended_action = "WAIT_PRESSURE_SOURCE";
+      state_store_.pressure_current = 0.0;
+      state_store_.contact_state.mode = "WAITING_FOR_PRESSURE_SOURCE";
+      state_store_.contact_state.confidence = 0.0;
+      state_store_.contact_state.pressure_current = 0.0;
+      state_store_.contact_state.recommended_action = "WAIT_PRESSURE_SOURCE";
       assign_contact_metadata(false);
       return;
     }
-    if (injected_faults_.count("overpressure") > 0) {
-      pressure_current_ = std::max(config_.pressure_upper + 0.5, force_limits_.max_z_force_n + 0.5);
+    if (authority_kernel_.injected_faults.count("overpressure") > 0) {
+      state_store_.pressure_current = std::max(state_store_.config.pressure_upper + 0.5, procedure_executor_.force_limits.max_z_force_n + 0.5);
     }
-    contact_state_.mode = "STABLE_CONTACT";
-    contact_state_.confidence = pressure_available ? 0.83 : 0.58;
-    contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = scan_procedure_active_ ? "RUNTIME_START_SCAN" : "START_SCAN";
-    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
-    if (scan_procedure_active_) {
+    state_store_.contact_state.mode = "STABLE_CONTACT";
+    state_store_.contact_state.confidence = pressure_available ? 0.83 : 0.58;
+    state_store_.contact_state.pressure_current = state_store_.pressure_current;
+    state_store_.contact_state.recommended_action = procedure_executor_.scan_procedure_active ? "RUNTIME_START_SCAN" : "START_SCAN";
+    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!state_store_.quality_available || state_store_.quality_authoritative));
+    if (procedure_executor_.scan_procedure_active) {
       std::string reason;
       if (!startPlanDrivenScanLocked(&reason)) {
-        contact_state_.recommended_action = "PAUSE_AND_HOLD";
-        execution_state_ = RobotCoreState::PausedHold;
-        state_reason_ = reason.empty() ? "scan_start_blocked" : reason;
+        state_store_.contact_state.recommended_action = "PAUSE_AND_HOLD";
+        state_store_.execution_state = RobotCoreState::PausedHold;
+        state_store_.state_reason = reason.empty() ? "scan_start_blocked" : reason;
       }
     }
     return;
   }
 
-  if (execution_state_ == RobotCoreState::Scanning) {
+  if (state_store_.execution_state == RobotCoreState::Scanning) {
     if (!pressure_available && !allow_simulated_pressure) {
-      pressure_current_ = 0.0;
-      contact_state_.mode = "PRESSURE_UNAVAILABLE";
-      contact_state_.confidence = 0.0;
-      contact_state_.pressure_current = 0.0;
-      contact_state_.recommended_action = "PAUSE_AND_HOLD";
+      state_store_.pressure_current = 0.0;
+      state_store_.contact_state.mode = "PRESSURE_UNAVAILABLE";
+      state_store_.contact_state.confidence = 0.0;
+      state_store_.contact_state.pressure_current = 0.0;
+      state_store_.contact_state.recommended_action = "PAUSE_AND_HOLD";
       assign_contact_metadata(false);
       return;
     }
-    pressure_current_ = pressure_available ? observed.pressure_force_n : (config_.pressure_target + 0.08 * std::sin(phase_));
-    if (injected_faults_.count("overpressure") > 0) {
-      pressure_current_ = std::max(config_.pressure_upper + 0.5, force_limits_.max_z_force_n + 0.5);
+    state_store_.pressure_current = pressure_available ? observed.pressure_force_n : (state_store_.config.pressure_target + 0.08 * std::sin(state_store_.phase));
+    if (authority_kernel_.injected_faults.count("overpressure") > 0) {
+      state_store_.pressure_current = std::max(state_store_.config.pressure_upper + 0.5, procedure_executor_.force_limits.max_z_force_n + 0.5);
     }
     updatePlanProgressLocked(observed, phase_telemetry);
-    contact_state_.mode = "STABLE_CONTACT";
-    contact_state_.confidence = pressure_available ? 0.87 : 0.61;
-    contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = "SCAN";
-    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
+    state_store_.contact_state.mode = "STABLE_CONTACT";
+    state_store_.contact_state.confidence = pressure_available ? 0.87 : 0.61;
+    state_store_.contact_state.pressure_current = state_store_.pressure_current;
+    state_store_.contact_state.recommended_action = "SCAN";
+    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!state_store_.quality_available || state_store_.quality_authoritative));
     return;
   }
 
-  if (execution_state_ == RobotCoreState::PausedHold) {
+  if (state_store_.execution_state == RobotCoreState::PausedHold) {
     if (pressure_available) {
-      pressure_current_ = observed.pressure_force_n;
+      state_store_.pressure_current = observed.pressure_force_n;
     } else if (allow_simulated_pressure) {
-      pressure_current_ = config_.pressure_target - 0.03;
+      state_store_.pressure_current = state_store_.config.pressure_target - 0.03;
     } else {
-      pressure_current_ = 0.0;
-      contact_state_.mode = "WAITING_FOR_PRESSURE_SOURCE";
-      contact_state_.confidence = 0.0;
-      contact_state_.pressure_current = 0.0;
-      contact_state_.recommended_action = "WAIT_PRESSURE_SOURCE";
+      state_store_.pressure_current = 0.0;
+      state_store_.contact_state.mode = "WAITING_FOR_PRESSURE_SOURCE";
+      state_store_.contact_state.confidence = 0.0;
+      state_store_.contact_state.pressure_current = 0.0;
+      state_store_.contact_state.recommended_action = "WAIT_PRESSURE_SOURCE";
       assign_contact_metadata(false);
       return;
     }
-    contact_state_.mode = "HOLDING_CONTACT";
-    contact_state_.confidence = pressure_available ? 0.75 : 0.5;
-    contact_state_.pressure_current = pressure_current_;
-    contact_state_.recommended_action = "RESUME_OR_RETREAT";
-    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!quality_available_ || quality_authoritative_));
+    state_store_.contact_state.mode = "HOLDING_CONTACT";
+    state_store_.contact_state.confidence = pressure_available ? 0.75 : 0.5;
+    state_store_.contact_state.pressure_current = state_store_.pressure_current;
+    state_store_.contact_state.recommended_action = "RESUME_OR_RETREAT";
+    assign_contact_metadata(pressure_available && !allow_simulated_pressure && (!state_store_.quality_available || state_store_.quality_authoritative));
     return;
   }
 
-  if (execution_state_ == RobotCoreState::Retreating) {
-    pressure_current_ = 0.0;
-    sdk_robot_.updateSessionRegisters(active_segment_, frame_id_);
-    contact_state_.mode = "NO_CONTACT";
-    contact_state_.confidence = 0.0;
-    contact_state_.pressure_current = 0.0;
-    contact_state_.recommended_action = "WAIT_RETREAT_COMPLETE";
+  if (state_store_.execution_state == RobotCoreState::Retreating) {
+    state_store_.pressure_current = 0.0;
+    procedure_executor_.sdk_robot.updateSessionRegisters(state_store_.active_segment, state_store_.frame_id);
+    state_store_.contact_state.mode = "NO_CONTACT";
+    state_store_.contact_state.confidence = 0.0;
+    state_store_.contact_state.pressure_current = 0.0;
+    state_store_.contact_state.recommended_action = "WAIT_RETREAT_COMPLETE";
     assign_contact_metadata(false);
     return;
   }
 
-  pressure_current_ = 0.0;
-  contact_stable_since_ns_ = 0;
-  contact_state_.mode = "NO_CONTACT";
-  contact_state_.confidence = 0.0;
-  contact_state_.pressure_current = 0.0;
-  contact_state_.recommended_action = "IDLE";
+  state_store_.pressure_current = 0.0;
+  state_store_.contact_stable_since_ns = 0;
+  state_store_.contact_state.mode = "NO_CONTACT";
+  state_store_.contact_state.confidence = 0.0;
+  state_store_.contact_state.pressure_current = 0.0;
+  state_store_.contact_state.recommended_action = "IDLE";
   assign_contact_metadata(false);
 }
 
 void CoreRuntime::refreshDeviceHealthLocked(int64_t ts_ns, const RtObservedState& observed) {
-  pressure_fresh_ = observed.pressure_valid && observed.pressure_age_ms <= static_cast<double>(config_.pressure_stale_ms);
-  robot_state_fresh_ = observed.valid && !observed.stale;
-  const bool live_runtime = sdk_robot_.liveBindingEstablished();
-  for (auto& device : devices_) {
+  state_store_.pressure_fresh = observed.pressure_valid && observed.pressure_age_ms <= static_cast<double>(state_store_.config.pressure_stale_ms);
+  state_store_.robot_state_fresh = observed.valid && !observed.stale;
+  const bool live_runtime = procedure_executor_.sdk_robot.liveBindingEstablished();
+  for (auto& device : evidence_projector_.devices) {
     if (device.device_name == "pressure") {
       device.present = true;
-      device.connected = pressure_fresh_ || observed.pressure_valid;
+      device.connected = state_store_.pressure_fresh || observed.pressure_valid;
       device.streaming = observed.pressure_valid;
       device.online = device.connected;
       device.authoritative = live_runtime && observed.pressure_valid;
-      device.fresh = observed.pressure_valid && pressure_fresh_;
+      device.fresh = observed.pressure_valid && state_store_.pressure_fresh;
       device.last_ts_ns = device.fresh ? ts_ns : 0;
       device.detail = device.connected ? (device.fresh ? "压力传感已接入并新鲜" : "压力通道已接入但数据过期") : "压力传感未建立 authoritative stream";
       continue;
     }
     if (device.device_name == "robot") {
       device.present = true;
-      device.connected = controller_online_;
+      device.connected = state_store_.controller_online;
       device.streaming = observed.valid;
       device.online = device.connected;
       device.authoritative = live_runtime;
-      device.fresh = device.connected && robot_state_fresh_;
+      device.fresh = device.connected && state_store_.robot_state_fresh;
       device.last_ts_ns = device.fresh ? ts_ns : 0;
-      if (execution_state_ == RobotCoreState::Fault || execution_state_ == RobotCoreState::Estop) {
+      if (state_store_.execution_state == RobotCoreState::Fault || state_store_.execution_state == RobotCoreState::Estop) {
         device.detail = "机器人控制器处于故障或急停状态";
       } else if (device.connected && !device.fresh) {
         device.detail = "机器人状态镜像未收到可信更新";
@@ -497,24 +504,24 @@ void CoreRuntime::refreshDeviceHealthLocked(int64_t ts_ns, const RtObservedState
 }
 
 SafetyStatus CoreRuntime::evaluateSafetyLocked() const {
-  auto status = safety_service_.evaluate(
-      controller_online_,
-      powered_,
-      automatic_mode_,
-      !session_id_.empty(),
-      plan_loaded_,
-      pressure_fresh_,
-      robot_state_fresh_,
-      pressure_current_ <= config_.pressure_upper,
-      rt_jitter_ok_,
-      tool_ready_,
-      tcp_ready_,
-      load_ready_);
-  const auto recovery = recovery_policy_.evaluate(pressure_current_, config_.pressure_target, config_.pressure_upper, pressure_fresh_ ? 0.0 : static_cast<double>(config_.pressure_stale_ms));
+  auto status = services_.safety_service.evaluate(
+      state_store_.controller_online,
+      state_store_.powered,
+      state_store_.automatic_mode,
+      !state_store_.session_id.empty(),
+      state_store_.plan_loaded,
+      state_store_.pressure_fresh,
+      state_store_.robot_state_fresh,
+      state_store_.pressure_current <= state_store_.config.pressure_upper,
+      state_store_.rt_jitter_ok,
+      state_store_.tool_ready,
+      state_store_.tcp_ready,
+      state_store_.load_ready);
+  const auto recovery = procedure_executor_.recovery_policy.evaluate(state_store_.pressure_current, state_store_.config.pressure_target, state_store_.config.pressure_upper, state_store_.pressure_fresh ? 0.0 : static_cast<double>(state_store_.config.pressure_stale_ms));
   status.recovery_reason = recovery.reason;
   status.last_recovery_action = recovery.action;
-  status.sensor_freshness_ms = pressure_fresh_ ? 0 : config_.pressure_stale_ms;
-  status.pressure_band_state = std::fabs(pressure_current_ - config_.pressure_target) <= force_limits_.resume_force_band_n ? "WITHIN_RESUME_BAND" : "OUT_OF_BAND";
+  status.sensor_freshness_ms = state_store_.pressure_fresh ? 0 : state_store_.config.pressure_stale_ms;
+  status.pressure_band_state = std::fabs(state_store_.pressure_current - state_store_.config.pressure_target) <= procedure_executor_.force_limits.resume_force_band_n ? "WITHIN_RESUME_BAND" : "OUT_OF_BAND";
   return status;
 }
 
@@ -523,60 +530,60 @@ void CoreRuntime::queueAlarmLocked(const std::string& severity, const std::strin
   alarm.severity = severity;
   alarm.source = source;
   alarm.message = message;
-  alarm.session_id = session_id_;
-  alarm.segment_id = active_segment_;
+  alarm.session_id = state_store_.session_id;
+  alarm.segment_id = state_store_.active_segment;
   alarm.event_ts_ns = json::nowNs();
   alarm.workflow_step = workflow_step;
   alarm.request_id = request_id;
   alarm.auto_action = auto_action;
-  pending_alarms_.push_back(alarm);
-  recording_service_.recordAlarm(alarm);
+  evidence_projector_.pending_alarms.push_back(alarm);
+  evidence_projector_.recording_service.recordAlarm(alarm);
   if (severity == "FATAL_FAULT") {
-    fault_code_ = source;
-    execution_state_ = execution_state_ == RobotCoreState::Estop ? RobotCoreState::Estop : RobotCoreState::Fault;
+    state_store_.fault_code = source;
+    state_store_.execution_state = state_store_.execution_state == RobotCoreState::Estop ? RobotCoreState::Estop : RobotCoreState::Fault;
   }
 }
 
 CoreStateSnapshot CoreRuntime::buildCoreSnapshotLocked() const {
   CoreStateSnapshot snapshot;
-  snapshot.execution_state = execution_state_;
-  snapshot.armed = !session_id_.empty() && plan_loaded_ && execution_state_ != RobotCoreState::Fault && execution_state_ != RobotCoreState::Estop;
-  snapshot.fault_code = fault_code_;
-  snapshot.active_segment = active_segment_;
-  snapshot.progress_pct = progress_pct_;
-  snapshot.session_id = session_id_;
-  snapshot.recovery_state = recovery_manager_.currentStateName();
-  snapshot.plan_hash = plan_hash_;
-  snapshot.contact_stable = execution_state_ == RobotCoreState::ContactStable || execution_state_ == RobotCoreState::Scanning || execution_state_ == RobotCoreState::PausedHold;
-  snapshot.contact_stable_since_ns = contact_stable_since_ns_;
-  snapshot.active_waypoint_index = active_waypoint_index_;
-  snapshot.last_transition = last_transition_;
-  snapshot.state_reason = state_reason_;
+  snapshot.execution_state = state_store_.execution_state;
+  snapshot.armed = !state_store_.session_id.empty() && state_store_.plan_loaded && state_store_.execution_state != RobotCoreState::Fault && state_store_.execution_state != RobotCoreState::Estop;
+  snapshot.fault_code = state_store_.fault_code;
+  snapshot.active_segment = state_store_.active_segment;
+  snapshot.progress_pct = state_store_.progress_pct;
+  snapshot.session_id = state_store_.session_id;
+  snapshot.recovery_state = procedure_executor_.recovery_manager.currentStateName();
+  snapshot.plan_hash = state_store_.plan_hash;
+  snapshot.contact_stable = state_store_.execution_state == RobotCoreState::ContactStable || state_store_.execution_state == RobotCoreState::Scanning || state_store_.execution_state == RobotCoreState::PausedHold;
+  snapshot.contact_stable_since_ns = state_store_.contact_stable_since_ns;
+  snapshot.active_waypoint_index = state_store_.active_waypoint_index;
+  snapshot.last_transition = state_store_.last_transition;
+  snapshot.state_reason = state_store_.state_reason;
   return snapshot;
 }
 
 ScanProgress CoreRuntime::buildScanProgressLocked() const {
   ScanProgress progress;
-  progress.active_segment = active_segment_;
-  progress.active_waypoint_index = active_waypoint_index_;
-  progress.completed_waypoints = execution_plan_runtime_.completed_waypoints;
-  progress.total_waypoints = execution_plan_runtime_.total_waypoints;
+  progress.active_segment = state_store_.active_segment;
+  progress.active_waypoint_index = state_store_.active_waypoint_index;
+  progress.completed_waypoints = procedure_executor_.execution_plan_runtime.completed_waypoints;
+  progress.total_waypoints = procedure_executor_.execution_plan_runtime.total_waypoints;
   progress.remaining_waypoints = std::max(0, progress.total_waypoints - progress.completed_waypoints);
-  progress.path_index = path_index_;
-  progress.overall_progress = progress_pct_;
-  progress.frame_id = frame_id_;
-  progress.checkpoint_tag = execution_plan_runtime_.active_checkpoint_tag;
+  progress.path_index = state_store_.path_index;
+  progress.overall_progress = state_store_.progress_pct;
+  progress.frame_id = state_store_.frame_id;
+  progress.checkpoint_tag = procedure_executor_.execution_plan_runtime.active_checkpoint_tag;
   return progress;
 }
 
 CoreRuntime::PendingRecordBundle CoreRuntime::buildRecordBundleLocked() const {
   PendingRecordBundle bundle{};
-  if (!recording_service_.active()) {
+  if (!evidence_projector_.recording_service.active()) {
     return bundle;
   }
   bundle.enabled = true;
-  bundle.robot_state = robot_state_hub_.latest();
-  bundle.contact_state = contact_state_;
+  bundle.robot_state = query_projector_.robot_state_hub.latest();
+  bundle.contact_state = state_store_.contact_state;
   bundle.core_state = buildCoreSnapshotLocked();
   bundle.scan_progress = buildScanProgressLocked();
   return bundle;
@@ -586,9 +593,9 @@ void CoreRuntime::flushRecordBundle(const PendingRecordBundle& bundle) {
   if (!bundle.enabled) {
     return;
   }
-  recording_service_.recordRobotState(bundle.robot_state);
-  recording_service_.recordContactState(bundle.contact_state);
-  recording_service_.recordScanProgress(bundle.core_state, bundle.scan_progress);
+  evidence_projector_.recording_service.recordRobotState(bundle.robot_state);
+  evidence_projector_.recording_service.recordContactState(bundle.contact_state);
+  evidence_projector_.recording_service.recordScanProgress(bundle.core_state, bundle.scan_progress);
 }
 
 }  // namespace robot_core

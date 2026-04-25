@@ -33,7 +33,7 @@ def test_live_profile_blocks_core_backend_when_runtime_doctor_is_blocked() -> No
         },
     )
 
-    normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    normalized, reply = service.guard_write_command('start_procedure', {'_command_context': {'role': 'operator'}})
     assert normalized['_command_context']['role'] == 'operator'
     assert reply is not None
     assert reply.ok is False
@@ -58,7 +58,7 @@ def test_live_profile_allows_core_backend_when_runtime_doctor_has_no_blockers() 
         },
     )
 
-    _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    _normalized, reply = service.guard_write_command('start_procedure', {'_command_context': {'role': 'operator'}})
     assert reply is None
 
 
@@ -85,7 +85,7 @@ def test_authoritative_write_capability_blocks_command_before_profile_fallback()
         },
     )
 
-    _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    _normalized, reply = service.guard_write_command('start_procedure', {'_command_context': {'role': 'operator'}})
     assert reply is not None
     assert reply.ok is False
     assert reply.data['required_claim'] == 'rt_motion_write'
@@ -113,7 +113,7 @@ def test_root_level_write_capabilities_are_honored() -> None:
         },
     )
 
-    _normalized, reply = service.guard_write_command('start_scan', {'_command_context': {'role': 'operator'}})
+    _normalized, reply = service.guard_write_command('start_procedure', {'_command_context': {'role': 'operator'}})
     assert reply is not None
     assert reply.ok is False
     assert reply.data['required_claim'] == 'rt_motion_write'

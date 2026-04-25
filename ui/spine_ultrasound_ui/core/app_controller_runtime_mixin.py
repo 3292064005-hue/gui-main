@@ -112,19 +112,32 @@ class AppControllerRuntimeMixin:
                 token through the desktop controller surface.
 
         Boundary behavior:
-            ``start_scan`` remains available as a compatibility alias, but new
-            UI/runtime code must enter the workflow through this canonical
-            method so permission surfaces and logs resolve to
-            ``start_procedure(scan)``.
+            Active UI/runtime code must enter the workflow through this
+            canonical method so permission surfaces and logs resolve to
+            ``start_procedure(scan)``. The legacy ``start_scan`` alias is
+            retired from the active controller surface.
         """
         normalized_procedure = str(procedure or "").strip().lower()
         if normalized_procedure != "scan":
             raise ValueError(f"unsupported procedure: {procedure}")
-        workflow_ops.start_scan(self)
+        workflow_ops.start_scan_procedure(self)
 
-    def start_scan(self) -> None:
-        """Compatibility alias for the canonical ``start_procedure(scan)`` entry."""
-        self.start_procedure("scan")
+    def retired_start_scan_alias(self) -> None:
+        """Reject the retired legacy start_scan alias.
+
+        Function:
+            Provides a deterministic migration failure for accidental legacy
+            callers without exposing ``start_scan`` as an active desktop action.
+        Args:
+            None.
+        Returns:
+            Never returns normally.
+        Raises:
+            RuntimeError: Always, with the canonical replacement command.
+        Boundary behavior:
+            No runtime command is sent and no workflow state is mutated.
+        """
+        raise RuntimeError("retired command alias: start_scan; use start_procedure(scan)")
 
     def pause_scan(self) -> None:
         self._run_guarded_command("pause_scan", success_message="扫查已暂停，系统进入保持状态。", fallback_to_safe_retreat=True)
@@ -133,8 +146,21 @@ class AppControllerRuntimeMixin:
         self._run_guarded_command("resume_scan", success_message="扫查已恢复。")
 
     def stop_scan(self) -> None:
-        self._log("INFO", "结束本轮扫查请求已映射到 canonical action=safe_retreat。")
-        self.safe_retreat()
+        """Request an orderly end-of-scan stop owned by the runtime graph.
+
+        Returns:
+            None.
+
+        Raises:
+            Exceptions raised by the runtime bridge are propagated through the
+            normal guarded-command boundary.
+
+        Boundary behavior:
+            ``stop_scan`` is not treated as equivalent to ``safe_retreat``.
+            The runtime must decide whether an orderly stop can complete the
+            active scan chain and transition into a sealed post-scan state.
+        """
+        self._run_guarded_command("stop_scan", success_message="结束本轮扫查请求已发送。")
 
     def safe_retreat(self) -> None:
         self._run_guarded_command("safe_retreat", success_message="安全退让已请求。")
@@ -239,10 +265,17 @@ class AppControllerRuntimeMixin:
         return self.runtime_bridge.run_guarded_command(command, payload, success_message=success_message, fallback_to_safe_retreat=fallback_to_safe_retreat)
 
     def _run_scan_start_step(self, command: str, payload: Optional[dict] = None) -> bool:
+        """Run the canonical procedure entry without desktop-owned recovery injection.
+
+        The runtime owns internal phase execution and any recovery action that
+        follows from those phases. Desktop keeps only the observable projection
+        and must not synthesize a second ``safe_retreat`` write after
+        ``start_procedure(scan)`` has already been handed over.
+        """
         return self.runtime_bridge.run_guarded_command(
             command,
             payload,
-            fallback_to_safe_retreat=True,
+            fallback_to_safe_retreat=False,
             force_asset_refresh=False,
         )
 

@@ -4,15 +4,17 @@ After=network.target
 
 [Service]
 Type=simple
-# Execution Directory
 WorkingDirectory=/opt/spine_ultrasound/cpp_robot_core
+EnvironmentFile=-/etc/default/spine-cpp-core
 ExecStart=/opt/spine_ultrasound/cpp_robot_core/bin/spine_robot_core
 
-# Critical: Allows mlockall and highest scheduler priority Without running as pure Root if possible
+# Canonical RT host contract. CPUAffinity must stay aligned with
+# SPINE_RT_CPU_SET in the EnvironmentFile and repository sample contract.
 LimitMEMLOCK=infinity
 LimitRTPRIO=99
 CPUSchedulingPolicy=fifo
-CPUSchedulingPriority=99
+CPUSchedulingPriority=90
+CPUAffinity=0 1
 
 Restart=on-failure
 RestartSec=1s

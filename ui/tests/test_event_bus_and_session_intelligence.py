@@ -45,7 +45,7 @@ def test_session_intelligence_artifacts_are_materialized(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.pause_scan()
     controller.resume_scan()
     controller.safe_retreat()

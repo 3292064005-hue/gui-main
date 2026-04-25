@@ -1,0 +1,7 @@
+{
+  "scope": "mainline_static_sandbox_fixture",
+  "source": "architecture_gate_static_fixture",
+  "live_rt_observed": false,
+  "hil_verified": false,
+  "notes": "Static fixture only. It preserves mainline evidence-gate wiring and is not live RT/HIL evidence."
+}

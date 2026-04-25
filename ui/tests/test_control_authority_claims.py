@@ -6,7 +6,7 @@ from spine_ultrasound_ui.services.control_authority_service import ControlAuthor
 def test_control_authority_auto_grants_required_claim_for_operator() -> None:
     service = ControlAuthorityService(strict_mode=True, auto_issue_implicit_lease=True)
     decision = service.guard_command(
-        'start_scan',
+        'start_procedure',
         {'_command_context': {'actor_id': 'desktop-a', 'workspace': 'desktop', 'role': 'operator'}},
         current_session_id='S1',
         source='headless',
@@ -23,7 +23,7 @@ def test_control_authority_auto_grants_required_claim_for_operator() -> None:
 def test_control_authority_rejects_role_without_required_claim() -> None:
     service = ControlAuthorityService(strict_mode=True, auto_issue_implicit_lease=True)
     decision = service.guard_command(
-        'start_scan',
+        'start_procedure',
         {'_command_context': {'actor_id': 'desktop-b', 'workspace': 'desktop', 'role': 'researcher'}},
         current_session_id='S1',
         source='headless',

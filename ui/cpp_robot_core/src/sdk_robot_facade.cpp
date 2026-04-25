@@ -1,4 +1,5 @@
 #include "robot_core/sdk_robot_facade_internal.h"
+#include "robot_core/deployment_policy.h"
 
 #include <sstream>
 #include <cstdlib>
@@ -8,19 +9,6 @@ namespace robot_core {
 
 using namespace sdk_robot_facade_internal;
 
-namespace {
-
-bool facadeDeploymentShellWritesForbidden() {
-  const char* profile = std::getenv("SPINE_DEPLOYMENT_PROFILE");
-  const std::string profile_name = profile != nullptr ? std::string(profile) : std::string();
-  if (profile_name == "research" || profile_name == "clinical") return true;
-  const char* strict = std::getenv("SPINE_STRICT_CONTROL_AUTHORITY");
-  if (strict == nullptr) return false;
-  const std::string value(strict);
-  return value == "1" || value == "true" || value == "TRUE" || value == "on" || value == "ON";
-}
-
-}  // namespace
 
 
 SdkRobotFacade::SdkRobotFacade() {
@@ -75,7 +63,7 @@ bool SdkRobotFacade::connect(const std::string& remote_ip, const std::string& lo
     motion_channel_ready_ = false;
     network_healthy_ = false;
     live_binding_established_ = false;
-    powered_ = false;
+    state_store_.powered = false;
     auto_mode_ = false;
     rt_mainline_configured_ = false;
     active_rt_phase_.clear();
@@ -91,7 +79,7 @@ bool SdkRobotFacade::connect(const std::string& remote_ip, const std::string& lo
     network_healthy_ = true;
     state_channel_ready_ = true;
     aux_channel_ready_ = true;
-    motion_channel_ready_ = powered_;
+    motion_channel_ready_ = state_store_.powered;
     backend_kind_ = "xcore_sdk_live_binding";
     binding_detail_ = "live_binding_connected";
     refreshRuntimeCaches();
@@ -106,7 +94,7 @@ bool SdkRobotFacade::connect(const std::string& remote_ip, const std::string& lo
     motion_channel_ready_ = false;
     network_healthy_ = false;
     live_binding_established_ = false;
-    powered_ = false;
+    state_store_.powered = false;
     auto_mode_ = false;
     rt_mainline_configured_ = false;
     active_rt_phase_.clear();
@@ -123,7 +111,7 @@ bool SdkRobotFacade::connect(const std::string& remote_ip, const std::string& lo
   connected_ = true;
   state_channel_ready_ = true;
   aux_channel_ready_ = true;
-  motion_channel_ready_ = powered_;
+  motion_channel_ready_ = state_store_.powered;
   binding_detail_ = "contract_shell_connected";
   appendLog("connectToRobot(" + remote_ip + "," + local_ip + ") contract_only");
   refreshBindingTruth();
@@ -157,7 +145,7 @@ void SdkRobotFacade::disconnect() {
   robot_.reset();
   rt_controller_.reset();
   connected_ = false;
-  powered_ = false;
+  state_store_.powered = false;
   auto_mode_ = false;
   rt_mainline_configured_ = false;
   motion_channel_ready_ = false;
@@ -187,20 +175,6 @@ bool SdkRobotFacade::requireLiveWrite(const std::string& prefix, std::string* re
   if (live_binding_established_ && robot_ != nullptr) {
     return true;
   }
-  if (rt_config_.allow_contract_shell_writes && !facadeDeploymentShellWritesForbidden()) {
-    appendLog(prefix + " contract_shell_write_override");
-    return true;
-  }
-  if (rt_config_.allow_contract_shell_writes && facadeDeploymentShellWritesForbidden()) {
-    captureFailure(prefix, "deployment_profile_forbids_contract_shell_write", reason);
-    binding_detail_ = "contract_shell_write_forbidden_by_profile";
-    refreshBindingTruth();
-    return false;
-  }
-#ifdef ROBOT_CORE_PROFILE_mock
-  appendLog(prefix + " mock_profile_contract_shell_write");
-  return true;
-#endif
   captureFailure(prefix, vendored_sdk_detected_ ? "live_binding_required" : "sdk_live_binding_unavailable", reason);
   binding_detail_ = vendored_sdk_detected_ ? "live_write_blocked_contract_shell" : "live_write_blocked_no_sdk";
   refreshBindingTruth();

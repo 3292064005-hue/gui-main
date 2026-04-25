@@ -24,8 +24,8 @@ def test_event_envelope_and_replay_bus_round_trip():
 
 def test_role_matrix_restricts_researcher_commands():
     matrix = RoleMatrix()
-    assert matrix.can_issue_command('operator', 'start_scan') is True
-    assert matrix.can_issue_command('researcher', 'start_scan') is False
+    assert matrix.can_issue_command('operator', 'start_procedure') is True
+    assert matrix.can_issue_command('researcher', 'start_procedure') is False
     assert matrix.can_read_category('reviewer', 'session') is True
     assert matrix.can_read_category('reviewer', 'runtime') is False
 

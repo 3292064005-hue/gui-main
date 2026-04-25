@@ -231,8 +231,6 @@ class MainWindow(QMainWindow):
     def _action_start_procedure(self) -> None:
         self._invoke_backend_action("start_procedure")
 
-    def _action_start_scan(self) -> None:
-        self._action_start_procedure()
 
     def _action_pause_scan(self) -> None:
         self._invoke_backend_action("pause_scan")

@@ -139,13 +139,14 @@ def test_backend_link_service_reports_blocked_state() -> None:
     assert "遥测通道未连通" in blocker_names
 
 
-def test_api_server_runtime_config_roundtrip(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_api_server_runtime_config_post_is_blocked_but_get_remains_available(monkeypatch: pytest.MonkeyPatch) -> None:
     with _client(monkeypatch) as client:
         post_resp = client.post("/api/v1/runtime-config", json={"pressure_target": 9.5, "rt_mode": "cartesianImpedance"})
-        assert post_resp.status_code == 200
+        assert post_resp.status_code == 403
+        assert "read-only evidence surface" in post_resp.json()["detail"]
         get_resp = client.get("/api/v1/runtime-config")
         assert get_resp.status_code == 200
-        assert get_resp.json()["runtime_config"]["pressure_target"] == 9.5
+        assert get_resp.json()["runtime_config"]["pressure_target"] == 8.0
 
 
 def test_api_server_backend_link_state(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,7 +170,7 @@ def test_backend_control_plane_service_detects_config_drift() -> None:
         status={"protocol_version": 1},
         health={"protocol_version": 1},
         topic_catalog={"topics": [{"name": "core_state"}, {"name": "robot_state"}, {"name": "safety_status"}, {"name": "scan_progress"}, {"name": "contact_state"}]},
-        recent_commands=[{"command": "start_scan", "ok": True, "message": "started"}],
+        recent_commands=[{"command": "start_procedure", "ok": True, "message": "started"}],
     )
     assert result["summary_state"] == "blocked"
     assert result["config_sync"]["summary_label"] == "配置漂移"

@@ -6,7 +6,7 @@ from spine_ultrasound_ui.services.command_audit_service import CommandAuditServi
 from spine_ultrasound_ui.services.command_dispatch_service import CommandDispatchService
 from spine_ultrasound_ui.services.command_guard_service import CommandGuardService
 from spine_ultrasound_ui.services.ipc_protocol import COMMANDS, ReplyEnvelope, is_write_command, validate_command_payload
-from spine_ultrasound_ui.services.runtime_command_catalog import is_plan_compile_command
+from spine_ultrasound_ui.services.runtime_command_catalog import is_plan_compile_command, retired_alias_rejection
 
 
 class HeadlessCommandService:
@@ -86,7 +86,7 @@ class HeadlessCommandService:
             ValueError: If the command is not registered.
         """
         if command not in COMMANDS:
-            raise ValueError(f"unsupported command: {command}")
+            raise ValueError(retired_alias_rejection(command))
         requested_payload = dict(payload or {})
         validate_command_payload(command, requested_payload)
         if is_write_command(command) or is_plan_compile_command(command):

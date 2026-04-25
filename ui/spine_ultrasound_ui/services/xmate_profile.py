@@ -33,7 +33,6 @@ class XMateProfile:
     local_ip: str = "192.168.0.100"
     preferred_link: str = MAINLINE_IDENTITY_DEFAULTS.preferred_link
     requires_single_control_source: bool = True
-    allow_contract_shell_writes: bool = False
     realtime_client_language: str = "C++"
     rt_loop_hz: int = 1000
     rt_mode: str = MAINLINE_IDENTITY_DEFAULTS.clinical_mainline_mode
@@ -159,7 +158,6 @@ class XMateProfile:
     contact_control: dict[str, Any] = field(default_factory=dict)
     force_estimator: dict[str, Any] = field(default_factory=dict)
     orientation_trim: dict[str, Any] = field(default_factory=dict)
-    compatibility_warnings: list[str] = field(default_factory=list)
     force_estimator_preferred_source: str = "fused"
     force_estimator_timeout_ms: int = 250
     force_estimator_min_confidence: float = 0.4
@@ -169,7 +167,7 @@ class XMateProfile:
         self.force_estimator = self._normalize_force_estimator(self.force_estimator)
         self.orientation_trim = self._normalize_orientation_trim(self.orientation_trim)
 
-    def _legacy_contact_control_defaults(self) -> dict[str, Any]:
+    def _derived_contact_control_defaults(self) -> dict[str, Any]:
         return {
             "mode": "normal_axis_admittance",
             "virtual_mass": max(0.05, 1.0 / max(self.normal_admittance_gain, 1e-6) / 10000.0),
@@ -184,7 +182,7 @@ class XMateProfile:
             "integrator_leak": self.pause_hold_integrator_leak,
         }
 
-    def _legacy_force_estimator_defaults(self) -> dict[str, Any]:
+    def _derived_force_estimator_defaults(self) -> dict[str, Any]:
         return {
             "preferred_source": str(self.force_estimator_preferred_source or "fused"),
             "pressure_weight": 0.7,
@@ -195,7 +193,7 @@ class XMateProfile:
             "min_confidence": float(self.force_estimator_min_confidence),
         }
 
-    def _legacy_orientation_trim_defaults(self) -> dict[str, Any]:
+    def _derived_orientation_trim_defaults(self) -> dict[str, Any]:
         return {
             "gain": self.scan_pose_trim_gain,
             "max_trim_deg": self.rt_max_pose_trim_deg,
@@ -203,19 +201,19 @@ class XMateProfile:
         }
 
     def _normalize_contact_control(self, payload: dict[str, Any] | None) -> dict[str, Any]:
-        data = self._legacy_contact_control_defaults()
+        data = self._derived_contact_control_defaults()
         if isinstance(payload, dict):
             data.update({k: payload[k] for k in payload if k in data})
         return data
 
     def _normalize_force_estimator(self, payload: dict[str, Any] | None) -> dict[str, Any]:
-        data = self._legacy_force_estimator_defaults()
+        data = self._derived_force_estimator_defaults()
         if isinstance(payload, dict):
             data.update({k: payload[k] for k in payload if k in data})
         return data
 
     def _normalize_orientation_trim(self, payload: dict[str, Any] | None) -> dict[str, Any]:
-        data = self._legacy_orientation_trim_defaults()
+        data = self._derived_orientation_trim_defaults()
         if isinstance(payload, dict):
             data.update({k: payload[k] for k in payload if k in data})
         return data
@@ -316,18 +314,6 @@ class XMateProfile:
             "orientation_trim": self.build_orientation_trim_profile(),
         }
         payload["rt_phase_contract"] = self.build_rt_phase_contract()
-        payload["legacy_compatibility"] = {
-            "flat_field_projection": {
-                "normal_admittance_gain": self.normal_admittance_gain,
-                "normal_damping_gain": self.normal_damping_gain,
-                "scan_normal_pi_kp": self.scan_normal_pi_kp,
-                "scan_normal_pi_ki": self.scan_normal_pi_ki,
-                "pause_hold_drift_kp": self.pause_hold_drift_kp,
-                "pause_hold_drift_ki": self.pause_hold_drift_ki,
-                "pause_hold_integrator_leak": self.pause_hold_integrator_leak,
-            },
-            "warnings": list(self.compatibility_warnings),
-        }
         payload["safety_contract"] = {
             "collision_detection_enabled": self.collision_detection_enabled,
             "collision_sensitivity": self.collision_sensitivity,
@@ -427,16 +413,6 @@ def load_xmate_profile(path: Path | None = None) -> XMateProfile:
     data.pop("rt_control_contract", None)
     data.pop("safety_contract", None)
     data.pop("clinical_scan_contract", None)
-    legacy_warnings: list[str] = []
-    if "contact_control" not in raw and any(key in raw for key in ("normal_admittance_gain", "normal_damping_gain", "seek_contact_max_step_mm", "pause_hold_integrator_leak")):
-        legacy_warnings.append("xmate_profile loaded legacy flat contact-control fields; nested contact_control was synthesized")
-    if "force_estimator" not in raw and any(key in raw for key in ("force_estimator_preferred_source", "pressure_stale_ms", "force_estimator_timeout_ms", "force_estimator_min_confidence")):
-        legacy_warnings.append("xmate_profile loaded legacy flat force-estimator fields; nested force_estimator was synthesized")
-    elif "force_estimator" not in raw and "rt_phase_contract" in raw:
-        legacy_warnings.append("xmate_profile loaded force_estimator from legacy rt_phase_contract projection")
-    if "orientation_trim" not in raw and any(key in raw for key in ("scan_pose_trim_gain", "rt_max_pose_trim_deg")):
-        legacy_warnings.append("xmate_profile loaded legacy flat orientation-trim fields; nested orientation_trim was synthesized")
-
     data["robot_model"] = identity.robot_model
     data["sdk_robot_class"] = identity.sdk_robot_class
     data["axis_count"] = identity.axis_count
@@ -494,7 +470,6 @@ def load_xmate_profile(path: Path | None = None) -> XMateProfile:
         if isinstance(raw.get("orientation_trim"), dict):
             data["orientation_trim"] = raw.get("orientation_trim")
 
-    data["compatibility_warnings"] = legacy_warnings
     return XMateProfile(**{k: v for k, v in data.items() if k in XMateProfile.__dataclass_fields__})
 
 

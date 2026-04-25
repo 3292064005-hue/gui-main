@@ -17,7 +17,7 @@ The repository now carries an explicit xMateModel compile gate (`test_xmate_mode
 Authoritative precheck is now required to pass the intended build path and the generated command/runtime contract parity gate before release scripts can succeed. Full closure still depends on enabled SDK/model builds plus end-to-end behavior proof on the intended surface.
 
 ### P2-03
-Acceptance scripts, test inventory, and the consolidated `release_ledger.json` are now aligned at the report-index layer, but a final release claim still requires complete build/test proof for the enabled runtime path, plus live/HIL evidence where relevant.
+Acceptance scripts, test inventory, and the consolidated `release_ledger.json` are now aligned at the report-index layer, and `research`/`clinical` ledger generation is fail-closed without archived live/HIL evidence. A final release claim still requires complete build/test proof for the enabled runtime path, plus live/HIL evidence where relevant.
 
 ## Usage rule
 No release, audit, or readiness statement may contradict this file without attaching the new evidence that closes the gap.

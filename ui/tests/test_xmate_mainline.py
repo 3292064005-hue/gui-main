@@ -39,7 +39,7 @@ def test_locked_session_freezes_xmate_profile_and_scan_protocol(tmp_path: Path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.save_results()
     controller.export_summary()
 

@@ -26,7 +26,7 @@ def build_lineage(session_id: str, manifest: dict[str, Any], scan_plan: dict[str
     for entry in journal:
         data = dict(entry.get("data", {}))
         command = str(data.get("command", ""))
-        if command in {"load_scan_plan", "start_procedure", "start_scan", "pause_scan", "resume_scan", "safe_retreat"}:
+        if command in {"load_scan_plan", "start_procedure", "pause_scan", "resume_scan", "safe_retreat", "stop_scan"}:
             steps.append(
                 {
                     "kind": "workflow_command",

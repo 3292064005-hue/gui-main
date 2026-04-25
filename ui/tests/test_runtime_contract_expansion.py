@@ -23,6 +23,8 @@ def test_runtime_asset_service_exposes_identity_and_contracts(tmp_path: Path) ->
     snapshot = service.refresh(backend, RuntimeConfig())
     assert snapshot["identity_contract"]["robot_model"] == "xmate3"
     assert snapshot["clinical_mainline_contract"]["rt_loop_hz"] == 1000
+    assert snapshot["clinical_mainline_contract"]["required_sequence"] == ["connect_robot", "power_on", "set_auto_mode", "lock_session", "load_scan_plan", "start_procedure", "safe_retreat"]
+    assert snapshot["clinical_mainline_contract"]["runtime_owned_phase_sequence"] == ["approach_prescan", "seek_contact", "contact_hold", "scan_follow", "controlled_retract"]
     assert snapshot["recovery_contract"]["safe_retreat_enabled"] is True
     assert snapshot["session_freeze"]["session_locked"] is False
 

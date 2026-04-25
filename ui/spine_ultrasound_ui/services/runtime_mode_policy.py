@@ -8,10 +8,10 @@ from spine_ultrasound_ui.models import RuntimeConfig
 from spine_ultrasound_ui.services.deployment_profile_service import DeploymentProfileService
 
 _DESKTOP_ALLOWED = {
-    "dev": frozenset({"mock", "core", "api"}),
-    "lab": frozenset({"core", "api"}),
-    "research": frozenset({"core", "api"}),
-    "clinical": frozenset({"core", "api"}),
+    "dev": frozenset({"mock", "core"}),
+    "lab": frozenset({"core"}),
+    "research": frozenset({"core"}),
+    "clinical": frozenset({"core"}),
     "review": frozenset({"core", "api"}),
 }
 _HEADLESS_ALLOWED = {
@@ -81,6 +81,7 @@ def resolve_runtime_mode(
     surface: str,
     config: RuntimeConfig | None = None,
     env: Mapping[str, str] | None = None,
+    allow_environment_override: bool = True,
 ) -> RuntimeModeDecision:
     """Resolve and validate the runtime backend mode for a surface.
 
@@ -91,6 +92,11 @@ def resolve_runtime_mode(
         config: Optional runtime config used only for deployment-profile
             resolution.
         env: Optional environment mapping.
+        allow_environment_override: Whether surface-local backend environment
+            variables (``SPINE_UI_BACKEND`` / ``SPINE_HEADLESS_BACKEND``) may
+            supply an implicit backend choice when ``explicit_mode`` is not
+            provided. Unified launcher paths should disable this so deployment
+            profile policy remains the single source of truth.
 
     Returns:
         Resolved, profile-validated backend decision.
@@ -101,10 +107,15 @@ def resolve_runtime_mode(
 
     Boundary behaviour:
         - When no explicit mode is provided, the resolver chooses a documented
-          default based on deployment profile and runtime surface.
+          default based on deployment profile and runtime surface. Surface-local
+          environment overrides are only consulted when
+          ``allow_environment_override`` is enabled.
         - Research and clinical surfaces do not silently fall back to mock;
           callers must run a live backend that matches the intended control
           plane.
+        - Desktop is the real operator station. ``api`` is therefore limited to
+          explicit review/integration surfaces and is rejected for live write
+          profiles.
         - Review headless defaults to ``core``; explicit ``mock`` is only for
           read-only evidence / replay / contract inspection flows.
     """
@@ -114,7 +125,9 @@ def resolve_runtime_mode(
     if normalized:
         resolution_source = "explicit"
     else:
-        env_candidates = [source.get("SPINE_HEADLESS_BACKEND")] if surface == "headless" else [source.get("SPINE_UI_BACKEND")]
+        env_candidates = []
+        if allow_environment_override:
+            env_candidates = [source.get("SPINE_HEADLESS_BACKEND")] if surface == "headless" else [source.get("SPINE_UI_BACKEND")]
         normalized = next((value for value in (_normalize_mode(item) for item in env_candidates) if value), "")
         resolution_source = "environment" if normalized else "profile_default"
     if not normalized:

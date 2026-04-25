@@ -14,7 +14,7 @@ def test_verify_cpp_build_evidence_emits_truthful_fallback_report(tmp_path: Path
         [
             sys.executable,
             'scripts/verify_cpp_build_evidence.py',
-            '--profile', 'mock',
+            '--profile', 'dev',
             '--target-timeout-sec', '1',
             '--report', str(report),
         ],

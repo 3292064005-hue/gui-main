@@ -44,14 +44,6 @@ struct ClearInjectedFaultsRequest {
   std::optional<std::string> _command_context;
 };
 
-struct CompileScanPlanRequest {
-  static constexpr const char* kCommand = "compile_scan_plan";
-  std::optional<std::string> config_snapshot;
-  std::string scan_plan{};
-  std::optional<std::string> scan_plan_hash;
-  std::optional<std::string> _command_context;
-};
-
 struct ConnectRobotRequest {
   static constexpr const char* kCommand = "connect_robot";
   std::optional<std::string> local_ip;
@@ -335,13 +327,13 @@ struct StartRecordPathRequest {
   std::optional<std::string> _command_context;
 };
 
-struct StartScanRequest {
-  static constexpr const char* kCommand = "start_scan";
+struct StopRecordPathRequest {
+  static constexpr const char* kCommand = "stop_record_path";
   std::optional<std::string> _command_context;
 };
 
-struct StopRecordPathRequest {
-  static constexpr const char* kCommand = "stop_record_path";
+struct StopScanRequest {
+  static constexpr const char* kCommand = "stop_scan";
   std::optional<std::string> _command_context;
 };
 
@@ -364,7 +356,6 @@ using RuntimeTypedRequestVariant = std::variant<
     CancelRecordPathRequest,
     ClearFaultRequest,
     ClearInjectedFaultsRequest,
-    CompileScanPlanRequest,
     ConnectRobotRequest,
     DisableDragRequest,
     DisconnectRobotRequest,
@@ -421,8 +412,8 @@ using RuntimeTypedRequestVariant = std::variant<
     SetManualModeRequest,
     StartProcedureRequest,
     StartRecordPathRequest,
-    StartScanRequest,
     StopRecordPathRequest,
+    StopScanRequest,
     ValidateScanPlanRequest,
     ValidateSetupRequest
 >;

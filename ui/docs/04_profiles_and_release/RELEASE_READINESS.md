@@ -9,7 +9,7 @@ status: active
 # Release Readiness
 
 ## Purpose
-Define readiness expectations for mock, HIL, and production-like release paths.
+Define readiness expectations for deployment profiles and their repository/live evidence boundaries.
 
 ## Required evidence families
 - repository gates
@@ -20,24 +20,26 @@ Define readiness expectations for mock, HIL, and production-like release paths.
 - release ledger (`release_ledger.json`) that indexes the linked proof files
 
 ## Readiness rules
-- Python-only or repository-only verification cannot be described as HIL/prod proof.
+- Python-only or repository-only verification cannot be described as research/clinical proof.
 - If a release claim depends on authoritative SDK/model execution, the evidence must come from a build/test path that actually enables those components.
 - Rollback instructions must exist for every release profile that can issue real robot writes.
 
 ## Release package rule
 - Final acceptance output must include a single `release_ledger.json` that links verification report, build evidence report, and acceptance summary, plus either a local readiness manifest or an archived live bundle that embeds the readiness manifest for that claim path.
 - The release ledger is an index, not a claim amplifier; if linked evidence remains repository/sandbox-only, the ledger must preserve that boundary.
+- `research` and `clinical` release ledgers are fail-closed: they must link an archived live/HIL evidence bundle validated by the verification report, or ledger generation must fail.
 
 ## Deployment baseline
 ### Supported profiles
 - `dev`: local iteration, relaxed seal requirements, debug-oriented logging
-- `research`: writable runtime with strong evidence and provenance capture
+- `lab`: controlled rehearsal / bring-up profile
+- `research`: writable preclinical execution profile with strong evidence and provenance capture
 - `clinical`: strict control authority, token-gated writes, strict evidence sealing
 - `review`: read-only replay/review/export profile
 
 ### Operator entrypoints
 - `scripts/start_mainline.py` is the single launcher contract for desktop/headless bring-up.
-- `start_prod.sh` and `start_headless.sh` are wrappers and must not redefine backend/profile policy.
+- wrapper launchers must not redefine backend/profile/build/model policy; they only bind named deployment profiles such as `research` or `clinical` into `scripts/start_mainline.py`. Unified launcher `auto` backend resolution ignores stale low-level surface backend env so wrapper/CLI profile intent remains authoritative.
 
 ### Primary smoke and preflight
 ```bash

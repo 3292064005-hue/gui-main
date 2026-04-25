@@ -111,10 +111,23 @@ set(CORE_RUNTIME_SOURCES
   src/runtime_command_contracts.cpp
   src/core_runtime.cpp
   src/core_runtime_dispatcher.cpp
+  src/core_runtime_query_commands.cpp
+  src/core_runtime_query_operational.cpp
+  src/core_runtime_query_motion.cpp
+  src/core_runtime_query_identity.cpp
+  src/core_runtime_query_contracts.cpp
   src/core_runtime_contract_publisher.cpp
   src/core_runtime_power_validation.cpp
+  src/core_runtime_authority.cpp
   src/core_runtime_session_execution.cpp
+  src/core_runtime_session_commands.cpp
+  src/core_runtime_execution_commands.cpp
   src/core_runtime_contracts.cpp
+  src/core_runtime_contract_identity.cpp
+  src/core_runtime_contract_safety.cpp
+  src/core_runtime_contract_governance.cpp
+  src/core_runtime_contract_execution.cpp
+  src/core_runtime_contract_release.cpp
   src/core_runtime_contract_projection.cpp
   src/core_runtime_contract_envelope.cpp
   src/runtime_state_store.cpp
@@ -138,11 +151,14 @@ set(CORE_RUNTIME_SOURCES
   src/scan_plan_validator.cpp
   src/state_machine_guard.cpp
   src/rt_motion_service.cpp
+  src/rt_host_bootstrap.cpp
+  src/deployment_policy.cpp
   src/safety_service.cpp
   src/sdk_robot_facade.cpp
   src/sdk_robot_facade_lifecycle.cpp
   src/sdk_robot_facade_nrt.cpp
   src/sdk_robot_facade_rt.cpp
+  src/sdk_robot_facade_rt_phase.cpp
   src/sdk_robot_facade_rt_contract.cpp
   src/sdk_robot_facade_cache.cpp
   src/sdk_robot_facade_ports.cpp
@@ -160,11 +176,17 @@ set(CORE_RUNTIME_SOURCES
 add_library(spine_robot_core_runtime STATIC ${CORE_RUNTIME_SOURCES} ${GENERATED_RUNTIME_COMMAND_MANIFEST_INC})
 set_source_files_properties(
   src/core_runtime_contracts.cpp
+  src/core_runtime_contract_identity.cpp
+  src/core_runtime_contract_safety.cpp
+  src/core_runtime_contract_governance.cpp
+  src/core_runtime_contract_execution.cpp
+  src/core_runtime_contract_release.cpp
   src/core_runtime_contract_projection.cpp
   src/core_runtime_contract_envelope.cpp
   src/runtime_state_store.cpp
   src/sdk_robot_facade.cpp
   src/sdk_robot_facade_rt.cpp
+  src/sdk_robot_facade_rt_phase.cpp
   src/sdk_robot_facade_rt_contract.cpp
   src/normal_axis_admittance_controller.cpp
   src/tangential_scan_controller.cpp

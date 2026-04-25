@@ -19,14 +19,14 @@ mix simulated, replay, and live inputs under the same operational claim.
 - Preview: allowed for live/replay/simulated.
 - Session lock: allowed.
 - Execution write: allowed.
-- Contract-shell writes: allowed.
+- Contract-shell writes: forbidden.
 - Semantics: local iteration only.
 
 ### lab
 - Preview: allowed for live/replay/simulated.
 - Session lock: blocked when guidance is simulated.
 - Execution write: allowed.
-- Contract-shell writes: allowed.
+- Contract-shell writes: forbidden.
 - Semantics: controlled bring-up and rehearsal.
 
 ### research
@@ -53,7 +53,7 @@ mix simulated, replay, and live inputs under the same operational claim.
 ## Export placeholder boundary
 
 Dataset export keeps a deterministic directory contract, but placeholder files are **not**
-authoritative evidence. Every exported case writes `export_manifest.json` with:
+authoritative evidence and are forbidden as formal lifecycle materialization for dataset/export/training evidence-chain artifacts. Every exported case writes `export_manifest.json` with:
 
 - `artifact_states`
 - `integrity_state`
@@ -76,4 +76,4 @@ If this boundary needs temporary rollback for local debugging:
 1. use `SPINE_DEPLOYMENT_PROFILE=dev`, or
 2. use `SPINE_DEPLOYMENT_PROFILE=lab` for controlled rehearsal.
 
-Research and clinical profiles must not be rolled back to contract-shell writes.
+No deployment profile may be rolled back to contract-shell writes.

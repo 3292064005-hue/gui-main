@@ -1,5 +1,7 @@
 #pragma once
 #include <atomic>
+#include <condition_variable>
+#include <deque>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -33,6 +35,8 @@ private:
   void statePollLoop();
   void watchdogLoop();
   void telemetryLoop();
+  void telemetryBroadcastLoop();
+  void enqueueTelemetryMessages(std::vector<spine_core::TelemetryEnvelope> messages);
   void broadcastProtobufLocked(const std::vector<spine_core::TelemetryEnvelope>& messages);
 
   RobotCoreState state_{RobotCoreState::Boot};
@@ -43,6 +47,9 @@ private:
   int telemetry_server_fd_{-1};
   mutable std::mutex telemetry_clients_mutex_;
   std::vector<TelemetryClient> telemetry_clients_;
+  std::mutex telemetry_queue_mutex_;
+  std::condition_variable telemetry_queue_cv_;
+  std::deque<std::vector<spine_core::TelemetryEnvelope>> telemetry_queue_;
   CoreRuntime runtime_{};
   TelemetryPublisher telemetry_publisher_{};
   std::thread command_thread_;
@@ -51,6 +58,7 @@ private:
   std::thread state_poll_thread_;
   std::thread watchdog_thread_;
   std::thread telemetry_thread_;
+  std::thread telemetry_broadcast_thread_;
 
   // TLS support
   SSL_CTX* ssl_ctx_{nullptr};

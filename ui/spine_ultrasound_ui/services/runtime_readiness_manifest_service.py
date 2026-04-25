@@ -110,6 +110,21 @@ class RuntimeReadinessManifestService:
                 "preferred_link": runtime_config.preferred_link,
                 "remote_ip": runtime_config.remote_ip,
                 "local_ip": runtime_config.local_ip,
+                "rt_host_bootstrap": {
+                    "env_policy_keys": [
+                        "SPINE_RT_SCHED_POLICY",
+                        "SPINE_RT_SCHED_PRIORITY",
+                        "SPINE_RT_CPU_SET",
+                        "SPINE_RT_FIXED_HOST_ID",
+                        "SPINE_RT_REQUIRE_SCHEDULER",
+                        "SPINE_RT_REQUIRE_AFFINITY",
+                        "SPINE_RT_REQUIRE_MEMORY_LOCK",
+                        "SPINE_RT_REQUIRE_FIXED_HOST_ID",
+                    ],
+                    "systemd_unit": "configs/systemd/spine-cpp-core.service",
+                    "contract_matrix": "configs/runtime/rt_host_profiles.json",
+                    "contract_label_env": "SPINE_RT_HOST_CONTRACT_LABEL",
+                },
             },
         }
 

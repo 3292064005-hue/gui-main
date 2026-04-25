@@ -47,16 +47,6 @@
     return true;
   }
 
-  if (command == "compile_scan_plan") {
-    CompileScanPlanRequest typed{};
-    if (request.hasObjectField("config_snapshot")) typed.config_snapshot = request.objectFieldJson("config_snapshot");
-    typed.scan_plan = request.objectFieldJson("scan_plan");
-    if (request.hasStringField("scan_plan_hash")) typed.scan_plan_hash = request.stringField("scan_plan_hash");
-    if (request.hasObjectField("_command_context")) typed._command_context = request.objectFieldJson("_command_context");
-    if (typed_request != nullptr) *typed_request = std::move(typed);
-    return true;
-  }
-
   if (command == "connect_robot") {
     ConnectRobotRequest typed{};
     if (request.hasStringField("local_ip")) typed.local_ip = request.stringField("local_ip");
@@ -452,15 +442,15 @@
     return true;
   }
 
-  if (command == "start_scan") {
-    StartScanRequest typed{};
+  if (command == "stop_record_path") {
+    StopRecordPathRequest typed{};
     if (request.hasObjectField("_command_context")) typed._command_context = request.objectFieldJson("_command_context");
     if (typed_request != nullptr) *typed_request = std::move(typed);
     return true;
   }
 
-  if (command == "stop_record_path") {
-    StopRecordPathRequest typed{};
+  if (command == "stop_scan") {
+    StopScanRequest typed{};
     if (request.hasObjectField("_command_context")) typed._command_context = request.objectFieldJson("_command_context");
     if (typed_request != nullptr) *typed_request = std::move(typed);
     return true;

@@ -32,9 +32,9 @@ Historical and non-mainline retained material lives under `archive/` and must no
 - Session freeze and runtime envelope are the authoritative cross-layer artifacts.
 
 ## Backend surfaces
-- `mock`: contract and UI development only.
+- `mock`: contract-replay and UI development only.
 - `core`: authoritative runtime transport surface.
-- `api`: explicit integration/review surface, not a substitute for robot-core truth.
+- `api`: explicit integration/review surface, not a substitute for robot-core truth and not a live operator backend for research/clinical desktop execution.
 
 ## Robot mainline identity
 Current formal robot mainline is restricted to the xMate collaborative path declared in runtime/profile policy. Identity drift across docs, Python, and C++ must be rejected.

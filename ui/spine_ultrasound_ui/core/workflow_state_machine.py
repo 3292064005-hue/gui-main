@@ -30,7 +30,6 @@ class WorkflowStateMachine:
         "generate_path": "生成扫查路径",
         "approve_localization_review": "批准视觉引导复核",
         "start_procedure": "开始扫查",
-        "start_scan": "开始扫查",
         "pause_scan": "暂停扫查",
         "resume_scan": "恢复扫查",
         "stop_scan": "停止扫查",
@@ -114,11 +113,6 @@ class WorkflowStateMachine:
                 ok_reason="路径预览完成，可执行扫查启动链。",
                 blocked_reason=self._start_scan_reason(ctx, plan_ready),
             ),
-            "start_scan": self._rule(
-                plan_ready and s in {SystemState.AUTO_READY, SystemState.PATH_VALIDATED, SystemState.SCAN_COMPLETE},
-                ok_reason="路径预览完成，可执行扫查启动链。",
-                blocked_reason=self._start_scan_reason(ctx, plan_ready),
-            ),
             "pause_scan": self._rule(
                 s == SystemState.SCANNING,
                 ok_reason="当前处于扫查中，可暂停。",
@@ -131,7 +125,7 @@ class WorkflowStateMachine:
             ),
             "stop_scan": self._rule(
                 s in {SystemState.SCANNING, SystemState.PAUSED_HOLD, SystemState.APPROACHING, SystemState.CONTACT_SEEKING, SystemState.CONTACT_STABLE},
-                ok_reason="当前流程中允许中止并回退。",
+                ok_reason="当前流程中允许结束本轮扫查并进入有序收口。",
                 blocked_reason="当前没有正在执行的扫查链路。",
             ),
             "safe_retreat": self._rule(

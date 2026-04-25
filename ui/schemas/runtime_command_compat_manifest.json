@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "policy": "retired_aliases_are_not_active_runtime_commands",
+  "retired_aliases": [
+    {
+      "name": "compile_scan_plan",
+      "required_payload_fields": [
+        "scan_plan"
+      ],
+      "required_nested_fields": {
+        "scan_plan": [
+          "plan_id",
+          "segments",
+          "plan_hash"
+        ]
+      },
+      "field_types": {
+        "scan_plan": "object",
+        "config_snapshot": "object",
+        "scan_plan_hash": "string"
+      },
+      "state_preconditions": [
+        "AUTO_READY",
+        "SESSION_LOCKED",
+        "PATH_VALIDATED",
+        "SCAN_COMPLETE"
+      ],
+      "write_command": false,
+      "capability_claim": "plan_compile",
+      "canonical_command": "validate_scan_plan",
+      "alias_kind": "shim_only",
+      "handler_group": "handleValidationCommand",
+      "deprecation_stage": "retired",
+      "removal_target": "implemented-mainline-convergence",
+      "replacement_command": "validate_scan_plan",
+      "compatibility_note": "Retired from the active runtime command catalog. Call the replacement command directly; no transport shim is registered.",
+      "retired_from_active_manifest": true,
+      "retirement_reason": "mainline architecture convergence requires canonical-only runtime command surface"
+    },
+    {
+      "name": "start_scan",
+      "required_payload_fields": [],
+      "state_preconditions": [
+        "PATH_VALIDATED",
+        "CONTACT_STABLE",
+        "PAUSED_HOLD"
+      ],
+      "capability_claim": "rt_motion_write",
+      "write_command": true,
+      "canonical_command": "start_procedure",
+      "alias_kind": "shim_only",
+      "handler_group": "handleExecutionCommand",
+      "deprecation_stage": "retired",
+      "removal_target": "implemented-mainline-convergence",
+      "replacement_command": "start_procedure",
+      "compatibility_note": "Retired from the active runtime command catalog. Call the replacement command directly; no transport shim is registered.",
+      "retired_from_active_manifest": true,
+      "retirement_reason": "mainline architecture convergence requires canonical-only runtime command surface"
+    }
+  ]
+}

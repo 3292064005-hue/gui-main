@@ -109,7 +109,7 @@ def test_runtime_command_contracts_capture_optional_typed_request_fields() -> No
 
 
 def test_cpp_runtime_handlers_no_longer_parse_payload_json_directly() -> None:
-    session_exec = Path('cpp_robot_core/src/core_runtime_session_execution.cpp').read_text(encoding='utf-8')
+    session_exec = Path('cpp_robot_core/src/core_runtime_session_commands.cpp').read_text(encoding='utf-8')
     power_validation = Path('cpp_robot_core/src/core_runtime_power_validation.cpp').read_text(encoding='utf-8')
     core_runtime = Path('cpp_robot_core/src/core_runtime.cpp').read_text(encoding='utf-8')
     assert 'payload_json' not in session_exec
@@ -141,7 +141,8 @@ def test_cpp_runtime_handlers_resolve_generated_typed_requests_instead_of_generi
     for rel in (
         'cpp_robot_core/src/core_runtime.cpp',
         'cpp_robot_core/src/core_runtime_power_validation.cpp',
-        'cpp_robot_core/src/core_runtime_session_execution.cpp',
+        'cpp_robot_core/src/core_runtime_session_commands.cpp',
+        'cpp_robot_core/src/core_runtime_execution_commands.cpp',
     ):
         source = Path(rel).read_text(encoding='utf-8')
         assert 'requestAs<' in source
@@ -182,12 +183,12 @@ def test_rt_quality_observed_fixture_exists_and_contains_loop_samples() -> None:
 
 
 def test_write_and_plan_compile_commands_expose_command_context_contract() -> None:
-    start_scan = contract_for('start_scan')
+    start_procedure = contract_for('start_procedure')
     compile_plan = contract_for('validate_scan_plan')
-    start_scan_fields = {field.name: field for field in start_scan.request_contract.fields}
+    start_fields = {field.name: field for field in start_procedure.request_contract.fields}
     compile_fields = {field.name: field for field in compile_plan.request_contract.fields}
-    assert '_command_context' in start_scan_fields
-    assert start_scan_fields['_command_context'].field_type == 'object'
+    assert '_command_context' in start_fields
+    assert start_fields['_command_context'].field_type == 'object'
     assert '_command_context' in compile_fields
     assert compile_fields['_command_context'].field_type == 'object'
 

@@ -37,7 +37,7 @@ def test_app_controller_locks_session_only_when_scan_starts(tmp_path):
     controller.generate_path()
     assert controller.workflow_artifacts.preview_plan_ready is True
     assert controller.workflow_artifacts.session_locked is False
-    controller.start_scan()
+    controller.start_procedure()
     assert controller.workflow_artifacts.session_locked is True
     assert controller.session_service.current_experiment.session_id
     manifest_path = controller.session_service.current_session_dir / "meta" / "manifest.json"
@@ -65,7 +65,7 @@ def test_app_controller_rolls_back_local_session_if_core_lock_fails(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     assert controller.workflow_artifacts.session_locked is False
     assert controller.session_service.current_session_dir is None
     assert controller.session_service.current_experiment.session_id == ""
@@ -81,7 +81,7 @@ def test_app_controller_rejects_config_updates_after_session_lock(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     try:
         controller.update_config(RuntimeConfig(pressure_target=1.8))
@@ -91,20 +91,20 @@ def test_app_controller_rejects_config_updates_after_session_lock(tmp_path):
         raise AssertionError("config updates should be blocked after session lock")
 
 
-def test_app_controller_requests_safe_retreat_if_scan_start_chain_fails(tmp_path):
-    class SeekContactFailBackend(MockBackend):
+def test_app_controller_observes_runtime_owned_recovery_without_desktop_safe_retreat(tmp_path):
+    class RuntimeOwnedRecoveryBackend(MockBackend):
         def __init__(self, root_dir: Path):
             super().__init__(root_dir)
             self.commands: list[str] = []
 
         def send_command(self, command, payload=None):
             self.commands.append(command)
-            if command == "seek_contact":
-                return ReplyEnvelope(ok=False, message="contact failed", data={})
+            if command == "start_procedure":
+                super().send_command("inject_fault", {"fault_name": "start_procedure_phase_fault"})
             return super().send_command(command, payload)
 
     _app()
-    backend = SeekContactFailBackend(Path(tmp_path))
+    backend = RuntimeOwnedRecoveryBackend(Path(tmp_path))
     controller = AppController(Path(tmp_path), backend)
     controller.connect_robot()
     controller.power_on()
@@ -112,9 +112,10 @@ def test_app_controller_requests_safe_retreat_if_scan_start_chain_fails(tmp_path
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
-    assert "safe_retreat" in backend.commands
+    assert backend.commands.count("safe_retreat") == 0
+    assert backend.runtime.execution_state.value == "RETREATING"
     assert controller.workflow_artifacts.session_locked is True
 
 
@@ -138,7 +139,7 @@ def test_app_controller_loads_session_bound_scan_plan_after_lock(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     assert backend.loaded_plan is not None
     assert backend.loaded_plan.get("session_id") == controller.workflow_artifacts.session_id
@@ -166,7 +167,7 @@ def test_app_controller_keeps_session_locked_if_load_scan_plan_fails(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
 
     assert controller.workflow_artifacts.session_locked is True
     assert controller.session_service.current_session_dir is not None
@@ -194,7 +195,7 @@ def test_app_controller_requests_safe_retreat_if_pause_scan_fails(tmp_path):
     controller.create_experiment()
     controller.run_localization()
     controller.generate_path()
-    controller.start_scan()
+    controller.start_procedure()
     controller.pause_scan()
 
     assert backend.commands.count("safe_retreat") >= 1

@@ -41,11 +41,11 @@ def test_bridge_observability_blocks_when_command_not_observed() -> None:
     service = BridgeObservabilityService()
     result = service.build(
         store,
-        {"control_plane": {"command_window": {"recent_commands": [{"command": "start_scan", "ok": True, "message": "started"}]}}},
+        {"control_plane": {"command_window": {"recent_commands": [{"command": "start_procedure", "ok": True, "message": "started"}]}}},
         WorkflowArtifacts(session_locked=True),
     )
     assert result["summary_state"] == "blocked"
-    assert result["command_observability"]["latest_checked_command"] == "start_scan"
+    assert result["command_observability"]["latest_checked_command"] == "start_procedure"
     assert result["command_observability"]["summary_label"] == "命令确认缺失"
 
 

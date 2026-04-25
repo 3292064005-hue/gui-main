@@ -18,14 +18,16 @@ from spine_ultrasound_ui.services.runtime_mode_policy import resolve_runtime_mod
 def main() -> int:
     """Print the resolved headless backend mode.
 
-    The script accepts no arguments and derives the decision from the current
-    environment so shell launchers can stay synchronized with the Python policy
-    source of truth.
+    The script accepts no arguments and derives the deployment-profile default
+    from runtime policy while intentionally ignoring stale low-level surface
+    backend environment overrides. Unified launchers must pass explicit backend
+    intent via `SPINE_MAINLINE_BACKEND` or CLI flags instead of `SPINE_HEADLESS_BACKEND`.
     """
     decision = resolve_runtime_mode(
-        explicit_mode=os.environ.get('SPINE_HEADLESS_BACKEND'),
+        explicit_mode=None,
         surface='headless',
         env=dict(os.environ),
+        allow_environment_override=False,
     )
     print(json.dumps(decision.to_dict(), ensure_ascii=False))
     return 0
